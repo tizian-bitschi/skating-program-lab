@@ -1,0 +1,6 @@
+[package]
+name = "skating-program-lab"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+description = "Foundation for technical figure skating program planning"
