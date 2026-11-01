@@ -15,4 +15,4 @@ This review covers the 16 July 2026 Adult announcement for Vernon 2026 and Obers
 
 An unfinished program may contain a selected jump whose rotation count has not yet been chosen, or a spin whose planned features have not yet been entered. Those values remain unspecified so the tool can retain the draft and identify the information needed for a complete check. The tool must not infer a jump, a call or a level from a missing field. An explicitly empty list of feature attempts means the skater has entered none; an unspecified list does not make that claim. Whether a user interface needs to expose this distinction is a product decision, not an ISU requirement.
 
-A human domain review remains an explicit acceptance criterion of issue #1. The findings above are a source review, not a record of independent human approval.
+Issue #1 originally requested independent human domain review. The repository owner explicitly waived further human domain review and instructed the project to follow the ISU rules. The findings above document a source review; no independent human domain approval is claimed.
