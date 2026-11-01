@@ -166,10 +166,45 @@ fn single_judge_scores_follow_source_rows() {
         assert_eq!(score.base.table, TABLE);
         assert!(score.goe_source.location.contains("GOE column +1"));
         assert_eq!(score.consistency_source.version, "2026-05-19");
-        for grade in -5..=5 {
+        let (values, section, notation) = match code {
+            "1Lz" => (
+                [-30, -24, -18, -12, -6, 0, 6, 12, 18, 24, 30],
+                "p. 2, Jumps",
+                "1Lz",
+            ),
+            "CSSp" => (
+                [-115, -92, -69, -46, -23, 0, 23, 46, 69, 92, 115],
+                "p. 8, Spins",
+                "CSSp1",
+            ),
+            _ => (
+                [-250, -200, -150, -100, -50, 0, 50, 100, 150, 200, 250],
+                "p. 14, Choreographic Elements",
+                "ChSp1",
+            ),
+        };
+        for (grade, expected) in (-5..=5).zip(values) {
             let score = score_element(TABLE, &r, &[], grade, Some(false)).unwrap();
-            assert_eq!(score.goe_hundredths, adjustment * i16::from(grade));
+            assert_eq!(score.goe_hundredths, expected);
+            let column = if grade == 0 {
+                "BASE (zero adjustment)".to_string()
+            } else {
+                format!("GOE column {grade:+}")
+            };
+            assert_eq!(
+                score.goe_source,
+                SourceReference {
+                    document: "ISU Communication 2786".into(),
+                    version: "2026-06-02".into(),
+                    location: format!("{section}, {column}, row {notation}"),
+                }
+            );
         }
+        assert_eq!(
+            score_element(TABLE, &r, &[], -2, Some(true)),
+            Err(ElementScoreError::InconsistentFall)
+        );
+        assert!(score_element(TABLE, &r, &[], -3, Some(true)).is_ok());
     }
 }
 
@@ -219,5 +254,66 @@ fn scoring_rejects_incomplete_or_inconsistent_inputs() {
             Some(false)
         ),
         Err(ElementScoreError::BaseValue(BaseValueError::Unsupported))
+    );
+}
+
+#[test]
+fn score_preserves_outcomes_and_rejects_unknowns_and_combinations() {
+    let mut r = recognition("1Lz", None, Some(vec![PanelCall::Downgraded]));
+    assert!(matches!(
+        lookup_base_value(TABLE, &r, &[]),
+        Ok(BaseValueOutcome::Value(BaseValue { hundredths: 0, .. }))
+    ));
+    assert_eq!(
+        score_element(TABLE, &r, &[], -3, Some(false)),
+        Err(ElementScoreError::UnsupportedMarks)
+    );
+    r.outcome = RecognitionOutcome::Ignored;
+    assert_eq!(
+        score_element(TABLE, &r, &[], 0, Some(false)),
+        Err(ElementScoreError::Ignored)
+    );
+    r.outcome = RecognitionOutcome::NoValue;
+    assert_eq!(
+        score_element(TABLE, &r, &[], 0, Some(false)),
+        Err(ElementScoreError::NoValue)
+    );
+    let unknown = recognition("1Lz", None, None);
+    assert_eq!(
+        score_element(TABLE, &unknown, &[], 0, Some(false)),
+        Err(ElementScoreError::BaseValue(BaseValueError::UnknownCalls))
+    );
+    let mut combo = recognition("1Lz", None, Some(vec![]));
+    combo.details = Some(
+        RecognitionDetails::new(
+            vec![
+                ComponentCode::try_from("1Lz").unwrap(),
+                ComponentCode::try_from("1T").unwrap(),
+            ],
+            None,
+            Some(vec![]),
+        )
+        .unwrap(),
+    );
+    assert_eq!(
+        score_element(TABLE, &combo, &[], 0, Some(false)),
+        Err(ElementScoreError::BaseValue(BaseValueError::Unsupported))
+    );
+    assert_eq!(
+        RecognitionDetails::new(
+            vec![ComponentCode::try_from("1Lz").unwrap()],
+            None,
+            Some(vec![
+                RecordedCall {
+                    target: CallTarget::Component(0),
+                    call: PanelCall::Quarter
+                },
+                RecordedCall {
+                    target: CallTarget::Component(0),
+                    call: PanelCall::UnderRotated
+                }
+            ])
+        ),
+        Err(RecognitionError::ConflictingCalls)
     );
 }

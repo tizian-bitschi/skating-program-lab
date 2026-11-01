@@ -27,6 +27,85 @@ pub enum BaseValueError {
     Unsupported,
 }
 
+struct TableRow {
+    hundredths: u16,
+    goe: Option<[i16; 11]>,
+    table: ScoringTableId,
+    notation: String,
+    document: &'static str,
+    version: &'static str,
+    section: &'static str,
+}
+
+impl TableRow {
+    fn source(&self, column: &str) -> SourceReference {
+        SourceReference {
+            document: self.document.into(),
+            version: self.version.into(),
+            location: format!("{}, {column}, row {}", self.section, self.notation),
+        }
+    }
+    fn base(&self) -> BaseValue {
+        BaseValue {
+            hundredths: self.hundredths,
+            table: self.table,
+            notation: self.notation.clone(),
+            source: self.source("BASE column"),
+        }
+    }
+}
+
+fn table_row(
+    table: ScoringTableId,
+    recognition: &PanelRecognition,
+) -> Result<TableRow, BaseValueError> {
+    let details = recognition
+        .details
+        .as_ref()
+        .ok_or(BaseValueError::UnknownDetails)?;
+    let notation = details.notation().ok_or(BaseValueError::UnknownCalls)?;
+    if details.components().len() != 1 {
+        return Err(BaseValueError::Unsupported);
+    }
+    let (hundredths, section, goe) = match table {
+        ScoringTableId::Isu2786June2_2026 => match (notation.as_str(), details.level()) {
+            ("1Lz", None) => (
+                60,
+                "p. 2, Jumps",
+                Some([-30, -24, -18, -12, -6, 0, 6, 12, 18, 24, 30]),
+            ),
+            ("1Lzq", None) | ("1Lz!", None) => (60, "p. 2, Jumps", None),
+            ("1Lz<", None) | ("1Lze", None) => (48, "p. 2, Jumps", None),
+            ("1Lz<<", None) => (0, "p. 2, Jumps", None),
+            ("1Lze<", None) => (36, "p. 2, Jumps", None),
+            ("1A<<", None) => (0, "p. 3, Jumps", None),
+            ("CSSp1", Some(Level::One)) => (
+                230,
+                "p. 8, Spins",
+                Some([-115, -92, -69, -46, -23, 0, 23, 46, 69, 92, 115]),
+            ),
+            ("ChSp1", None) => (
+                350,
+                "p. 14, Choreographic Elements",
+                Some([-250, -200, -150, -100, -50, 0, 50, 100, 150, 200, 250]),
+            ),
+            _ => return Err(BaseValueError::Unsupported),
+        },
+    };
+    let (document, version) = match table {
+        ScoringTableId::Isu2786June2_2026 => ("ISU Communication 2786", "2026-06-02"),
+    };
+    Ok(TableRow {
+        hundredths,
+        goe,
+        table,
+        notation,
+        document,
+        version,
+        section,
+    })
+}
+
 /// Look up a supplied panel outcome. This does not establish event eligibility.
 pub fn lookup_base_value(
     table: ScoringTableId,
@@ -37,41 +116,13 @@ pub fn lookup_base_value(
         return Err(BaseValueError::Unsupported);
     }
     match recognition.outcome {
-        RecognitionOutcome::Ignored => return Ok(BaseValueOutcome::Ignored),
-        RecognitionOutcome::NoValue => return Ok(BaseValueOutcome::NoValue),
-        RecognitionOutcome::Unknown => return Err(BaseValueError::UnknownRecognition),
-        RecognitionOutcome::Recognized => {}
+        RecognitionOutcome::Ignored => Ok(BaseValueOutcome::Ignored),
+        RecognitionOutcome::NoValue => Ok(BaseValueOutcome::NoValue),
+        RecognitionOutcome::Unknown => Err(BaseValueError::UnknownRecognition),
+        RecognitionOutcome::Recognized => Ok(BaseValueOutcome::Value(
+            table_row(table, recognition)?.base(),
+        )),
     }
-    let details = recognition
-        .details
-        .as_ref()
-        .ok_or(BaseValueError::UnknownDetails)?;
-    let notation = details.notation().ok_or(BaseValueError::UnknownCalls)?;
-    if details.components().len() != 1 {
-        return Err(BaseValueError::Unsupported);
-    }
-    let (hundredths, location) = match table {
-        ScoringTableId::Isu2786June2_2026 => match (notation.as_str(), details.level()) {
-            ("1Lz", None) | ("1Lzq", None) | ("1Lz!", None) => (60, "p. 2, Jumps, BASE column"),
-            ("1Lz<", None) | ("1Lze", None) => (48, "p. 2, Jumps, BASE column"),
-            ("1Lz<<", None) => (0, "p. 2, Jumps, BASE column"),
-            ("1Lze<", None) => (36, "p. 2, Jumps, BASE column"),
-            ("1A<<", None) => (0, "p. 3, Jumps, BASE column"),
-            ("CSSp1", Some(Level::One)) => (230, "p. 8, Spins, BASE column"),
-            ("ChSp1", None) => (350, "p. 14, Choreographic Elements, BASE column"),
-            _ => return Err(BaseValueError::Unsupported),
-        },
-    };
-    Ok(BaseValueOutcome::Value(BaseValue {
-        hundredths,
-        table,
-        source: SourceReference {
-            document: "ISU Communication 2786".into(),
-            version: "2026-06-02".into(),
-            location: format!("{location}, row {notation}"),
-        },
-        notation,
-    }))
 }
 
 /// A single hypothetical judge's unfactored element score, in hundredths.
@@ -88,7 +139,8 @@ pub struct ElementScore {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ElementScoreError {
     BaseValue(BaseValueError),
-    NoScorableValue,
+    Ignored,
+    NoValue,
     InvalidGoe,
     UnknownFall,
     InconsistentFall,
@@ -107,40 +159,29 @@ pub fn score_element(
     if !(-5..=5).contains(&goe) {
         return Err(ElementScoreError::InvalidGoe);
     }
-    let base = match lookup_base_value(table, recognition, annotations)
+    match lookup_base_value(table, recognition, annotations)
         .map_err(ElementScoreError::BaseValue)?
     {
-        BaseValueOutcome::Value(value) => value,
-        BaseValueOutcome::Ignored | BaseValueOutcome::NoValue => {
-            return Err(ElementScoreError::NoScorableValue)
-        }
-    };
-    let per_grade = match base.notation.as_str() {
-        "1Lz" => 6,
-        "CSSp1" => 23,
-        "ChSp1" => 50,
-        _ => return Err(ElementScoreError::UnsupportedMarks),
-    };
+        BaseValueOutcome::Ignored => return Err(ElementScoreError::Ignored),
+        BaseValueOutcome::NoValue => return Err(ElementScoreError::NoValue),
+        BaseValueOutcome::Value(_) => {}
+    }
+    let row = table_row(table, recognition).map_err(ElementScoreError::BaseValue)?;
+    let goe_values = row.goe.ok_or(ElementScoreError::UnsupportedMarks)?;
     match fall {
         None => return Err(ElementScoreError::UnknownFall),
         Some(true) if goe > -3 => return Err(ElementScoreError::InconsistentFall),
         _ => {}
     }
-    let goe_hundredths = i16::from(goe) * per_grade;
-    let score_hundredths = base.hundredths as i16 + goe_hundredths;
+    let goe_hundredths = goe_values[(goe + 5) as usize];
+    let score_hundredths = row.hundredths as i16 + goe_hundredths;
     let column = if goe == 0 {
         String::from("BASE (zero adjustment)")
     } else {
         format!("GOE column {goe:+}")
     };
-    let goe_source = SourceReference {
-        document: "ISU Communication 2786".into(),
-        version: "2026-06-02".into(),
-        location: format!(
-            "{}, {column}",
-            base.source.location.replace("BASE column, ", "")
-        ),
-    };
+    let goe_source = row.source(&column);
+    let base = row.base();
     let consistency_source = SourceReference {
         document: "ISU Communication 2788".into(),
         version: "2026-05-19".into(),
