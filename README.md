@@ -1,18 +1,24 @@
 # Skating Program Lab
 
-An open-source foundation for planning technical figure skating programs. The first intended scope is singles free skating at Bronze, Silver, Gold and Masters in the 2026/27 ISU-supported International Adult Figure Skating Competitions.
+An open-source Rust foundation for planning technical figure skating programs. The initial scope is singles Free Skating at Bronze, Silver, Gold and Masters in the 2026/27 ISU-supported International Adult competitions. The library provides partial validation and scoring and a [bounded Bronze optimizer](docs/specs/optimization.md#bounded-pumpkin-optimizer). An empty finding list does not establish complete compliance, and results are not official judging decisions.
 
-The planned core will validate programs, simulate technical scores and find programs with maximum base value under rules and personal constraints. The Rust library currently models season, category, supported ruleset and scoring-table identities, and source references. It partially validates Bronze jump eligibility, the four jump-element limit, combination structure and listed-jump repetitions; it also calculates limited source-linked scoring scenarios for selected elements and Bronze fall deductions. A bounded optimizer searches a documented three-slot Bronze 1Lz domain; it does not establish complete program compliance or a global maximum. Other validation rules are not implemented. See [requirements](docs/requirements.md#bounded-pumpkin-optimizer) for the assumptions and limits. An empty finding list does not establish full compliance. Results from future versions must not be treated as official judging decisions.
+## Documentation
+
+- Product scope and stages: [requirements](docs/requirements.md).
+- Module boundaries and data flow: [architecture](docs/architecture.md). Current support and tests: [implementation status](docs/implementation-status.md).
+- Domain work: [Adult rules](docs/rules/isu-adult-2026-27.md), [source editions and open questions](docs/rule-sources.md), and [source review](docs/rule-review.md).
+- Feature work: [scoring](docs/specs/scoring.md) and [optimization](docs/specs/optimization.md). Solver evidence: [Pumpkin ADR](docs/adr/0001-pumpkin.md) and [comparison](docs/solver-comparison.md).
+- Coding agents: [AGENTS.md](AGENTS.md).
 
 ## Development
 
-Install Rust using `rustup`; the repository selects the required toolchain with `rustfmt` and `clippy`. Then run:
+Install Rust with `rustup`; the repository selects the toolchain, `rustfmt` and `clippy`. Run:
 
 ```sh
 cargo build
 cargo fmt --check
-cargo clippy -- -D warnings
+cargo clippy --all-targets -- -D warnings
 cargo test
 ```
 
-Read [requirements](docs/requirements.md), [architecture](docs/architecture.md), [rule sources](docs/rule-sources.md), and [agent instructions](AGENTS.md) before contributing. Licensed under the [MIT License](LICENSE).
+The [solver comparison](docs/solver-comparison.md) has separate checks. Licensed under the [MIT License](LICENSE).
