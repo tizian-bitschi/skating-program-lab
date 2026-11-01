@@ -66,7 +66,7 @@ fn finding(
     }
 }
 
-/// Checks Bronze jump eligibility only; an empty finding list does not establish compliance.
+/// Checks Bronze jump eligibility and element count; an empty list does not establish compliance.
 pub fn validate_program(program: &Program) -> ValidationResult {
     let mut result = ValidationResult {
         coverage: Coverage::Partial,
@@ -88,8 +88,10 @@ pub fn validate_program(program: &Program) -> ValidationResult {
         ));
         return result;
     }
+    let mut jump_count = 0;
     for (index, element) in program.elements.iter().enumerate() {
         if let PlannedElement::Jump(jump) = element {
+            jump_count += 1;
             match jump {
                 JumpElement::Solo(jump) => check_jump(jump, index, None, &mut result.findings),
                 JumpElement::Combination(parts) | JumpElement::Sequence(parts) => {
@@ -101,6 +103,16 @@ pub fn validate_program(program: &Program) -> ValidationResult {
                 }
             }
         }
+    }
+    if jump_count > 4 {
+        let mut count_finding = finding(
+            FindingKind::Violation,
+            None,
+            None,
+            "Bronze permits at most four jump elements.",
+        );
+        count_finding.rule_id = "isu-adult-2026-27-bronze-jump-element-count";
+        result.findings.push(count_finding);
     }
     result
 }
