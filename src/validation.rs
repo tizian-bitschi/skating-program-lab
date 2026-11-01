@@ -22,6 +22,8 @@ pub struct Finding {
     pub rule_id: &'static str,
     /// Zero-based program element index; None denotes program-level scope.
     pub element_index: Option<usize>,
+    /// Zero-based index in the combination or sequence parts, including transitions.
+    pub component_index: Option<usize>,
     pub explanation: &'static str,
     pub source: SourceReference,
 }
@@ -31,17 +33,35 @@ pub struct ValidationResult {
     pub findings: Vec<Finding>,
 }
 
-fn finding(kind: FindingKind, element_index: Option<usize>, explanation: &'static str) -> Finding {
+fn finding(
+    kind: FindingKind,
+    element_index: Option<usize>,
+    component_index: Option<usize>,
+    explanation: &'static str,
+) -> Finding {
     Finding {
         kind,
-        rule_id: RULE,
+        rule_id: if kind == FindingKind::Unsupported {
+            "validator-scope"
+        } else {
+            RULE
+        },
         element_index,
+        component_index,
         explanation,
-        source: SourceReference {
-            document: "International Adult Figure Skating Competitions Technical Announcement"
-                .into(),
-            version: "2026-07-16".into(),
-            location: "p. 11, Bronze Free Skating, jumps".into(),
+        source: if kind == FindingKind::Unsupported {
+            SourceReference {
+                document: "Skating Program Lab architecture".into(),
+                version: "issue-13".into(),
+                location: "Current state, validator scope".into(),
+            }
+        } else {
+            SourceReference {
+                document: "International Adult Figure Skating Competitions Technical Announcement"
+                    .into(),
+                version: "2026-07-16".into(),
+                location: "p. 11, Bronze Free Skating, jumps".into(),
+            }
         },
     }
 }
@@ -63,6 +83,7 @@ pub fn validate_program(program: &Program) -> ValidationResult {
         result.findings.push(finding(
             FindingKind::Unsupported,
             None,
+            None,
             "Only Bronze in the 2026/27 Adult ruleset is supported.",
         ));
         return result;
@@ -70,11 +91,11 @@ pub fn validate_program(program: &Program) -> ValidationResult {
     for (index, element) in program.elements.iter().enumerate() {
         if let PlannedElement::Jump(jump) = element {
             match jump {
-                JumpElement::Solo(jump) => check_jump(jump, index, &mut result.findings),
+                JumpElement::Solo(jump) => check_jump(jump, index, None, &mut result.findings),
                 JumpElement::Combination(parts) | JumpElement::Sequence(parts) => {
-                    for part in parts {
+                    for (component_index, part) in parts.iter().enumerate() {
                         if let JumpPart::Jump(jump) = part {
-                            check_jump(jump, index, &mut result.findings);
+                            check_jump(jump, index, Some(component_index), &mut result.findings);
                         }
                     }
                 }
@@ -84,22 +105,35 @@ pub fn validate_program(program: &Program) -> ValidationResult {
     result
 }
 
-fn check_jump(jump: &ListedJump, index: usize, findings: &mut Vec<Finding>) {
+fn check_jump(
+    jump: &ListedJump,
+    index: usize,
+    component_index: Option<usize>,
+    findings: &mut Vec<Finding>,
+) {
     let index = Some(index);
     if jump.kind.is_none() || jump.rotations.is_none() || jump.rotations == Some(0) {
         findings.push(finding(
             FindingKind::Unknown,
             index,
+            component_index,
             "Jump kind or a positive rotation count is missing.",
         ));
     }
-    if jump.rotations.is_some_and(|count| count >= 2)
-        || (jump.kind == Some(JumpKind::Axel) && jump.rotations == Some(1))
-    {
+    if jump.kind == Some(JumpKind::Axel) {
         findings.push(finding(
             FindingKind::Violation,
             index,
-            "Bronze permits only single jumps other than Axel.",
+            component_index,
+            "Axel jumps are prohibited in Bronze.",
+        ));
+    }
+    if jump.rotations.is_some_and(|count| count >= 2) {
+        findings.push(finding(
+            FindingKind::Violation,
+            index,
+            component_index,
+            "Multi-rotation jumps are prohibited in Bronze.",
         ));
     }
 }

@@ -93,6 +93,15 @@ fn unsupported_category_and_season_are_explicit() {
         ));
         assert_eq!(result.findings.len(), 1);
         assert_eq!(result.findings[0].kind, FindingKind::Unsupported);
+        assert_eq!(result.findings[0].rule_id, "validator-scope");
+        assert_eq!(
+            result.findings[0].source,
+            SourceReference {
+                document: "Skating Program Lab architecture".into(),
+                version: "issue-13".into(),
+                location: "Current state, validator scope".into()
+            }
+        );
         assert_eq!(result.coverage, Coverage::Partial);
     }
     let mut other_season = program(
@@ -106,5 +115,62 @@ fn unsupported_category_and_season_are_explicit() {
     assert_eq!(
         validate_program(&other_season).findings[0].kind,
         FindingKind::Unsupported
+    );
+}
+
+#[test]
+fn incomplete_axel_and_components_have_distinct_explainable_findings() {
+    let result = validate_program(&program(
+        AdultCategory::Bronze,
+        vec![
+            solo(Some(JumpKind::Axel), None),
+            PlannedElement::Jump(JumpElement::Combination(vec![
+                JumpPart::Jump(jump(Some(JumpKind::Axel), Some(1))),
+                JumpPart::Euler,
+                JumpPart::Jump(jump(Some(JumpKind::ToeLoop), Some(2))),
+            ])),
+        ],
+    ));
+    let source = SourceReference {
+        document: "International Adult Figure Skating Competitions Technical Announcement".into(),
+        version: "2026-07-16".into(),
+        location: "p. 11, Bronze Free Skating, jumps".into(),
+    };
+    let expected = |kind, element_index, component_index, explanation| Finding {
+        kind,
+        rule_id: "isu-adult-2026-27-bronze-jump-eligibility",
+        element_index,
+        component_index,
+        explanation,
+        source: source.clone(),
+    };
+    assert_eq!(
+        result.findings,
+        vec![
+            expected(
+                FindingKind::Unknown,
+                Some(0),
+                None,
+                "Jump kind or a positive rotation count is missing."
+            ),
+            expected(
+                FindingKind::Violation,
+                Some(0),
+                None,
+                "Axel jumps are prohibited in Bronze."
+            ),
+            expected(
+                FindingKind::Violation,
+                Some(1),
+                Some(0),
+                "Axel jumps are prohibited in Bronze."
+            ),
+            expected(
+                FindingKind::Violation,
+                Some(1),
+                Some(2),
+                "Multi-rotation jumps are prohibited in Bronze."
+            ),
+        ]
     );
 }
