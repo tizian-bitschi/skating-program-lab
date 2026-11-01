@@ -2,7 +2,7 @@
 
 ## Current state
 
-One Rust library models season, Adult singles categories, supported ruleset and scoring-table identities, and source references. These are metadata only: source applicability and consistency between fields are not validated. There is no rule database, validator, scoring, solver, API or UI. Independent domain review is required. CI checks formatting, Clippy and tests. The intended scope and source limitations are in [requirements](requirements.md) and [rule sources](rule-sources.md).
+One Rust library models season, Adult singles categories, supported ruleset and scoring-table identities, source references, and ordered planned elements. Source applicability and consistency between fields are not validated. Jump transitions are distinct from listed jumps; regular spins distinguish flying and non-flying entries and retain position and foot-change order. Choreographic spins are separate elements. Optional spin details distinguish unspecified from explicitly empty lists. Feature attempts are descriptions attached to positions, not recognized features; other phases are not yet modeled for features. Spin revolutions currently record whole counts only. The model permits incomplete or illegal plans and does not validate them. There is no rule database, validator, scoring, solver, API or UI. Independent domain review is required. CI checks formatting, Clippy and tests. The intended scope and source limitations are in [requirements](requirements.md) and [rule sources](rule-sources.md).
 
 ## Intent and boundaries
 
