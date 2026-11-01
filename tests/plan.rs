@@ -18,6 +18,20 @@ fn bronze_plan_preserves_order_and_details() {
         },
         category: AdultCategory::Bronze,
         ruleset: RulesetId::IsuAdult2026_27July16,
+        scoring_table: ScoringTableId::Isu2786June2_2026,
+        sources: vec![
+            SourceReference {
+                document: "International Adult Figure Skating Competitions Technical Announcement"
+                    .into(),
+                version: "2026-07-16".into(),
+                location: "p. 11, Bronze Free Skating".into(),
+            },
+            SourceReference {
+                document: "ISU Communication 2786, Scale of Values".into(),
+                version: "2026-06-02".into(),
+                location: "pp. 2, 8, 14".into(),
+            },
+        ],
         elements: vec![
             PlannedElement::Jump(JumpElement::Solo(jump(JumpKind::Lutz))),
             PlannedElement::Jump(JumpElement::Combination(vec![
@@ -40,7 +54,9 @@ fn bronze_plan_preserves_order_and_details() {
                     },
                 ]),
             }),
-            PlannedElement::ChoreographicSequence,
+            PlannedElement::ChoreographicSequence {
+                movements: Some(vec!["spiral".into(), "spread eagle".into()]),
+            },
         ],
     };
     let copy = program.clone();
@@ -53,6 +69,16 @@ fn bronze_plan_preserves_order_and_details() {
     );
     assert_eq!(copy.category, AdultCategory::Bronze);
     assert_eq!(copy.ruleset, RulesetId::IsuAdult2026_27July16);
+    assert_eq!(copy.scoring_table, ScoringTableId::Isu2786June2_2026);
+    assert_eq!(copy.sources, program.sources);
+    assert_eq!(copy.sources[0].location, "p. 11, Bronze Free Skating");
+    assert_eq!(copy.sources[1].version, "2026-06-02");
+    assert_eq!(
+        copy.elements[3],
+        PlannedElement::ChoreographicSequence {
+            movements: Some(vec!["spiral".into(), "spread eagle".into()]),
+        }
+    );
     assert_eq!(copy.elements, program.elements);
     assert!(
         matches!(&copy.elements[1], PlannedElement::Jump(JumpElement::Combination(parts))
@@ -122,7 +148,7 @@ fn transitions_and_unspecified_details_remain_distinct() {
     );
     assert_ne!(
         PlannedElement::ChoreographicSpin,
-        PlannedElement::ChoreographicSequence
+        PlannedElement::ChoreographicSequence { movements: None }
     );
     let position = |feature_attempts| SpinStep::Position {
         position: Some(SpinPosition::Sit),
@@ -144,6 +170,6 @@ fn transitions_and_unspecified_details_remain_distinct() {
     );
     assert_ne!(
         PlannedElement::StepSequence,
-        PlannedElement::ChoreographicSequence
+        PlannedElement::ChoreographicSequence { movements: None }
     );
 }
