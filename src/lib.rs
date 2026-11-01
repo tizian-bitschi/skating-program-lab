@@ -4,6 +4,9 @@
 
 use std::{fmt, str::FromStr};
 
+mod plan;
+pub use plan::*;
+
 /// A skating season, identified by its starting and ending years.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Season {
