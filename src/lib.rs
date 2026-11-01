@@ -95,3 +95,6 @@ impl FromStr for ScoringTableId {
 
 mod validation;
 pub use validation::*;
+
+mod scoring;
+pub use scoring::*;
