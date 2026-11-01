@@ -6,7 +6,18 @@ use crate::{
     Season,
 };
 
-/// Slot positions correspond to starts at 10, 20 and 30 seconds.
+/// Fixed assumptions for this exhaustive model.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ReferenceDomain {
+    pub slot_start_seconds: [u16; 3],
+    pub duration_seconds: u16,
+    pub uninterrupted_timing_assumed: bool,
+    pub no_event_exception_assumed: bool,
+    pub clean_recognition_assumed: bool,
+    pub exclude_lutz: bool,
+}
+
+/// Slot occupancy corresponds to the result's domain times.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ReferenceCandidate {
     pub slots: [bool; 3],
@@ -17,7 +28,7 @@ pub struct ReferenceCandidate {
 
 /// Complete enumeration within the documented domain, not official program feasibility.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum ReferenceResult {
+pub enum ReferenceOutcome {
     Optimal {
         base_hundredths: u16,
         candidates: Vec<ReferenceCandidate>,
@@ -26,14 +37,29 @@ pub enum ReferenceResult {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ReferenceResult {
+    pub domain: ReferenceDomain,
+    pub outcome: ReferenceOutcome,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ReferenceError {
     IncompleteValidation,
+    UnsupportedElement,
     BaseValue(BaseValueError),
 }
 
 /// Enumerate every slot assignment. Exclusion removes 1Lz from every slot.
 /// Lookup errors abort the search rather than producing an incomplete optimum.
 pub fn enumerate_bronze_reference(exclude_lutz: bool) -> Result<ReferenceResult, ReferenceError> {
+    let domain = ReferenceDomain {
+        slot_start_seconds: [10, 20, 30],
+        duration_seconds: 100,
+        uninterrupted_timing_assumed: true,
+        no_event_exception_assumed: true,
+        clean_recognition_assumed: true,
+        exclude_lutz,
+    };
     let ruleset = RulesetId::IsuAdult2026_27July16;
     let table = ScoringTableId::Isu2786June2_2026;
     let mut best = None;
@@ -75,27 +101,9 @@ pub fn enumerate_bronze_reference(exclude_lutz: bool) -> Result<ReferenceResult,
         if !validation.findings.is_empty() {
             continue;
         }
-        let recognition = PanelRecognition {
-            ruleset,
-            source: None,
-            planned_element: None,
-            observed_element: None,
-            outcome: RecognitionOutcome::Recognized,
-            details: Some(
-                RecognitionDetails::new(
-                    vec![ComponentCode::try_from("1Lz").expect("known code")],
-                    None,
-                    Some(vec![]),
-                )
-                .expect("known recognition"),
-            ),
-        };
         let mut total = 0;
-        for _ in &program.elements {
-            match lookup_base_value(table, &recognition, &[]).map_err(ReferenceError::BaseValue)? {
-                BaseValueOutcome::Value(value) => total += value.hundredths,
-                _ => return Err(ReferenceError::BaseValue(BaseValueError::Unsupported)),
-            }
+        for element in &program.elements {
+            total += reference_base_value(element, ruleset, table)?;
         }
         let candidate = ReferenceCandidate {
             slots,
@@ -117,11 +125,71 @@ pub fn enumerate_bronze_reference(exclude_lutz: bool) -> Result<ReferenceResult,
             _ => {}
         }
     }
-    Ok(match best {
-        Some(base_hundredths) => ReferenceResult::Optimal {
-            base_hundredths,
-            candidates,
+    Ok(ReferenceResult {
+        domain,
+        outcome: match best {
+            Some(base_hundredths) => ReferenceOutcome::Optimal {
+                base_hundredths,
+                candidates,
+            },
+            None => ReferenceOutcome::Infeasible,
         },
-        None => ReferenceResult::Infeasible,
     })
+}
+
+fn reference_base_value(
+    element: &PlannedElement,
+    ruleset: RulesetId,
+    table: ScoringTableId,
+) -> Result<u16, ReferenceError> {
+    let code = match element {
+        PlannedElement::Jump(JumpElement::Solo(ListedJump {
+            kind: Some(JumpKind::Lutz),
+            rotations: Some(1),
+        })) => "1Lz",
+        _ => return Err(ReferenceError::UnsupportedElement),
+    };
+    let recognition = PanelRecognition {
+        ruleset,
+        source: None,
+        planned_element: None,
+        observed_element: None,
+        outcome: RecognitionOutcome::Recognized,
+        details: Some(
+            RecognitionDetails::new(
+                vec![ComponentCode::try_from(code).expect("known code")],
+                None,
+                Some(vec![]),
+            )
+            .expect("known recognition"),
+        ),
+    };
+    match lookup_base_value(table, &recognition, &[]).map_err(ReferenceError::BaseValue)? {
+        BaseValueOutcome::Value(value) => Ok(value.hundredths),
+        _ => Err(ReferenceError::BaseValue(BaseValueError::Unsupported)),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn scoring_rejects_elements_outside_the_domain() {
+        for element in [
+            PlannedElement::Unspecified,
+            PlannedElement::Jump(JumpElement::Solo(ListedJump {
+                kind: Some(JumpKind::Flip),
+                rotations: Some(1),
+            })),
+        ] {
+            assert_eq!(
+                reference_base_value(
+                    &element,
+                    RulesetId::IsuAdult2026_27July16,
+                    ScoringTableId::Isu2786June2_2026
+                ),
+                Err(ReferenceError::UnsupportedElement)
+            );
+        }
+    }
 }
