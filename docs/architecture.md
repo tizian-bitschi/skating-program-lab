@@ -34,3 +34,5 @@ The scoring module provides a limited source-linked base-value lookup over suppl
 Program scoring composes the existing element scorer with explicit timing and fall facts. It reports per-element results, optional TES, and independently sourced fall and time deductions. It applies the general second-half rule only when the caller confirms ordinary timing and checks event-specific exceptions. Unresolved elements and facts remain explicit; this scenario calculation does not establish event eligibility or a complete official result.
 
 The exhaustive reference optimizer enumerates one fixed, three-slot Bronze domain. It calls the shared validator and independently sums source-backed lookup values for each accepted plan. It reports all timed ties or model infeasibility, with partial coverage; it does not introduce a solver. Its exact domain and assumptions are in [requirements](requirements.md).
+
+The bounded comparison in [solver-comparison](solver-comparison.md) selects Pumpkin for the next native prototype, subject to the documented toolchain, interruption and WebAssembly checks. The standalone prototype is not a dependency of the domain library.

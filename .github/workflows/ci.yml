@@ -18,3 +18,15 @@ jobs:
       - run: cargo fmt --check
       - run: cargo clippy --all-targets -- -D warnings
       - run: cargo test
+
+  solver-comparison:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - run: cargo fmt --manifest-path solver-comparison/Cargo.toml -- --check
+      - run: cargo clippy --manifest-path solver-comparison/Cargo.toml --all-targets --locked -- -D warnings
+      - run: cargo test --manifest-path solver-comparison/Cargo.toml --locked
+      - run: cargo run --manifest-path solver-comparison/Cargo.toml --locked
