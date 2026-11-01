@@ -118,6 +118,49 @@ fn structure_markers_have_one_valid_position_and_kind() {
 }
 
 #[test]
+fn notation_orders_marks_independently_of_input_order_and_single_element_alias() {
+    // ISU Q&A 3, p. 1, Q2: an under-rotation mark precedes the asterisk.
+    let input_orders = [
+        vec![
+            call(CallTarget::Component(0), PanelCall::NotCounted),
+            call(CallTarget::Component(0), PanelCall::UnderRotated),
+        ],
+        vec![
+            call(CallTarget::Component(0), PanelCall::UnderRotated),
+            call(CallTarget::Component(0), PanelCall::NotCounted),
+        ],
+        vec![
+            call(CallTarget::Element, PanelCall::UnderRotated),
+            call(CallTarget::Component(0), PanelCall::NotCounted),
+        ],
+        vec![
+            call(CallTarget::Element, PanelCall::NotCounted),
+            call(CallTarget::Component(0), PanelCall::UnderRotated),
+        ],
+    ];
+    for calls in input_orders {
+        let details = RecognitionDetails::new(vec![code("2T")], None, Some(calls)).unwrap();
+        assert_eq!(details.notation().as_deref(), Some("2T<*"));
+        assert!(details
+            .calls()
+            .unwrap()
+            .iter()
+            .all(|entry| entry.target == CallTarget::Component(0)));
+    }
+    // Communication 2786 p. 2: 1Lze< uses edge before under-rotation.
+    let details = RecognitionDetails::new(
+        vec![code("1Lz")],
+        None,
+        Some(vec![
+            call(CallTarget::Component(0), PanelCall::UnderRotated),
+            call(CallTarget::Element, PanelCall::WrongEdge),
+        ]),
+    )
+    .unwrap();
+    assert_eq!(details.notation().as_deref(), Some("1Lze<"));
+}
+
+#[test]
 fn recognition_retains_source_and_all_component_marks() {
     // ISU Q&A 3, October 2026, p. 1, Q2: 3S+SEQ+2T<*+2Aq*.
     let calls = vec![

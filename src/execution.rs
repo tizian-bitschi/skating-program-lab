@@ -98,7 +98,7 @@ impl RecognitionDetails {
     pub fn new(
         components: Vec<ComponentCode>,
         level: Option<Level>,
-        calls: Option<Vec<RecordedCall>>,
+        mut calls: Option<Vec<RecordedCall>>,
     ) -> Result<Self, RecognitionError> {
         if components.is_empty() {
             return Err(RecognitionError::EmptyComponents);
@@ -110,7 +110,18 @@ impl RecognitionDetails {
         {
             return Err(RecognitionError::InvalidTarget);
         }
-        if let Some(ref calls) = calls {
+        if let Some(ref mut calls) = calls {
+            for entry in calls.iter_mut() {
+                if components.len() == 1
+                    && entry.target == CallTarget::Element
+                    && !matches!(
+                        entry.call,
+                        PanelCall::Repetition | PanelCall::Combination | PanelCall::Sequence
+                    )
+                {
+                    entry.target = CallTarget::Component(0);
+                }
+            }
             for (index, entry) in calls.iter().enumerate() {
                 let structure = matches!(entry.call, PanelCall::Combination | PanelCall::Sequence);
                 let valid_target = match entry.target {
@@ -119,7 +130,9 @@ impl RecognitionDetails {
                             && (components.len() == 1
                                 || !(entry.call.is_rotation() || entry.call.is_edge()))
                     }
-                    CallTarget::Component(i) => !structure && i < components.len(),
+                    CallTarget::Component(i) => {
+                        !structure && entry.call != PanelCall::Repetition && i < components.len()
+                    }
                     CallTarget::BetweenComponents(i) => structure && i > 0 && i <= components.len(),
                 };
                 if !valid_target {
@@ -185,17 +198,24 @@ impl RecognitionDetails {
                     result.push_str(level.symbol());
                 }
             }
-            for entry in calls
+            let mut component_calls: Vec<_> = calls
                 .iter()
                 .filter(|c| c.target == CallTarget::Component(index))
-            {
+                .collect();
+            component_calls.sort_by_key(|c| c.call.notation_order());
+            for entry in component_calls {
                 result.push_str(entry.call.symbol());
             }
         }
-        for entry in calls.iter().filter(|c| {
-            c.target == CallTarget::BetweenComponents(self.components.len())
-                || c.target == CallTarget::Element
-        }) {
+        let mut trailing: Vec<_> = calls
+            .iter()
+            .filter(|c| {
+                c.target == CallTarget::BetweenComponents(self.components.len())
+                    || c.target == CallTarget::Element
+            })
+            .collect();
+        trailing.sort_by_key(|c| c.call.notation_order());
+        for entry in trailing {
             result.push_str(entry.call.symbol());
         }
         Some(result)
@@ -302,6 +322,16 @@ pub enum PanelCall {
 }
 
 impl PanelCall {
+    fn notation_order(self) -> u8 {
+        match self {
+            Self::UnclearEdge | Self::WrongEdge => 0,
+            Self::Quarter | Self::UnderRotated | Self::Downgraded => 1,
+            Self::ReducedSpinValue => 2,
+            Self::NotCounted => 3,
+            Self::Combination | Self::Sequence => 4,
+            Self::Repetition => 5,
+        }
+    }
     fn is_rotation(self) -> bool {
         matches!(self, Self::Quarter | Self::UnderRotated | Self::Downgraded)
     }
