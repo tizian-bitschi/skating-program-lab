@@ -112,15 +112,15 @@ impl RecognitionDetails {
         }
         if let Some(ref calls) = calls {
             for (index, entry) in calls.iter().enumerate() {
+                let structure = matches!(entry.call, PanelCall::Combination | PanelCall::Sequence);
                 let valid_target = match entry.target {
                     CallTarget::Element => {
-                        components.len() == 1 || !(entry.call.is_rotation() || entry.call.is_edge())
+                        !structure
+                            && (components.len() == 1
+                                || !(entry.call.is_rotation() || entry.call.is_edge()))
                     }
-                    CallTarget::Component(i) => i < components.len(),
-                    CallTarget::BetweenComponents(i) => {
-                        i <= components.len()
-                            && matches!(entry.call, PanelCall::Combination | PanelCall::Sequence)
-                    }
+                    CallTarget::Component(i) => !structure && i < components.len(),
+                    CallTarget::BetweenComponents(i) => structure && i > 0 && i <= components.len(),
                 };
                 if !valid_target {
                     return Err(RecognitionError::InvalidTarget);
@@ -136,7 +136,11 @@ impl RecognitionDetails {
                     if same_target
                         && (previous.call == entry.call
                             || (previous.call.is_rotation() && entry.call.is_rotation())
-                            || (previous.call.is_edge() && entry.call.is_edge()))
+                            || (previous.call.is_edge() && entry.call.is_edge())
+                            || (matches!(
+                                previous.call,
+                                PanelCall::Combination | PanelCall::Sequence
+                            ) && structure))
                     {
                         return Err(RecognitionError::ConflictingCalls);
                     }

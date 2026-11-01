@@ -30,8 +30,31 @@ fn observed_fall_and_supplied_calls_do_not_change_the_plan() {
         )]),
     )
     .unwrap();
-    assert_eq!(details.notation().as_deref(), Some("1Lz<"));
+    let recognition = PanelRecognition {
+        ruleset: RulesetId::IsuAdult2026_27July16,
+        source: None,
+        planned_element: Some(0),
+        observed_element: Some(0),
+        outcome: RecognitionOutcome::Recognized,
+        details: Some(details),
+    };
+    assert_eq!(
+        recognition.details.as_ref().unwrap().notation().as_deref(),
+        Some("1Lz<")
+    );
+    assert_eq!(recognition.planned_element, observed.planned_element);
+    assert_eq!(recognition.observed_element, Some(0));
     assert_eq!(observed.fall, Some(true));
+    let unknown = ObservedElement {
+        ruleset: observed.ruleset,
+        source: None,
+        planned_element: None,
+        movement: None,
+        attempted_rotations: None,
+        fall: None,
+    };
+    assert_ne!(observed, unknown);
+    assert_ne!(unknown.fall, Some(false));
     assert_eq!(
         planned,
         PlannedElement::Jump(JumpElement::Solo(ListedJump {
@@ -39,6 +62,59 @@ fn observed_fall_and_supplied_calls_do_not_change_the_plan() {
             rotations: Some(1),
         }))
     );
+}
+
+#[test]
+fn structure_markers_have_one_valid_position_and_kind() {
+    let components = vec![code("3F"), code("2T")];
+    assert_eq!(
+        RecognitionDetails::new(
+            components.clone(),
+            None,
+            Some(vec![call(
+                CallTarget::BetweenComponents(0),
+                PanelCall::Sequence
+            )])
+        ),
+        Err(RecognitionError::InvalidTarget)
+    );
+    assert_eq!(
+        RecognitionDetails::new(
+            components.clone(),
+            None,
+            Some(vec![call(CallTarget::Component(0), PanelCall::Combination)])
+        ),
+        Err(RecognitionError::InvalidTarget)
+    );
+    assert_eq!(
+        RecognitionDetails::new(
+            components.clone(),
+            None,
+            Some(vec![call(CallTarget::Element, PanelCall::Sequence)])
+        ),
+        Err(RecognitionError::InvalidTarget)
+    );
+    assert_eq!(
+        RecognitionDetails::new(
+            components.clone(),
+            None,
+            Some(vec![
+                call(CallTarget::BetweenComponents(1), PanelCall::Combination),
+                call(CallTarget::BetweenComponents(1), PanelCall::Sequence)
+            ])
+        ),
+        Err(RecognitionError::ConflictingCalls)
+    );
+    let final_marker = RecognitionDetails::new(
+        components,
+        None,
+        Some(vec![call(
+            CallTarget::BetweenComponents(2),
+            PanelCall::Sequence,
+        )]),
+    )
+    .unwrap();
+    assert_eq!(final_marker.notation().as_deref(), Some("3F+2T+SEQ"));
 }
 
 #[test]
