@@ -1,6 +1,6 @@
 //! Intended program structure. These types do not validate or recognize elements.
 
-use crate::{AdultCategory, RulesetId, Season};
+use crate::{AdultCategory, RulesetId, ScoringTableId, Season, SourceReference};
 
 /// An ordered Free Skating plan. The season and ruleset are selected independently.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -8,6 +8,8 @@ pub struct Program {
     pub season: Season,
     pub category: AdultCategory,
     pub ruleset: RulesetId,
+    pub scoring_table: ScoringTableId,
+    pub sources: Vec<SourceReference>,
     pub elements: Vec<PlannedElement>,
 }
 
@@ -17,7 +19,9 @@ pub enum PlannedElement {
     RegularSpin(RegularSpin),
     ChoreographicSpin,
     StepSequence,
-    ChoreographicSequence,
+    ChoreographicSequence {
+        movements: Option<Vec<String>>,
+    },
     /// An element whose type has not yet been selected.
     Unspecified,
 }

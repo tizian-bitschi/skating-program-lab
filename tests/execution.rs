@@ -25,11 +25,21 @@ fn observed_fall_and_supplied_calls_do_not_change_the_plan() {
         outcome: RecognitionOutcome::Recognized,
         code: Some("1Lz".into()),
         level: None,
-        calls: Some(vec![PanelCall::UnderRotated]),
+        components: None,
+        calls: Some(vec![RecordedCall {
+            target: CallTarget::Element,
+            call: PanelCall::UnderRotated,
+        }]),
     };
     assert_eq!(planned, original);
     assert_eq!(observed.fall, Some(true));
-    assert_eq!(recognition.calls, Some(vec![PanelCall::UnderRotated]));
+    assert_eq!(
+        recognition.calls,
+        Some(vec![RecordedCall {
+            target: CallTarget::Element,
+            call: PanelCall::UnderRotated
+        }])
+    );
     assert_eq!(recognition.planned_element, observed.planned_element);
     assert_eq!(recognition.observed_element, Some(0));
 }
@@ -59,6 +69,7 @@ fn unknown_and_explicit_outcomes_remain_distinct() {
         outcome: RecognitionOutcome::Unknown,
         code: None,
         level: None,
+        components: None,
         calls: None,
     };
     let unknown_panel = panel.clone();
@@ -68,10 +79,77 @@ fn unknown_and_explicit_outcomes_remain_distinct() {
     assert_ne!(panel.outcome, RecognitionOutcome::Ignored);
     panel.outcome = RecognitionOutcome::Recognized;
     panel.code = Some("1A".into());
-    panel.calls = Some(vec![PanelCall::Downgraded]);
+    panel.calls = Some(vec![RecordedCall {
+        target: CallTarget::Element,
+        call: PanelCall::Downgraded,
+    }]);
     assert_ne!(panel.outcome, RecognitionOutcome::NoValue);
-    assert_eq!(panel.calls, Some(vec![PanelCall::Downgraded]));
+    assert_eq!(
+        panel.calls,
+        Some(vec![RecordedCall {
+            target: CallTarget::Element,
+            call: PanelCall::Downgraded
+        }])
+    );
     panel.calls = Some(vec![]);
     assert_ne!(panel.calls, unknown_panel.calls);
     assert_ne!(Some(false), unknown.fall);
+}
+
+#[test]
+fn marks_retain_their_component_and_element_targets() {
+    // ISU Q&A 3, October 2026, Q2: 3S+SEQ+2T<*+2Aq*.
+    let recognition = PanelRecognition {
+        ruleset: RulesetId::IsuAdult2026_27July16,
+        source: None,
+        planned_element: None,
+        observed_element: None,
+        outcome: RecognitionOutcome::Recognized,
+        code: None,
+        level: None,
+        components: Some(vec!["3S".into(), "2T".into(), "2A".into()]),
+        calls: Some(vec![
+            RecordedCall {
+                target: CallTarget::BetweenComponents(1),
+                call: PanelCall::Sequence,
+            },
+            RecordedCall {
+                target: CallTarget::Component(1),
+                call: PanelCall::UnderRotated,
+            },
+            RecordedCall {
+                target: CallTarget::Component(1),
+                call: PanelCall::NotCounted,
+            },
+            RecordedCall {
+                target: CallTarget::Component(2),
+                call: PanelCall::Quarter,
+            },
+            RecordedCall {
+                target: CallTarget::Component(2),
+                call: PanelCall::NotCounted,
+            },
+        ]),
+    };
+    assert_eq!(
+        recognition.calls.as_ref().unwrap()[1].target,
+        CallTarget::Component(1)
+    );
+    assert_ne!(
+        recognition.calls.as_ref().unwrap()[1].target,
+        recognition.calls.as_ref().unwrap()[3].target
+    );
+
+    // Adult announcement p. 11: V on a change-foot spin with too few revolutions.
+    let spin_mark = RecordedCall {
+        target: CallTarget::Element,
+        call: PanelCall::ReducedSpinValue,
+    };
+    assert_ne!(spin_mark.call, PanelCall::NotCounted);
+    // Handbook p. 33: +REP applies to the jump element, separately from *.
+    let repetition = RecordedCall {
+        target: CallTarget::Element,
+        call: PanelCall::Repetition,
+    };
+    assert_ne!(repetition.call, spin_mark.call);
 }

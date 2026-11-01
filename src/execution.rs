@@ -26,9 +26,35 @@ pub struct PanelRecognition {
     pub observed_element: Option<usize>,
     pub outcome: RecognitionOutcome,
     pub code: Option<String>,
-    pub level: Option<u8>,
+    pub level: Option<Level>,
+    /// Ordered recognized components, including transitions when present.
+    /// None means unknown; indices in calls refer to this list.
+    pub components: Option<Vec<String>>,
     /// None means unknown; an empty list means explicitly no calls.
-    pub calls: Option<Vec<PanelCall>>,
+    pub calls: Option<Vec<RecordedCall>>,
+}
+
+/// Basic level is distinct from numbered levels and from an unknown level.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Level {
+    Basic,
+    Number(u8),
+}
+
+/// The target is explicit: a whole element or a zero-based component of it.
+/// Component indices refer to the ordered recognized components, not the plan.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RecordedCall {
+    pub target: CallTarget,
+    pub call: PanelCall,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CallTarget {
+    Element,
+    Component(usize),
+    /// Before the component at this index; the list length denotes the end.
+    BetweenComponents(usize),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -39,7 +65,7 @@ pub enum RecognitionOutcome {
     Unknown,
 }
 
-/// Exact supplied rotation and edge marks, without combination validation.
+/// Supplied technical marks and combination/sequence notation. No legality is inferred.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PanelCall {
     /// q
@@ -52,4 +78,16 @@ pub enum PanelCall {
     UnclearEdge,
     /// e
     WrongEdge,
+    /// V: reduced value of a spin.
+    ReducedSpinValue,
+    /// *: the marked element or jump does not count.
+    NotCounted,
+    /// +REP: repetition treatment, including the 80% rule where applicable.
+    Repetition,
+    /// +COMBO: combination notation, including an interrupted combination.
+    Combination,
+    /// +SEQ: sequence notation, including an interrupted sequence.
+    Sequence,
+    /// x: supplied second-half base-value credit, not inferred from timing.
+    SecondHalfCredit,
 }
