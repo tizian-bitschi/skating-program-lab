@@ -15,6 +15,7 @@ pub struct Program {
 pub enum PlannedElement {
     Jump(JumpElement),
     RegularSpin(RegularSpin),
+    ChoreographicSpin,
     StepSequence,
     ChoreographicSequence,
     /// An element whose type has not yet been selected.
@@ -55,10 +56,16 @@ pub enum JumpKind {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RegularSpin {
+    /// None means the entry has not been specified.
+    pub entry: Option<SpinEntry>,
     /// None means the ordered steps have not been specified; an empty list is explicit.
     pub steps: Option<Vec<SpinStep>>,
-    /// None means feature attempts have not been specified.
-    pub feature_attempts: Option<Vec<String>>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SpinEntry {
+    Flying,
+    NonFlying,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -67,6 +74,8 @@ pub enum SpinStep {
         position: Option<SpinPosition>,
         /// Whole intended revolutions; None preserves an unspecified count.
         revolutions: Option<u16>,
+        /// None means feature attempts for this position are unspecified.
+        feature_attempts: Option<Vec<String>>,
     },
     ChangeFoot,
 }

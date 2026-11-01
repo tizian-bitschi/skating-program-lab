@@ -25,18 +25,20 @@ fn bronze_plan_preserves_order_and_details() {
                 JumpPart::Jump(jump(JumpKind::ToeLoop)),
             ])),
             PlannedElement::RegularSpin(RegularSpin {
+                entry: Some(SpinEntry::NonFlying),
                 steps: Some(vec![
                     SpinStep::Position {
                         position: Some(SpinPosition::Sit),
                         revolutions: Some(3),
+                        feature_attempts: Some(vec!["difficult variation".into()]),
                     },
                     SpinStep::ChangeFoot,
                     SpinStep::Position {
                         position: Some(SpinPosition::Sit),
                         revolutions: Some(3),
+                        feature_attempts: Some(vec![]),
                     },
                 ]),
-                feature_attempts: Some(vec!["difficult variation".into()]),
             }),
             PlannedElement::ChoreographicSequence,
         ],
@@ -56,9 +58,24 @@ fn bronze_plan_preserves_order_and_details() {
         matches!(&copy.elements[1], PlannedElement::Jump(JumpElement::Combination(parts))
         if parts == &vec![JumpPart::Jump(jump(JumpKind::Salchow)), JumpPart::Jump(jump(JumpKind::ToeLoop))])
     );
-    assert!(
-        matches!(&copy.elements[2], PlannedElement::RegularSpin(spin)
-        if spin.steps.as_ref().unwrap().len() == 3 && spin.feature_attempts.as_ref().unwrap() == &["difficult variation"])
+    assert_eq!(
+        copy.elements[2],
+        PlannedElement::RegularSpin(RegularSpin {
+            entry: Some(SpinEntry::NonFlying),
+            steps: Some(vec![
+                SpinStep::Position {
+                    position: Some(SpinPosition::Sit),
+                    revolutions: Some(3),
+                    feature_attempts: Some(vec!["difficult variation".into()])
+                },
+                SpinStep::ChangeFoot,
+                SpinStep::Position {
+                    position: Some(SpinPosition::Sit),
+                    revolutions: Some(3),
+                    feature_attempts: Some(vec![])
+                },
+            ]),
+        })
     );
 }
 
@@ -85,13 +102,45 @@ fn transitions_and_unspecified_details_remain_distinct() {
     );
     assert_ne!(
         RegularSpin {
+            entry: None,
             steps: None,
-            feature_attempts: None
         },
         RegularSpin {
+            entry: None,
             steps: Some(vec![]),
-            feature_attempts: Some(vec![])
         }
+    );
+    assert_ne!(
+        RegularSpin {
+            entry: Some(SpinEntry::Flying),
+            steps: None
+        },
+        RegularSpin {
+            entry: Some(SpinEntry::NonFlying),
+            steps: None
+        }
+    );
+    assert_ne!(
+        PlannedElement::ChoreographicSpin,
+        PlannedElement::ChoreographicSequence
+    );
+    let position = |feature_attempts| SpinStep::Position {
+        position: Some(SpinPosition::Sit),
+        revolutions: Some(3),
+        feature_attempts,
+    };
+    assert_ne!(position(None), position(Some(vec![])));
+    assert_ne!(
+        vec![
+            position(Some(vec!["variation".into()])),
+            SpinStep::ChangeFoot,
+            position(Some(vec![]))
+        ],
+        vec![
+            position(Some(vec![])),
+            SpinStep::ChangeFoot,
+            position(Some(vec!["variation".into()]))
+        ]
     );
     assert_ne!(
         PlannedElement::StepSequence,
