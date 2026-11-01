@@ -2,7 +2,7 @@
 
 ## Current state
 
-One Rust library contains only crate documentation. There is no rule model, validator, scoring, solver, API or UI. CI checks formatting, Clippy and tests. The intended scope and source limitations are in [requirements](requirements.md) and [rule sources](rule-sources.md).
+One Rust library models season, Adult singles categories, supported ruleset and scoring-table identities, and source references. These are metadata only: source applicability and consistency between fields are not validated. There is no rule database, validator, scoring, solver, API or UI. Independent domain review is required. CI checks formatting, Clippy and tests. The intended scope and source limitations are in [requirements](requirements.md) and [rule sources](rule-sources.md).
 
 ## Intent and boundaries
 

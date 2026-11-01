@@ -2,7 +2,7 @@
 
 An open-source foundation for planning technical figure skating programs. The first intended scope is singles free skating at Bronze, Silver, Gold and Masters in the 2026/27 ISU-supported International Adult Figure Skating Competitions.
 
-The planned core will validate programs, simulate technical scores and find programs with maximum base value under rules and personal constraints. This repository currently contains specifications and an empty Rust library: none of those functions is implemented. Results from future versions must not be treated as official judging decisions.
+The planned core will validate programs, simulate technical scores and find programs with maximum base value under rules and personal constraints. The Rust library currently models season, category, supported ruleset and scoring-table identities, and source references. It does not implement validation, scoring or optimization. Results from future versions must not be treated as official judging decisions.
 
 ## Development
 
