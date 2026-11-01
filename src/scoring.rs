@@ -168,6 +168,10 @@ pub fn score_element(
     }
     let row = table_row(table, recognition).map_err(ElementScoreError::BaseValue)?;
     let goe_values = row.goe.ok_or(ElementScoreError::UnsupportedMarks)?;
+    // Communication 2788 pp. 14, 16: downgrade reduction and starting limit.
+    if row.notation.ends_with("<<") && goe > -1 {
+        return Err(ElementScoreError::UnsupportedMarks);
+    }
     match fall {
         None => return Err(ElementScoreError::UnknownFall),
         Some(true) if goe > -3 => return Err(ElementScoreError::InconsistentFall),
@@ -185,7 +189,12 @@ pub fn score_element(
     let consistency_source = SourceReference {
         document: "ISU Communication 2788".into(),
         version: "2026-05-19".into(),
-        location: "pp. 14, 16, fall reduction and maximum starting GOE".into(),
+        location: if row.notation.ends_with("<<") {
+            "pp. 14, 16, downgrade and fall reductions and maximum starting GOE"
+        } else {
+            "pp. 14, 16, fall reduction and maximum starting GOE"
+        }
+        .into(),
     };
     Ok(ElementScore {
         base,
@@ -397,11 +406,15 @@ fn second_half_selection(
     for (i, (element, score)) in elements.iter().zip(preliminary).enumerate() {
         if matches!(
             score,
-            Err(ProgramScoreError::Element(
-                ElementScoreError::Ignored | ElementScoreError::NoValue
-            ))
+            Err(ProgramScoreError::Element(ElementScoreError::Ignored))
         ) {
             continue;
+        }
+        if matches!(
+            score,
+            Err(ProgramScoreError::Element(ElementScoreError::NoValue))
+        ) {
+            return Err(ProgramScoreError::TimingUnknown);
         }
         if score.is_err() {
             if is_jump(element) != Some(false) {

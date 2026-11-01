@@ -694,7 +694,7 @@ fn timestamps_follow_program_order_across_element_types() {
 fn resolved_zero_and_ignored_elements_do_not_make_tes_incomplete() {
     // Communication 2786 p. 2: 1Lz<< has zero in every GOE column.
     // Adult announcement p. 11: the Bronze Waltz jump is ignored.
-    let mut zero = program_element("1Lz", None, 0, false, Some(10_000));
+    let mut zero = program_element("1Lz", None, -1, false, Some(10_000));
     zero.recognition = recognition("1Lz", None, Some(vec![PanelCall::Downgraded]));
     let mut ignored = program_element("1A", None, 0, false, Some(20_000));
     ignored.recognition.outcome = RecognitionOutcome::Ignored;
@@ -743,4 +743,64 @@ fn no_value_is_zero_but_invalid_or_unknown_outcomes_are_not() {
     element.annotations.clear();
     element.recognition.outcome = RecognitionOutcome::Unknown;
     assert_eq!(score(element).tes_hundredths, None);
+}
+
+#[test]
+fn downgraded_zero_rows_require_consistent_goe() {
+    // Communication 2788 pp. 14 and 16: downgrade reduction and starting limit.
+    for code in ["1Lz", "1A"] {
+        let r = recognition(code, None, Some(vec![PanelCall::Downgraded]));
+        assert_eq!(
+            score_element(TABLE, &r, &[], -1, Some(false))
+                .unwrap()
+                .score_hundredths,
+            0
+        );
+        for goe in [0, 5] {
+            assert_eq!(
+                score_element(TABLE, &r, &[], goe, Some(false)),
+                Err(ElementScoreError::UnsupportedMarks)
+            );
+        }
+    }
+}
+
+#[test]
+fn no_value_jump_does_not_claim_a_bonus_when_eligibility_is_unknown() {
+    let mut no_value = program_element("1S", None, 0, false, Some(70_000));
+    no_value.recognition.outcome = RecognitionOutcome::NoValue;
+    let jumps = [
+        program_element("1Lz", None, 1, false, Some(51_000)),
+        program_element("1Lz", None, 1, false, Some(60_000)),
+        no_value.clone(),
+        {
+            no_value.start_ms = Some(80_000);
+            no_value
+        },
+    ];
+    let result = score_program(
+        RulesetId::IsuAdult2026_27July16,
+        AdultCategory::Bronze,
+        TABLE,
+        &jumps,
+        Some(0),
+        ordinary(100),
+    );
+    assert_eq!(result.tes_hundredths, None);
+}
+
+#[test]
+fn repeated_program_scores_and_sources_match() {
+    let elements = [program_element("1Lz", None, 1, false, Some(51_000))];
+    let score = || {
+        score_program(
+            RulesetId::IsuAdult2026_27July16,
+            AdultCategory::Bronze,
+            TABLE,
+            &elements,
+            Some(0),
+            ordinary(100),
+        )
+    };
+    assert_eq!(score(), score());
 }
