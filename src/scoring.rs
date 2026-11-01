@@ -76,9 +76,9 @@ fn table_row(
             ),
             ("1Lzq", None) | ("1Lz!", None) => (60, "p. 2, Jumps", None),
             ("1Lz<", None) | ("1Lze", None) => (48, "p. 2, Jumps", None),
-            ("1Lz<<", None) => (0, "p. 2, Jumps", None),
+            ("1Lz<<", None) => (0, "p. 2, Jumps", Some([0; 11])),
             ("1Lze<", None) => (36, "p. 2, Jumps", None),
-            ("1A<<", None) => (0, "p. 3, Jumps", None),
+            ("1A<<", None) => (0, "p. 3, Jumps", Some([0; 11])),
             ("CSSp1", Some(Level::One)) => (
                 230,
                 "p. 8, Spins",
@@ -168,9 +168,15 @@ pub fn score_element(
     }
     let row = table_row(table, recognition).map_err(ElementScoreError::BaseValue)?;
     let goe_values = row.goe.ok_or(ElementScoreError::UnsupportedMarks)?;
+    // Communication 2788 pp. 14, 16: downgrade reduction and starting limit.
+    if row.notation.ends_with("<<") && goe > -1 {
+        return Err(ElementScoreError::UnsupportedMarks);
+    }
     match fall {
         None => return Err(ElementScoreError::UnknownFall),
-        Some(true) if goe > -3 => return Err(ElementScoreError::InconsistentFall),
+        Some(true) if goe > if row.notation.ends_with("<<") { -5 } else { -3 } => {
+            return Err(ElementScoreError::InconsistentFall);
+        }
         _ => {}
     }
     let goe_hundredths = goe_values[(goe + 5) as usize];
@@ -185,7 +191,12 @@ pub fn score_element(
     let consistency_source = SourceReference {
         document: "ISU Communication 2788".into(),
         version: "2026-05-19".into(),
-        location: "pp. 14, 16, fall reduction and maximum starting GOE".into(),
+        location: if row.notation.ends_with("<<") {
+            "pp. 14, 16, downgrade and fall reductions and maximum starting GOE"
+        } else {
+            "pp. 14, 16, fall reduction and maximum starting GOE"
+        }
+        .into(),
     };
     Ok(ElementScore {
         base,
@@ -249,6 +260,7 @@ pub struct Deduction {
 pub struct ProgramScore {
     pub elements: Vec<Result<ProgramElementScore, ProgramScoreError>>,
     /// None means at least one element is unresolved, not a zero score.
+    /// Ignored and no-value outcomes are represented in `elements` and contribute zero.
     pub tes_hundredths: Option<i64>,
     pub fall_deduction: Result<Deduction, ProgramScoreError>,
     pub time_deduction: Result<Deduction, ProgramScoreError>,
@@ -394,6 +406,30 @@ fn second_half_selection(
 ) -> Result<Vec<usize>, ProgramScoreError> {
     let mut indices = Vec::new();
     for (i, (element, score)) in elements.iter().zip(preliminary).enumerate() {
+        if matches!(
+            score,
+            Err(ProgramScoreError::Element(ElementScoreError::Ignored))
+        ) {
+            continue;
+        }
+        if matches!(
+            score,
+            Err(ProgramScoreError::Element(ElementScoreError::NoValue))
+        ) {
+            let before_half = element
+                .start_ms
+                .is_some_and(|start| u64::from(start) * 2 < u64::from(required) * 1000);
+            let known_nonjump = element.recognition.details.as_ref().is_some_and(|details| {
+                details
+                    .components()
+                    .iter()
+                    .all(|c| !c.as_str().starts_with(char::is_numeric))
+            });
+            if before_half || known_nonjump {
+                continue;
+            }
+            return Err(ProgramScoreError::TimingUnknown);
+        }
         if score.is_err() {
             if is_jump(element) != Some(false) {
                 return Err(ProgramScoreError::TimingUnknown);
@@ -481,7 +517,13 @@ pub fn score_program(
         .collect();
     let tes_hundredths = results
         .iter()
-        .map(|r| r.as_ref().map(|s| i64::from(s.score_hundredths)))
+        .map(|r| match r {
+            Ok(score) => Ok(i64::from(score.score_hundredths)),
+            Err(ProgramScoreError::Element(
+                ElementScoreError::Ignored | ElementScoreError::NoValue,
+            )) => Ok(0),
+            Err(error) => Err(error),
+        })
         .sum::<Result<i64, _>>()
         .ok()
         .filter(|_| !elements.is_empty())
