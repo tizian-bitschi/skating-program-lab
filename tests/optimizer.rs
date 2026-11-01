@@ -28,6 +28,22 @@ fn recognition() -> PanelRecognition {
 fn exhaustive_reference_matches_independent_eight_case_table() {
     let result = enumerate_bronze_reference(false).unwrap();
     assert_eq!(result.domain.slot_start_seconds, [10, 20, 30]);
+    if let ReferenceOutcome::Optimal { candidates, .. } = &result.outcome {
+        for candidate in candidates {
+            assert!(candidate
+                .program
+                .sources
+                .iter()
+                .any(|s| s.document.contains("Adult Figure Skating")));
+            assert!(candidate
+                .program
+                .sources
+                .iter()
+                .any(|s| s.document == "ISU Communication 2786" && s.location.contains("row 1Lz")));
+        }
+    } else {
+        panic!("expected feasible reference domain");
+    }
     assert_eq!(result.domain.duration_seconds, 100);
     assert!(
         result.domain.uninterrupted_timing_assumed
@@ -188,6 +204,11 @@ fn pumpkin_matches_reference_and_respects_limits() {
         OptimizerStatus::Incomplete | OptimizerStatus::FeasibleUnproven
     ));
     assert!(!interrupted.enumeration_complete);
+    assert_eq!(
+        interrupted.termination_reason,
+        TerminationReason::OptimizationInterrupted
+    );
+    assert_eq!(interrupted.time_limit, Some(Duration::ZERO));
     let limited = optimize_bronze(&OptimizerRequest {
         exclude_lutz: false,
         enabled_slots: [true; 3],
@@ -201,6 +222,9 @@ fn pumpkin_matches_reference_and_respects_limits() {
     assert_eq!(limited.status, OptimizerStatus::OptimalProven);
     assert_eq!(limited.candidates.len(), 2);
     assert!(!limited.enumeration_complete);
+    assert_eq!(limited.termination_reason, TerminationReason::SolutionLimit);
+    assert_eq!(limited.max_solutions, 2);
+    assert!(limited.enumerate_equal_optima);
 }
 
 #[cfg(feature = "optimizer")]
@@ -329,6 +353,14 @@ fn result_caps_and_disabled_enumeration_are_conservative() {
         assert_eq!(result.status, OptimizerStatus::OptimalProven);
         assert_eq!(result.candidates.len(), limit.min(3));
         assert_eq!(result.enumeration_complete, limit > 3);
+        assert_eq!(
+            result.termination_reason,
+            if limit > 3 {
+                TerminationReason::EnumerationExhausted
+            } else {
+                TerminationReason::SolutionLimit
+            }
+        );
     }
     let result = optimize_bronze(&OptimizerRequest {
         enumerate_equal_optima: false,
@@ -339,4 +371,9 @@ fn result_caps_and_disabled_enumeration_are_conservative() {
     assert_eq!(result.status, OptimizerStatus::OptimalProven);
     assert_eq!(result.candidates.len(), 1);
     assert!(!result.enumeration_complete);
+    assert_eq!(
+        result.termination_reason,
+        TerminationReason::EnumerationDisabled
+    );
+    assert!(!result.enumerate_equal_optima);
 }

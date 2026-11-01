@@ -84,7 +84,7 @@ pub fn enumerate_bronze_reference(exclude_lutz: bool) -> Result<ReferenceResult,
         if !slots.iter().any(|&occupied| occupied) || (exclude_lutz && slots.contains(&true)) {
             continue;
         }
-        let program = bronze_program(slots);
+        let mut program = bronze_program(slots);
         let validation = validate_program(&program);
         if validation
             .findings
@@ -97,9 +97,15 @@ pub fn enumerate_bronze_reference(exclude_lutz: bool) -> Result<ReferenceResult,
             continue;
         }
         let mut total = 0;
+        let mut sources = vec![crate::validation::bronze_jump_source()];
         for element in &program.elements {
-            total += reference_base_value(element, ruleset, table)?.hundredths;
+            let value = reference_base_value(element, ruleset, table)?;
+            total += value.hundredths;
+            if !sources.contains(&value.source) {
+                sources.push(value.source);
+            }
         }
+        program.sources = sources;
         let candidate = ReferenceCandidate {
             slots,
             program,
