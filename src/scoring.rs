@@ -73,3 +73,85 @@ pub fn lookup_base_value(
         notation,
     }))
 }
+
+/// A single hypothetical judge's unfactored element score, in hundredths.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ElementScore {
+    pub base: BaseValue,
+    pub goe: i8,
+    pub goe_hundredths: i16,
+    pub score_hundredths: i16,
+    pub goe_source: SourceReference,
+    pub consistency_source: SourceReference,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ElementScoreError {
+    BaseValue(BaseValueError),
+    NoScorableValue,
+    InvalidGoe,
+    UnknownFall,
+    InconsistentFall,
+    UnsupportedMarks,
+}
+
+/// Scores only individually reviewed unmarked elements, with an explicit fall observation.
+/// This does not validate event eligibility or other execution errors.
+pub fn score_element(
+    table: ScoringTableId,
+    recognition: &PanelRecognition,
+    annotations: &[ScoringAnnotation],
+    goe: i8,
+    fall: Option<bool>,
+) -> Result<ElementScore, ElementScoreError> {
+    if !(-5..=5).contains(&goe) {
+        return Err(ElementScoreError::InvalidGoe);
+    }
+    let base = match lookup_base_value(table, recognition, annotations)
+        .map_err(ElementScoreError::BaseValue)?
+    {
+        BaseValueOutcome::Value(value) => value,
+        BaseValueOutcome::Ignored | BaseValueOutcome::NoValue => {
+            return Err(ElementScoreError::NoScorableValue)
+        }
+    };
+    let per_grade = match base.notation.as_str() {
+        "1Lz" => 6,
+        "CSSp1" => 23,
+        "ChSp1" => 50,
+        _ => return Err(ElementScoreError::UnsupportedMarks),
+    };
+    match fall {
+        None => return Err(ElementScoreError::UnknownFall),
+        Some(true) if goe > -3 => return Err(ElementScoreError::InconsistentFall),
+        _ => {}
+    }
+    let goe_hundredths = i16::from(goe) * per_grade;
+    let score_hundredths = base.hundredths as i16 + goe_hundredths;
+    let column = if goe == 0 {
+        String::from("BASE (zero adjustment)")
+    } else {
+        format!("GOE column {goe:+}")
+    };
+    let goe_source = SourceReference {
+        document: "ISU Communication 2786".into(),
+        version: "2026-06-02".into(),
+        location: format!(
+            "{}, {column}",
+            base.source.location.replace("BASE column, ", "")
+        ),
+    };
+    let consistency_source = SourceReference {
+        document: "ISU Communication 2788".into(),
+        version: "2026-05-19".into(),
+        location: "pp. 14, 16, fall reduction and maximum starting GOE".into(),
+    };
+    Ok(ElementScore {
+        base,
+        goe,
+        goe_hundredths,
+        score_hundredths,
+        goe_source,
+        consistency_source,
+    })
+}
