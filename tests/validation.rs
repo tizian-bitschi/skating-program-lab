@@ -88,24 +88,36 @@ fn bronze_counts_jump_elements_independently_of_local_findings() {
         JumpPart::Jump(jump(Some(JumpKind::ToeLoop), Some(1))),
         JumpPart::Jump(jump(Some(JumpKind::Salchow), Some(1))),
     ]));
-    let mut elements = vec![single(), single(), single(), combination];
+    let mut elements = vec![
+        single(),
+        solo(Some(JumpKind::Flip), Some(1)),
+        solo(Some(JumpKind::Loop), Some(1)),
+        combination,
+    ];
     elements.push(PlannedElement::ChoreographicSequence {
         movements: Some(vec!["five jumps".into()]),
     });
+    let count_rule = "isu-adult-2026-27-bronze-jump-element-count";
     assert!(
-        validate_program(&program(AdultCategory::Bronze, elements.clone()))
+        !validate_program(&program(AdultCategory::Bronze, elements.clone()))
             .findings
-            .is_empty()
+            .iter()
+            .any(|finding| finding.rule_id == count_rule)
     );
     elements.push(solo(Some(JumpKind::Axel), Some(1)));
     let result = validate_program(&program(AdultCategory::Bronze, elements));
-    assert_eq!(result.findings.len(), 2);
-    assert_eq!(result.findings[0].element_index, Some(5));
-    assert_eq!(
-        result.findings[0].rule_id,
-        "isu-adult-2026-27-bronze-jump-eligibility"
-    );
-    let count = &result.findings[1];
+    assert!(result
+        .findings
+        .iter()
+        .any(|finding| finding.element_index == Some(5)
+            && finding.rule_id == "isu-adult-2026-27-bronze-jump-eligibility"));
+    let counts: Vec<_> = result
+        .findings
+        .iter()
+        .filter(|finding| finding.rule_id == count_rule)
+        .collect();
+    assert_eq!(counts.len(), 1);
+    let count = counts[0];
     assert_eq!(count.kind, FindingKind::Violation);
     assert_eq!(count.rule_id, "isu-adult-2026-27-bronze-jump-element-count");
     assert_eq!(count.element_index, None);
@@ -120,6 +132,48 @@ fn bronze_counts_jump_elements_independently_of_local_findings() {
     let unsupported = validate_program(&program(AdultCategory::Silver, vec![single(); 5]));
     assert_eq!(unsupported.findings.len(), 1);
     assert_eq!(unsupported.findings[0].kind, FindingKind::Unsupported);
+}
+
+#[test]
+fn five_eligible_jumps_produce_one_count_finding() {
+    let elements = [
+        JumpKind::ToeLoop,
+        JumpKind::Salchow,
+        JumpKind::Loop,
+        JumpKind::Flip,
+        JumpKind::Lutz,
+    ]
+    .into_iter()
+    .map(|kind| solo(Some(kind), Some(1)))
+    .collect();
+    let result = validate_program(&program(AdultCategory::Bronze, elements));
+    assert_eq!(
+        result
+            .findings
+            .iter()
+            .filter(|finding| finding.rule_id == "isu-adult-2026-27-bronze-jump-element-count")
+            .count(),
+        1
+    );
+}
+
+#[test]
+fn sequence_occupies_one_jump_element_slot() {
+    let sequence = PlannedElement::Jump(JumpElement::Sequence(vec![
+        JumpPart::Jump(jump(Some(JumpKind::ToeLoop), Some(1))),
+        JumpPart::Jump(jump(Some(JumpKind::Salchow), Some(1))),
+    ]));
+    let elements = vec![
+        solo(Some(JumpKind::Loop), Some(1)),
+        solo(Some(JumpKind::Flip), Some(1)),
+        solo(Some(JumpKind::Lutz), Some(1)),
+        sequence,
+    ];
+    let result = validate_program(&program(AdultCategory::Bronze, elements));
+    assert!(!result
+        .findings
+        .iter()
+        .any(|finding| finding.rule_id == "isu-adult-2026-27-bronze-jump-element-count"));
 }
 
 #[test]
