@@ -25,13 +25,177 @@ pub struct PanelRecognition {
     pub planned_element: Option<usize>,
     pub observed_element: Option<usize>,
     pub outcome: RecognitionOutcome,
-    pub code: Option<String>,
-    pub level: Option<Level>,
-    /// Ordered recognized components, including transitions when present.
-    /// None means unknown; indices in calls refer to this list.
-    pub components: Option<Vec<String>>,
-    /// None means unknown; an empty list means explicitly no calls.
-    pub calls: Option<Vec<RecordedCall>>,
+    /// None means the recognized details are unknown.
+    pub details: Option<RecognitionDetails>,
+}
+
+/// The canonical recognition consists of unmarked component codes, a level,
+/// and calls. A full protocol code is derived from these fields, not stored twice.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RecognitionDetails {
+    components: Vec<ComponentCode>,
+    level: Option<Level>,
+    calls: Option<Vec<RecordedCall>>,
+}
+
+/// A supported unmarked code. Marks and levels are stored separately.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ComponentCode(String);
+
+impl TryFrom<&str> for ComponentCode {
+    type Error = String;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        let jump = value
+            .strip_prefix(['1', '2', '3', '4', '5'])
+            .is_some_and(|suffix| matches!(suffix, "T" | "S" | "Lo" | "F" | "Lz" | "A"));
+        let element = matches!(
+            value,
+            "Eu" | "CSp"
+                | "SSp"
+                | "USp"
+                | "LSp"
+                | "CoSp"
+                | "FCSp"
+                | "FSSp"
+                | "FUSp"
+                | "FLSp"
+                | "FCoSp"
+                | "CCSp"
+                | "CSSp"
+                | "CUSp"
+                | "CCoSp"
+                | "FCCSp"
+                | "FCSSp"
+                | "FCUSp"
+                | "FCCoSp"
+                | "StSq"
+                | "ChSq1"
+                | "ChSp1"
+        );
+        if jump || element {
+            Ok(Self(value.into()))
+        } else {
+            Err(value.into())
+        }
+    }
+}
+
+impl ComponentCode {
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RecognitionError {
+    EmptyComponents,
+    InvalidTarget,
+    ConflictingCalls,
+}
+
+impl RecognitionDetails {
+    pub fn new(
+        components: Vec<ComponentCode>,
+        level: Option<Level>,
+        calls: Option<Vec<RecordedCall>>,
+    ) -> Result<Self, RecognitionError> {
+        if components.is_empty() {
+            return Err(RecognitionError::EmptyComponents);
+        }
+        if level.is_some()
+            && (components.len() != 1
+                || components[0].as_str().starts_with(char::is_numeric)
+                || matches!(components[0].as_str(), "Eu" | "ChSq1" | "ChSp1"))
+        {
+            return Err(RecognitionError::InvalidTarget);
+        }
+        if let Some(ref calls) = calls {
+            for (index, entry) in calls.iter().enumerate() {
+                let valid_target = match entry.target {
+                    CallTarget::Element => {
+                        components.len() == 1 || !(entry.call.is_rotation() || entry.call.is_edge())
+                    }
+                    CallTarget::Component(i) => i < components.len(),
+                    CallTarget::BetweenComponents(i) => {
+                        i <= components.len()
+                            && matches!(entry.call, PanelCall::Combination | PanelCall::Sequence)
+                    }
+                };
+                if !valid_target {
+                    return Err(RecognitionError::InvalidTarget);
+                }
+                for previous in &calls[..index] {
+                    let same_target = previous.target == entry.target
+                        || (components.len() == 1
+                            && matches!(
+                                (previous.target, entry.target),
+                                (CallTarget::Element, CallTarget::Component(0))
+                                    | (CallTarget::Component(0), CallTarget::Element)
+                            ));
+                    if same_target
+                        && (previous.call == entry.call
+                            || (previous.call.is_rotation() && entry.call.is_rotation())
+                            || (previous.call.is_edge() && entry.call.is_edge()))
+                    {
+                        return Err(RecognitionError::ConflictingCalls);
+                    }
+                }
+            }
+        }
+        Ok(Self {
+            components,
+            level,
+            calls,
+        })
+    }
+
+    pub fn components(&self) -> &[ComponentCode] {
+        &self.components
+    }
+    pub fn level(&self) -> Option<Level> {
+        self.level
+    }
+    pub fn calls(&self) -> Option<&[RecordedCall]> {
+        self.calls.as_deref()
+    }
+
+    /// Render the stored notation when calls are known. This does not validate legality.
+    pub fn notation(&self) -> Option<String> {
+        let calls = self.calls.as_deref()?;
+        let mut result = String::new();
+        for (index, component) in self.components.iter().enumerate() {
+            if index > 0 {
+                result.push('+');
+            }
+            for entry in calls
+                .iter()
+                .filter(|c| c.target == CallTarget::BetweenComponents(index))
+            {
+                result.push_str(entry.call.symbol().trim_start_matches('+'));
+                result.push('+');
+            }
+            result.push_str(component.as_str());
+            if self.components.len() == 1 {
+                if let Some(level) = self.level {
+                    result.push_str(level.symbol());
+                }
+            }
+            for entry in calls
+                .iter()
+                .filter(|c| c.target == CallTarget::Component(index))
+            {
+                result.push_str(entry.call.symbol());
+            }
+        }
+        for entry in calls.iter().filter(|c| {
+            c.target == CallTarget::BetweenComponents(self.components.len())
+                || c.target == CallTarget::Element
+        }) {
+            result.push_str(entry.call.symbol());
+        }
+        Some(result)
+    }
 }
 
 /// Basic level is distinct from numbered levels and from an unknown level.
@@ -54,6 +218,18 @@ impl TryFrom<u8> for Level {
             3 => Ok(Self::Three),
             4 => Ok(Self::Four),
             _ => Err(value),
+        }
+    }
+}
+
+impl Level {
+    fn symbol(self) -> &'static str {
+        match self {
+            Self::Basic => "B",
+            Self::One => "1",
+            Self::Two => "2",
+            Self::Three => "3",
+            Self::Four => "4",
         }
     }
 }
@@ -119,4 +295,27 @@ pub enum PanelCall {
     Combination,
     /// +SEQ: sequence notation, including an interrupted sequence.
     Sequence,
+}
+
+impl PanelCall {
+    fn is_rotation(self) -> bool {
+        matches!(self, Self::Quarter | Self::UnderRotated | Self::Downgraded)
+    }
+    fn is_edge(self) -> bool {
+        matches!(self, Self::UnclearEdge | Self::WrongEdge)
+    }
+    fn symbol(self) -> &'static str {
+        match self {
+            Self::Quarter => "q",
+            Self::UnderRotated => "<",
+            Self::Downgraded => "<<",
+            Self::UnclearEdge => "!",
+            Self::WrongEdge => "e",
+            Self::ReducedSpinValue => "V",
+            Self::NotCounted => "*",
+            Self::Repetition => "+REP",
+            Self::Combination => "+COMBO",
+            Self::Sequence => "+SEQ",
+        }
+    }
 }

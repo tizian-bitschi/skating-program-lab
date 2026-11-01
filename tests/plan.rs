@@ -71,6 +71,14 @@ fn bronze_plan_preserves_order_and_details() {
     assert_eq!(copy.ruleset, RulesetId::IsuAdult2026_27July16);
     assert_eq!(copy.scoring_table, ScoringTableId::Isu2786June2_2026);
     assert_eq!(copy.sources, program.sources);
+    assert_eq!(copy.sources[0].location, "p. 11, Bronze Free Skating");
+    assert_eq!(copy.sources[1].version, "2026-06-02");
+    assert_eq!(
+        copy.elements[3],
+        PlannedElement::ChoreographicSequence {
+            movements: Some(vec!["spiral".into(), "spread eagle".into()]),
+        }
+    );
     assert_eq!(copy.elements, program.elements);
     assert!(
         matches!(&copy.elements[1], PlannedElement::Jump(JumpElement::Combination(parts))
