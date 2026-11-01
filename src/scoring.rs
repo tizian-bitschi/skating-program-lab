@@ -196,3 +196,223 @@ pub fn score_element(
         consistency_source,
     })
 }
+
+/// Facts required for the supported, uninterrupted timing scenario.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ProgramTiming {
+    pub duration_seconds: u32,
+    /// True only when interruption and incomplete-program consequences have been ruled out.
+    pub ordinary_timing_confirmed: bool,
+    /// True only after checking applicable event notices and Adult exceptions.
+    pub second_half_default_confirmed: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ProgramElement {
+    pub recognition: PanelRecognition,
+    pub annotations: Vec<ScoringAnnotation>,
+    pub goe: i8,
+    pub fall: Option<bool>,
+    /// Elapsed milliseconds from the program start; required for jumps.
+    pub start_ms: Option<u32>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ProgramElementScore {
+    pub unfactored: ElementScore,
+    pub second_half: bool,
+    pub credited_base_hundredths: u16,
+    pub score_hundredths: i16,
+    pub second_half_source: Option<SourceReference>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ProgramScoreError {
+    Element(ElementScoreError),
+    TimingUnknown,
+    InvalidTiming,
+    ExceptionUnresolved,
+    UnsupportedCategory,
+    UnknownFall,
+    InvalidInput,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Deduction {
+    pub hundredths: u32,
+    pub source: SourceReference,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ProgramScore {
+    pub elements: Vec<Result<ProgramElementScore, ProgramScoreError>>,
+    /// None means at least one element is unresolved, not a zero score.
+    pub tes_hundredths: Option<i64>,
+    pub fall_deduction: Result<Deduction, ProgramScoreError>,
+    pub time_deduction: Result<Deduction, ProgramScoreError>,
+}
+
+fn adult_source(location: &str) -> SourceReference {
+    SourceReference {
+        document: "International Adult Figure Skating Competitions Technical Announcement".into(),
+        version: "2026-07-16".into(),
+        location: location.into(),
+    }
+}
+
+fn required_duration(category: crate::AdultCategory) -> (u32, &'static str) {
+    match category {
+        crate::AdultCategory::Bronze => (100, "p. 11"),
+        crate::AdultCategory::Silver => (120, "p. 10"),
+        crate::AdultCategory::Gold => (170, "p. 9"),
+        crate::AdultCategory::Masters => (180, "p. 8"),
+    }
+}
+
+fn factored_base(hundredths: u16) -> u16 {
+    ((u32::from(hundredths) * 11 + 5) / 10) as u16
+}
+
+/// Calculate a partial-coverage scenario, not an official panel or segment score.
+/// Elements must be in program order; callers supply all recognized elements and falls.
+pub fn score_program(
+    category: crate::AdultCategory,
+    table: ScoringTableId,
+    elements: &[ProgramElement],
+    outside_falls: Option<u32>,
+    timing: Option<ProgramTiming>,
+) -> ProgramScore {
+    let (required, page) = required_duration(category);
+    let timing_ok = timing.filter(|t| t.ordinary_timing_confirmed && t.duration_seconds > 0);
+    let time_deduction = match timing_ok {
+        None => Err(ProgramScoreError::TimingUnknown),
+        Some(t) => {
+            let deviation = required.abs_diff(t.duration_seconds).saturating_sub(10);
+            deviation
+                .div_ceil(5)
+                .checked_mul(100)
+                .map(|hundredths| Deduction {
+                    hundredths,
+                    source: adult_source(&format!(
+                        "p. 6, time deductions; {page}, required duration"
+                    )),
+                })
+                .ok_or(ProgramScoreError::InvalidInput)
+        }
+    };
+    let fall_deduction = match (
+        category,
+        outside_falls,
+        elements.iter().all(|e| {
+            e.fall == Some(false)
+                || (e.fall == Some(true) && e.recognition.outcome == RecognitionOutcome::Recognized)
+        }),
+    ) {
+        (crate::AdultCategory::Bronze, Some(count), true) => count
+            .checked_mul(50)
+            .map(|hundredths| Deduction {
+                hundredths,
+                source: adult_source("p. 11, Bronze fall deductions"),
+            })
+            .ok_or(ProgramScoreError::InvalidInput),
+        (crate::AdultCategory::Bronze, _, _) => Err(ProgramScoreError::UnknownFall),
+        _ => Err(ProgramScoreError::UnsupportedCategory),
+    };
+    let preliminary: Vec<_> = elements
+        .iter()
+        .map(|e| {
+            // The x annotation is a recorded claim, not evidence of eligibility.
+            score_element(table, &e.recognition, &[], e.goe, e.fall)
+                .map_err(ProgramScoreError::Element)
+        })
+        .collect();
+    let mut jump_indices = Vec::new();
+    let mut jump_error = None;
+    let mut previous_start = None;
+    for (i, (element, score)) in elements.iter().zip(&preliminary).enumerate() {
+        if let Ok(score) = score {
+            if score.base.notation == "1Lz" {
+                if let Some(start) = element.start_ms {
+                    if previous_start.is_some_and(|previous| start < previous) {
+                        jump_error = Some(ProgramScoreError::InvalidTiming);
+                    }
+                    previous_start = Some(start);
+                }
+                match (timing_ok, element.start_ms) {
+                    (None, _) | (_, None) => jump_error = Some(ProgramScoreError::TimingUnknown),
+                    (Some(t), Some(start))
+                        if u64::from(start) > u64::from(t.duration_seconds) * 1000 =>
+                    {
+                        jump_error = Some(ProgramScoreError::InvalidTiming)
+                    }
+                    (Some(t), _) if !t.second_half_default_confirmed => {
+                        jump_error = Some(ProgramScoreError::ExceptionUnresolved)
+                    }
+                    (Some(_), Some(start))
+                        if u64::from(start) * 2 >= u64::from(required) * 1000 =>
+                    {
+                        jump_indices.push(i)
+                    }
+                    _ => {}
+                }
+            }
+        }
+    }
+    // An unresolved element may itself affect which jumps are the last three.
+    if preliminary.iter().any(Result::is_err) && !jump_indices.is_empty() {
+        jump_error = Some(ProgramScoreError::TimingUnknown);
+    }
+    let selected = jump_indices.len().saturating_sub(3);
+    let results: Vec<_> = preliminary
+        .into_iter()
+        .enumerate()
+        .map(|(i, result)| {
+            let score = result?;
+            let jump = score.base.notation == "1Lz";
+            if jump {
+                if let Some(error) = &jump_error {
+                    return Err(error.clone());
+                }
+            }
+            let second_half = jump_indices[selected..].contains(&i);
+            let credited = if second_half {
+                u32::from(factored_base(score.base.hundredths))
+            } else {
+                u32::from(score.base.hundredths)
+            } as u16;
+            let total = credited as i16 + score.goe_hundredths;
+            let source = second_half.then(|| SourceReference {
+                document: "ISU Sports Rules — Figure Skating".into(),
+                version: "2026-06-12".into(),
+                location: "p. 9, Rule 353.1(h)(iii)".into(),
+            });
+            Ok(ProgramElementScore {
+                unfactored: score,
+                second_half,
+                credited_base_hundredths: credited,
+                score_hundredths: total,
+                second_half_source: source,
+            })
+        })
+        .collect();
+    let tes = results
+        .iter()
+        .map(|r| r.as_ref().map(|s| i64::from(s.score_hundredths)))
+        .sum::<Result<i64, _>>()
+        .ok();
+    ProgramScore {
+        elements: results,
+        tes_hundredths: tes,
+        fall_deduction,
+        time_deduction,
+    }
+}
+
+#[cfg(test)]
+mod program_tests {
+    #[test]
+    fn factored_base_rounds_each_value_to_hundredths() {
+        assert_eq!(super::factored_base(35), 39);
+        assert_eq!(super::factored_base(34), 37);
+    }
+}
