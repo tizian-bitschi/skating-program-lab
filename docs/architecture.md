@@ -14,12 +14,12 @@ Priorities: (1) correctness against applicable sources, (2) traceability and exp
 
 Start with modules within one crate, introduced only when implemented:
 
-- **Domain and rules:** explicit types for program, planned/executed/recognized elements, source-linked ruleset and table identities.
-- **Validator:** local and program-wide checks, returning findings with source locations and affected inputs.
-- **Scoring:** deterministic calculation from recognized elements, calls and GOE, showing intermediate values and separately reporting deductions.
-- **Optimizer:** search a stated finite candidate space under official and user constraints, returning proof status and alternatives. Validate candidates and recompute scores through the core.
+- **Domain and rules:** explicit representations for ordered plans, observed execution, supplied panel recognition and source-linked ruleset and table identities. These stages remain distinct.
+- **Validator:** local and program-wide checks, returning separate plan findings, recognition/input inconsistencies and unknowns with source locations and affected inputs. It does not infer every panel decision or spin level.
+- **Scoring:** deterministic scenario calculation from supplied recognized code, calls and a final single-judge GOE, using versioned table values. Return element breakdowns and TES separately from deductions; PCS and panel aggregation are future work.
+- **Optimizer:** search a finite request-defined candidate space under official and personal constraints. Report proof and enumeration status, including incomplete or infeasible outcomes. Validate candidates and recompute their base values through the core.
 
-Input and selected version flow into domain structures; validation reports findings. Recognized execution and scoring tables feed scoring. Optimization consumes the same domain and rule semantics, then submits candidates to validation and objective calculation. Consumers depend on the core; validator and scoring depend on domain/rules, optimizer may use all three. Domain logic must not depend on UI, network, storage or solver-specific infrastructure. Avoid duplicated rule interpretations; if solver constraints duplicate semantics, test them against the validator and independently enumerated small cases.
+Input and selected version flow into domain structures; validation reports findings and unknowns. Supplied recognition, final hypothetical GOE and scoring tables feed scoring, while fall and timing facts feed separate deductions. Optimization consumes the same domain and rule semantics, then submits candidates to validation and objective calculation. A proof is limited to the modeled domain and constraints. Consumers depend on the core; validator and scoring depend on domain/rules, optimizer may use all three. Domain logic must not depend on UI, network, storage or solver-specific infrastructure. Avoid duplicated rule interpretations; if solver constraints duplicate semantics, test them against the validator and independently enumerated small cases.
 
 ## Decisions and quality assurance
 
