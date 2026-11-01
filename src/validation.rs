@@ -4,12 +4,12 @@ use crate::{
     Season, SourceReference,
 };
 
-const ELIGIBILITY_RULE: &str = "isu-adult-2026-27-bronze-jump-eligibility";
-const COUNT_RULE: &str = "isu-adult-2026-27-bronze-jump-element-count";
-const COMBINATION_COUNT_RULE: &str = "isu-adult-2026-27-bronze-combination-count";
-const STRUCTURE_RULE: &str = "isu-adult-2026-27-bronze-combination-structure";
-const EULER_RULE: &str = "isu-adult-2026-27-bronze-combination-euler";
-const REPETITION_RULE: &str = "isu-adult-2026-27-bronze-jump-repetition";
+pub(crate) const ELIGIBILITY_RULE: &str = "isu-adult-2026-27-bronze-jump-eligibility";
+pub(crate) const COUNT_RULE: &str = "isu-adult-2026-27-bronze-jump-element-count";
+pub(crate) const COMBINATION_COUNT_RULE: &str = "isu-adult-2026-27-bronze-combination-count";
+pub(crate) const STRUCTURE_RULE: &str = "isu-adult-2026-27-bronze-combination-structure";
+pub(crate) const EULER_RULE: &str = "isu-adult-2026-27-bronze-combination-euler";
+pub(crate) const REPETITION_RULE: &str = "isu-adult-2026-27-bronze-jump-repetition";
 const SCOPE_RULE: &str = "validator-scope";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -39,6 +39,14 @@ pub struct ValidationResult {
     pub findings: Vec<Finding>,
 }
 
+pub(crate) fn bronze_jump_source() -> SourceReference {
+    SourceReference {
+        document: "International Adult Figure Skating Competitions Technical Announcement".into(),
+        version: "2026-07-16".into(),
+        location: "p. 11, Bronze Free Skating, jumps".into(),
+    }
+}
+
 fn finding(
     kind: FindingKind,
     rule_id: &'static str,
@@ -59,12 +67,7 @@ fn finding(
                 location: "Current state, validator scope".into(),
             }
         } else {
-            SourceReference {
-                document: "International Adult Figure Skating Competitions Technical Announcement"
-                    .into(),
-                version: "2026-07-16".into(),
-                location: "p. 11, Bronze Free Skating, jumps".into(),
-            }
+            bronze_jump_source()
         },
     }
 }

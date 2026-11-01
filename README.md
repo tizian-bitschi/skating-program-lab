@@ -2,11 +2,11 @@
 
 An open-source foundation for planning technical figure skating programs. The first intended scope is singles free skating at Bronze, Silver, Gold and Masters in the 2026/27 ISU-supported International Adult Figure Skating Competitions.
 
-The planned core will validate programs, simulate technical scores and find programs with maximum base value under rules and personal constraints. The Rust library currently models season, category, supported ruleset and scoring-table identities, and source references. It partially validates Bronze jump eligibility, the four jump-element limit, combination structure and listed-jump repetitions; it also calculates limited source-linked scoring scenarios for selected elements and Bronze fall deductions. Optimization and all other validation rules are not implemented. An empty finding list does not establish full compliance. Results from future versions must not be treated as official judging decisions.
+The planned core will validate programs, simulate technical scores and find programs with maximum base value under rules and personal constraints. The Rust library currently models season, category, supported ruleset and scoring-table identities, and source references. It partially validates Bronze jump eligibility, the four jump-element limit, combination structure and listed-jump repetitions; it also calculates limited source-linked scoring scenarios for selected elements and Bronze fall deductions. A bounded optimizer searches a documented three-slot Bronze 1Lz domain; it does not establish complete program compliance or a global maximum. Other validation rules are not implemented. See [requirements](docs/requirements.md#bounded-pumpkin-optimizer) for the assumptions and limits. An empty finding list does not establish full compliance. Results from future versions must not be treated as official judging decisions.
 
 ## Development
 
-Install stable Rust with `rustfmt` and `clippy`, then run:
+Install Rust using `rustup`; the repository selects the required toolchain with `rustfmt` and `clippy`. Then run:
 
 ```sh
 cargo build
