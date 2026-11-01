@@ -658,3 +658,32 @@ fn bronze_boundary_fixture_uses_required_duration_and_unfactored_goe() {
     );
     assert_eq!(result.tes_hundredths, Some(138));
 }
+
+#[test]
+fn timestamps_follow_program_order_across_element_types() {
+    let rules = RulesetId::IsuAdult2026_27July16;
+    let spin = program_element("CSSp", Some(Level::One), 1, false, Some(80_000));
+    let jump = program_element("1Lz", None, 1, false, Some(50_000));
+    let result = score_program(
+        rules,
+        AdultCategory::Bronze,
+        TABLE,
+        &[spin, jump],
+        Some(0),
+        ordinary(100),
+    );
+    assert_eq!(result.elements[0].as_ref().unwrap().score_hundredths, 253);
+    assert_eq!(result.elements[1], Err(ProgramScoreError::InvalidTiming));
+    assert_eq!(result.tes_hundredths, None);
+    let spin = program_element("CSSp", Some(Level::One), 1, false, Some(40_000));
+    let jump = program_element("1Lz", None, 1, false, Some(50_000));
+    let result = score_program(
+        rules,
+        AdultCategory::Bronze,
+        TABLE,
+        &[spin, jump],
+        Some(0),
+        ordinary(100),
+    );
+    assert_eq!(result.tes_hundredths, Some(325));
+}

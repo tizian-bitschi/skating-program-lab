@@ -49,12 +49,17 @@ impl std::error::Error for UnknownVersion {}
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RulesetId {
     IsuAdult2026_27July16,
+    /// Synthetic identity used only to exercise version mismatch handling.
+    #[cfg(test)]
+    TestOther,
 }
 
 impl RulesetId {
     pub fn as_str(self) -> &'static str {
         match self {
             Self::IsuAdult2026_27July16 => "isu-adult-2026-27-2026-07-16",
+            #[cfg(test)]
+            Self::TestOther => "test-other",
         }
     }
 }

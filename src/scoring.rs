@@ -273,6 +273,8 @@ fn required_duration(
             crate::AdultCategory::Gold => (170, "p. 9"),
             crate::AdultCategory::Masters => (180, "p. 8"),
         },
+        #[cfg(test)]
+        crate::RulesetId::TestOther => unreachable!("test identity has no scoring rules"),
     }
 }
 
@@ -391,7 +393,6 @@ fn second_half_selection(
     required: u32,
 ) -> Result<Vec<usize>, ProgramScoreError> {
     let mut indices = Vec::new();
-    let mut previous = None;
     for (i, (element, score)) in elements.iter().zip(preliminary).enumerate() {
         if score.is_err() {
             if is_jump(element) != Some(false) {
@@ -409,10 +410,6 @@ fn second_half_selection(
             return Err(ProgramScoreError::ExceptionUnresolved);
         }
         let start = element.start_ms.ok_or(ProgramScoreError::TimingUnknown)?;
-        if previous.is_some_and(|p| start < p) {
-            return Err(ProgramScoreError::InvalidTiming);
-        }
-        previous = Some(start);
         if u64::from(start) * 2 >= u64::from(required) * 1000 {
             indices.push(i);
         }
@@ -453,9 +450,20 @@ pub fn score_program(
     timing: Option<ProgramTiming>,
 ) -> ProgramScore {
     let (required, page) = required_duration(ruleset, category);
+    let mut previous_start = None;
     let preliminary: Vec<_> = elements
         .iter()
-        .map(|e| element_score(ruleset, table, e, timing, required))
+        .map(|e| {
+            if let Some(start) = e.start_ms {
+                let inconsistent = previous_start.is_some_and(|previous| start < previous);
+                previous_start =
+                    Some(previous_start.map_or(start, |previous: u32| previous.max(start)));
+                if inconsistent {
+                    return Err(ProgramScoreError::InvalidTiming);
+                }
+            }
+            element_score(ruleset, table, e, timing, required)
+        })
         .collect();
     let selection = second_half_selection(elements, &preliminary, timing, required);
     let results: Vec<_> = preliminary
@@ -496,5 +504,38 @@ mod program_tests {
     fn factored_base_rounds_each_value_to_hundredths() {
         assert_eq!(super::factored_base(35), 39);
         assert_eq!(super::factored_base(34), 37);
+    }
+
+    #[test]
+    fn mismatched_recognition_ruleset_prevents_exact_tes() {
+        use super::*;
+        let element = ProgramElement {
+            recognition: PanelRecognition {
+                ruleset: crate::RulesetId::TestOther,
+                source: None,
+                planned_element: None,
+                observed_element: None,
+                outcome: RecognitionOutcome::Recognized,
+                details: None,
+            },
+            annotations: vec![],
+            goe: 0,
+            fall: Some(false),
+            start_ms: Some(1_000),
+        };
+        let result = score_program(
+            crate::RulesetId::IsuAdult2026_27July16,
+            crate::AdultCategory::Bronze,
+            ScoringTableId::Isu2786June2_2026,
+            &[element],
+            Some(0),
+            Some(ProgramTiming {
+                duration_seconds: 100,
+                ordinary_timing_confirmed: true,
+                second_half_default_confirmed: true,
+            }),
+        );
+        assert_eq!(result.elements[0], Err(ProgramScoreError::RulesetMismatch));
+        assert_eq!(result.tes_hundredths, None);
     }
 }
