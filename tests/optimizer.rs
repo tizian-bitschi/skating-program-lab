@@ -130,3 +130,109 @@ fn excluding_the_only_variant_is_infeasible() {
     assert!(result.domain.exclude_lutz);
     assert_eq!(result.outcome, ReferenceOutcome::Infeasible);
 }
+
+#[test]
+fn pumpkin_matches_reference_and_respects_limits() {
+    use std::time::Duration;
+    for exclude in [false, true] {
+        let request = OptimizerRequest {
+            exclude_lutz: exclude,
+            enabled_slots: [true; 3],
+            ruleset: RulesetId::IsuAdult2026_27July16,
+            scoring_table: ScoringTableId::Isu2786June2_2026,
+            enumerate_equal_optima: true,
+            max_solutions: 8,
+            time_limit: None,
+        };
+        let result = optimize_bronze(&request).unwrap();
+        match enumerate_bronze_reference(exclude).unwrap().outcome {
+            ReferenceOutcome::Infeasible => {
+                assert_eq!(result.status, OptimizerStatus::InfeasibleProven)
+            }
+            ReferenceOutcome::Optimal {
+                base_hundredths,
+                candidates,
+            } => {
+                assert_eq!(result.status, OptimizerStatus::OptimalProven);
+                assert!(result.enumeration_complete);
+                let mut expected = candidates.iter().map(|c| c.slots).collect::<Vec<_>>();
+                expected.sort();
+                assert_eq!(
+                    result
+                        .candidates
+                        .iter()
+                        .map(|c| c.slots)
+                        .collect::<Vec<_>>(),
+                    expected
+                );
+                assert!(result
+                    .candidates
+                    .iter()
+                    .all(|c| c.base_hundredths == base_hundredths));
+            }
+        }
+    }
+    let interrupted = optimize_bronze(&OptimizerRequest {
+        exclude_lutz: false,
+        enabled_slots: [true; 3],
+        ruleset: RulesetId::IsuAdult2026_27July16,
+        scoring_table: ScoringTableId::Isu2786June2_2026,
+        enumerate_equal_optima: true,
+        max_solutions: 8,
+        time_limit: Some(Duration::ZERO),
+    })
+    .unwrap();
+    assert!(matches!(
+        interrupted.status,
+        OptimizerStatus::Incomplete | OptimizerStatus::FeasibleUnproven
+    ));
+    assert!(!interrupted.enumeration_complete);
+    let limited = optimize_bronze(&OptimizerRequest {
+        exclude_lutz: false,
+        enabled_slots: [true; 3],
+        ruleset: RulesetId::IsuAdult2026_27July16,
+        scoring_table: ScoringTableId::Isu2786June2_2026,
+        enumerate_equal_optima: true,
+        max_solutions: 2,
+        time_limit: None,
+    })
+    .unwrap();
+    assert_eq!(limited.status, OptimizerStatus::OptimalProven);
+    assert_eq!(limited.candidates.len(), 2);
+    assert!(!limited.enumeration_complete);
+}
+
+#[test]
+fn candidate_slots_narrow_the_domain() {
+    let request = OptimizerRequest {
+        exclude_lutz: false,
+        enabled_slots: [true, false, true],
+        ruleset: RulesetId::IsuAdult2026_27July16,
+        scoring_table: ScoringTableId::Isu2786June2_2026,
+        enumerate_equal_optima: true,
+        max_solutions: 8,
+        time_limit: None,
+    };
+    let result = optimize_bronze(&request).unwrap();
+    assert_eq!(result.status, OptimizerStatus::OptimalProven);
+    assert!(result.enumeration_complete);
+    assert_eq!(result.candidates.len(), 1);
+    assert_eq!(result.candidates[0].slots, [true, false, true]);
+    assert_eq!(result.candidates[0].base_hundredths, 120);
+    let no_slots = OptimizerRequest {
+        enabled_slots: [false; 3],
+        ..request.clone()
+    };
+    assert_eq!(
+        optimize_bronze(&no_slots).unwrap().status,
+        OptimizerStatus::InfeasibleProven
+    );
+    let no_results = OptimizerRequest {
+        max_solutions: 0,
+        ..request
+    };
+    assert!(matches!(
+        optimize_bronze(&no_results),
+        Err(ReferenceError::InvalidLimit)
+    ));
+}

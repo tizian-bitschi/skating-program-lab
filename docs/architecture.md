@@ -36,3 +36,5 @@ Program scoring composes the existing element scorer with explicit timing and fa
 The exhaustive reference optimizer enumerates one fixed, three-slot Bronze domain. It calls the shared validator and independently sums source-backed lookup values for each accepted plan. It reports all timed ties or model infeasibility, with partial coverage; it does not introduce a solver. Its exact domain and assumptions are in [requirements](requirements.md).
 
 The bounded comparison in [solver-comparison](solver-comparison.md) selects Pumpkin for the next native prototype, subject to the documented toolchain, interruption and WebAssembly checks. The standalone prototype is not a dependency of the domain library.
+
+The bounded optimizer uses Pumpkin 0.5 on subsets of the reference domain. It derives the finite allowed assignments from the validator and checks each returned candidate with the validator and BV lookup. Proof status and equal-optimum enumeration remain separate. Its native dependency and limited domain are described in [requirements](requirements.md#bounded-pumpkin-optimizer); WebAssembly support is not established.

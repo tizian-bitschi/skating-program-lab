@@ -4,3 +4,6 @@ version = "0.1.0"
 edition = "2021"
 license = "MIT"
 description = "Foundation for technical figure skating program planning"
+
+[dependencies]
+pumpkin-solver = "=0.5.0"
