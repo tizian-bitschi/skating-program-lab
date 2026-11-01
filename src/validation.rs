@@ -4,7 +4,9 @@ use crate::{
     Season, SourceReference,
 };
 
-const RULE: &str = "isu-adult-2026-27-bronze-jump-eligibility";
+const ELIGIBILITY_RULE: &str = "isu-adult-2026-27-bronze-jump-eligibility";
+const COUNT_RULE: &str = "isu-adult-2026-27-bronze-jump-element-count";
+const SCOPE_RULE: &str = "validator-scope";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FindingKind {
@@ -35,21 +37,18 @@ pub struct ValidationResult {
 
 fn finding(
     kind: FindingKind,
+    rule_id: &'static str,
     element_index: Option<usize>,
     component_index: Option<usize>,
     explanation: &'static str,
 ) -> Finding {
     Finding {
         kind,
-        rule_id: if kind == FindingKind::Unsupported {
-            "validator-scope"
-        } else {
-            RULE
-        },
+        rule_id,
         element_index,
         component_index,
         explanation,
-        source: if kind == FindingKind::Unsupported {
+        source: if rule_id == SCOPE_RULE {
             SourceReference {
                 document: "Skating Program Lab architecture".into(),
                 version: "issue-13".into(),
@@ -66,7 +65,7 @@ fn finding(
     }
 }
 
-/// Checks Bronze jump eligibility only; an empty finding list does not establish compliance.
+/// Checks Bronze jump eligibility and element count; an empty list does not establish compliance.
 pub fn validate_program(program: &Program) -> ValidationResult {
     let mut result = ValidationResult {
         coverage: Coverage::Partial,
@@ -82,14 +81,17 @@ pub fn validate_program(program: &Program) -> ValidationResult {
     {
         result.findings.push(finding(
             FindingKind::Unsupported,
+            SCOPE_RULE,
             None,
             None,
             "Only Bronze in the 2026/27 Adult ruleset is supported.",
         ));
         return result;
     }
+    let mut jump_count = 0;
     for (index, element) in program.elements.iter().enumerate() {
         if let PlannedElement::Jump(jump) = element {
+            jump_count += 1;
             match jump {
                 JumpElement::Solo(jump) => check_jump(jump, index, None, &mut result.findings),
                 JumpElement::Combination(parts) | JumpElement::Sequence(parts) => {
@@ -101,6 +103,15 @@ pub fn validate_program(program: &Program) -> ValidationResult {
                 }
             }
         }
+    }
+    if jump_count > 4 {
+        result.findings.push(finding(
+            FindingKind::Violation,
+            COUNT_RULE,
+            None,
+            None,
+            "Bronze permits at most four jump elements.",
+        ));
     }
     result
 }
@@ -115,6 +126,7 @@ fn check_jump(
     if jump.kind.is_none() || jump.rotations.is_none() || jump.rotations == Some(0) {
         findings.push(finding(
             FindingKind::Unknown,
+            ELIGIBILITY_RULE,
             index,
             component_index,
             "Jump kind or a positive rotation count is missing.",
@@ -123,6 +135,7 @@ fn check_jump(
     if jump.kind == Some(JumpKind::Axel) {
         findings.push(finding(
             FindingKind::Violation,
+            ELIGIBILITY_RULE,
             index,
             component_index,
             "Axel jumps are prohibited in Bronze.",
@@ -131,6 +144,7 @@ fn check_jump(
     if jump.rotations.is_some_and(|count| count >= 2) {
         findings.push(finding(
             FindingKind::Violation,
+            ELIGIBILITY_RULE,
             index,
             component_index,
             "Multi-rotation jumps are prohibited in Bronze.",
