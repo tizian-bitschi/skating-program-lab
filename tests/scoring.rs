@@ -265,8 +265,10 @@ fn score_preserves_outcomes_and_rejects_unknowns_and_combinations() {
         Ok(BaseValueOutcome::Value(BaseValue { hundredths: 0, .. }))
     ));
     assert_eq!(
-        score_element(TABLE, &r, &[], -3, Some(false)),
-        Err(ElementScoreError::UnsupportedMarks)
+        score_element(TABLE, &r, &[], -3, Some(false))
+            .unwrap()
+            .score_hundredths,
+        0
     );
     r.outcome = RecognitionOutcome::Ignored;
     assert_eq!(
@@ -686,4 +688,59 @@ fn timestamps_follow_program_order_across_element_types() {
         ordinary(100),
     );
     assert_eq!(result.tes_hundredths, Some(325));
+}
+
+#[test]
+fn resolved_zero_and_ignored_elements_do_not_make_tes_incomplete() {
+    // Communication 2786 p. 2: 1Lz<< has zero in every GOE column.
+    // Adult announcement p. 11: the Bronze Waltz jump is ignored.
+    let mut zero = program_element("1Lz", None, 0, false, Some(10_000));
+    zero.recognition = recognition("1Lz", None, Some(vec![PanelCall::Downgraded]));
+    let mut ignored = program_element("1A", None, 0, false, Some(20_000));
+    ignored.recognition.outcome = RecognitionOutcome::Ignored;
+    let jump = program_element("1Lz", None, 1, false, Some(60_000));
+    let result = score_program(
+        RulesetId::IsuAdult2026_27July16,
+        AdultCategory::Bronze,
+        TABLE,
+        &[zero, ignored, jump],
+        Some(0),
+        ordinary(100),
+    );
+    assert_eq!(result.elements[0].as_ref().unwrap().score_hundredths, 0);
+    assert_eq!(
+        result.elements[1],
+        Err(ProgramScoreError::Element(ElementScoreError::Ignored))
+    );
+    assert_eq!(result.elements[2].as_ref().unwrap().score_hundredths, 72);
+    assert_eq!(result.tes_hundredths, Some(72));
+}
+
+#[test]
+fn no_value_is_zero_but_invalid_or_unknown_outcomes_are_not() {
+    let mut element = program_element("1A", None, 0, false, Some(20_000));
+    element.recognition.outcome = RecognitionOutcome::NoValue;
+    let score = |element| {
+        score_program(
+            RulesetId::IsuAdult2026_27July16,
+            AdultCategory::Bronze,
+            TABLE,
+            &[element],
+            Some(0),
+            ordinary(100),
+        )
+    };
+    let result = score(element.clone());
+    assert_eq!(
+        result.elements[0],
+        Err(ProgramScoreError::Element(ElementScoreError::NoValue))
+    );
+    assert_eq!(result.tes_hundredths, Some(0));
+    element
+        .annotations
+        .push(ScoringAnnotation::SecondHalfCredit);
+    assert_eq!(score(element.clone()).tes_hundredths, None);
+    element.annotations.clear();
+    element.recognition.outcome = RecognitionOutcome::Unknown;
+    assert_eq!(score(element).tes_hundredths, None);
 }

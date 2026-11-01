@@ -76,9 +76,9 @@ fn table_row(
             ),
             ("1Lzq", None) | ("1Lz!", None) => (60, "p. 2, Jumps", None),
             ("1Lz<", None) | ("1Lze", None) => (48, "p. 2, Jumps", None),
-            ("1Lz<<", None) => (0, "p. 2, Jumps", None),
+            ("1Lz<<", None) => (0, "p. 2, Jumps", Some([0; 11])),
             ("1Lze<", None) => (36, "p. 2, Jumps", None),
-            ("1A<<", None) => (0, "p. 3, Jumps", None),
+            ("1A<<", None) => (0, "p. 3, Jumps", Some([0; 11])),
             ("CSSp1", Some(Level::One)) => (
                 230,
                 "p. 8, Spins",
@@ -249,6 +249,7 @@ pub struct Deduction {
 pub struct ProgramScore {
     pub elements: Vec<Result<ProgramElementScore, ProgramScoreError>>,
     /// None means at least one element is unresolved, not a zero score.
+    /// Ignored and no-value outcomes are represented in `elements` and contribute zero.
     pub tes_hundredths: Option<i64>,
     pub fall_deduction: Result<Deduction, ProgramScoreError>,
     pub time_deduction: Result<Deduction, ProgramScoreError>,
@@ -394,6 +395,14 @@ fn second_half_selection(
 ) -> Result<Vec<usize>, ProgramScoreError> {
     let mut indices = Vec::new();
     for (i, (element, score)) in elements.iter().zip(preliminary).enumerate() {
+        if matches!(
+            score,
+            Err(ProgramScoreError::Element(
+                ElementScoreError::Ignored | ElementScoreError::NoValue
+            ))
+        ) {
+            continue;
+        }
         if score.is_err() {
             if is_jump(element) != Some(false) {
                 return Err(ProgramScoreError::TimingUnknown);
@@ -481,7 +490,13 @@ pub fn score_program(
         .collect();
     let tes_hundredths = results
         .iter()
-        .map(|r| r.as_ref().map(|s| i64::from(s.score_hundredths)))
+        .map(|r| match r {
+            Ok(score) => Ok(i64::from(score.score_hundredths)),
+            Err(ProgramScoreError::Element(
+                ElementScoreError::Ignored | ElementScoreError::NoValue,
+            )) => Ok(0),
+            Err(error) => Err(error),
+        })
         .sum::<Result<i64, _>>()
         .ok()
         .filter(|_| !elements.is_empty())
