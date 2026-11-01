@@ -38,7 +38,38 @@ pub struct PanelRecognition {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Level {
     Basic,
-    Number(u8),
+    One,
+    Two,
+    Three,
+    Four,
+}
+
+impl TryFrom<u8> for Level {
+    type Error = u8;
+
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        match value {
+            1 => Ok(Self::One),
+            2 => Ok(Self::Two),
+            3 => Ok(Self::Three),
+            4 => Ok(Self::Four),
+            _ => Err(value),
+        }
+    }
+}
+
+/// A supplied protocol annotation, separate from a panel decision.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ScoringAnnotation {
+    /// x: second-half base-value credit; event applicability is not inferred.
+    SecondHalfCredit,
+}
+
+/// Supplied scoring annotations for a recognized element, indexed in its list.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ScoringAnnotations {
+    pub recognized_element: usize,
+    pub annotations: Vec<ScoringAnnotation>,
 }
 
 /// The target is explicit: a whole element or a zero-based component of it.
@@ -88,6 +119,4 @@ pub enum PanelCall {
     Combination,
     /// +SEQ: sequence notation, including an interrupted sequence.
     Sequence,
-    /// x: supplied second-half base-value credit, not inferred from timing.
-    SecondHalfCredit,
 }

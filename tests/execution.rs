@@ -101,7 +101,11 @@ fn marks_retain_their_component_and_element_targets() {
     // ISU Q&A 3, October 2026, Q2: 3S+SEQ+2T<*+2Aq*.
     let recognition = PanelRecognition {
         ruleset: RulesetId::IsuAdult2026_27July16,
-        source: None,
+        source: Some(SourceReference {
+            document: "ISU Technical Committee Q&A 3".into(),
+            version: "2026-10".into(),
+            location: "p. 1, Q2".into(),
+        }),
         planned_element: None,
         observed_element: None,
         outcome: RecognitionOutcome::Recognized,
@@ -152,4 +156,22 @@ fn marks_retain_their_component_and_element_targets() {
         call: PanelCall::Repetition,
     };
     assert_ne!(repetition.call, spin_mark.call);
+}
+
+#[test]
+fn level_and_scoring_annotation_are_distinct() {
+    assert_eq!(Level::try_from(1), Ok(Level::One));
+    assert_eq!(Level::try_from(4), Ok(Level::Four));
+    assert_eq!(Level::try_from(0), Err(0));
+    assert_eq!(Level::try_from(5), Err(5));
+    assert_ne!(Some(Level::Basic), None);
+
+    let annotation = ScoringAnnotations {
+        recognized_element: 0,
+        annotations: vec![ScoringAnnotation::SecondHalfCredit],
+    };
+    assert_eq!(
+        annotation.annotations,
+        vec![ScoringAnnotation::SecondHalfCredit]
+    );
 }
