@@ -106,8 +106,7 @@ pub fn validate_program(program: &Program) -> ValidationResult {
             jump_count += 1;
             match jump {
                 JumpElement::Solo(jump) => {
-                    check_jump(jump, index, None, &mut result.findings);
-                    check_repetition(
+                    check_listed_jump(
                         jump,
                         index,
                         None,
@@ -119,49 +118,8 @@ pub fn validate_program(program: &Program) -> ValidationResult {
                 JumpElement::Combination(parts) | JumpElement::Sequence(parts) => {
                     if matches!(jump, JumpElement::Combination(_)) {
                         combination_count += 1;
-                        let count = parts
-                            .iter()
-                            .filter(|part| matches!(part, JumpPart::Jump(_)))
-                            .count();
-                        if count < 2 {
+                        if check_combination(parts, index, &mut result.findings) {
                             repetition_unknown = true;
-                        }
-                        let incomplete = parts.iter().any(|part| matches!(part, JumpPart::Jump(j) if j.kind.is_none() || j.rotations.is_none_or(|n| n == 0)));
-                        if count > 2 {
-                            result.findings.push(finding(
-                                FindingKind::Violation,
-                                STRUCTURE_RULE,
-                                Some(index),
-                                None,
-                                "A Bronze combination permits at most two listed jumps.",
-                            ));
-                        } else if count < 2 || incomplete {
-                            result.findings.push(finding(
-                                FindingKind::Unknown,
-                                STRUCTURE_RULE,
-                                Some(index),
-                                None,
-                                "Combination jump details are incomplete.",
-                            ));
-                        }
-                        for (component_index, part) in parts.iter().enumerate() {
-                            match part {
-                                JumpPart::Euler => result.findings.push(finding(
-                                    FindingKind::Violation,
-                                    EULER_RULE,
-                                    Some(index),
-                                    Some(component_index),
-                                    "Euler is prohibited in a Bronze combination.",
-                                )),
-                                JumpPart::UnspecifiedTransition => result.findings.push(finding(
-                                    FindingKind::Unknown,
-                                    EULER_RULE,
-                                    Some(index),
-                                    Some(component_index),
-                                    "The unspecified transition may be an Euler.",
-                                )),
-                                _ => {}
-                            }
                         }
                     } else {
                         result.findings.push(finding(
@@ -174,8 +132,7 @@ pub fn validate_program(program: &Program) -> ValidationResult {
                     }
                     for (component_index, part) in parts.iter().enumerate() {
                         if let JumpPart::Jump(jump) = part {
-                            check_jump(jump, index, Some(component_index), &mut result.findings);
-                            check_repetition(
+                            check_listed_jump(
                                 jump,
                                 index,
                                 Some(component_index),
@@ -225,6 +182,62 @@ pub fn validate_program(program: &Program) -> ValidationResult {
         ));
     }
     result
+}
+
+fn check_combination(parts: &[JumpPart], index: usize, findings: &mut Vec<Finding>) -> bool {
+    let count = parts
+        .iter()
+        .filter(|part| matches!(part, JumpPart::Jump(_)))
+        .count();
+    if count > 2 {
+        findings.push(finding(
+            FindingKind::Violation,
+            STRUCTURE_RULE,
+            Some(index),
+            None,
+            "A Bronze combination permits at most two listed jumps.",
+        ));
+    } else if count < 2 {
+        findings.push(finding(
+            FindingKind::Unknown,
+            STRUCTURE_RULE,
+            Some(index),
+            None,
+            "Combination jump details are incomplete.",
+        ));
+    }
+    for (component_index, part) in parts.iter().enumerate() {
+        match part {
+            JumpPart::Euler => findings.push(finding(
+                FindingKind::Violation,
+                EULER_RULE,
+                Some(index),
+                Some(component_index),
+                "Euler is prohibited in a Bronze combination.",
+            )),
+            JumpPart::UnspecifiedTransition => findings.push(finding(
+                FindingKind::Unknown,
+                EULER_RULE,
+                Some(index),
+                Some(component_index),
+                "The unspecified transition may be an Euler.",
+            )),
+            _ => {}
+        }
+    }
+    count < 2
+}
+
+fn check_listed_jump(
+    jump: &ListedJump,
+    index: usize,
+    component_index: Option<usize>,
+    occurrences: &mut Vec<(JumpKind, u8)>,
+    unknown: &mut bool,
+    findings: &mut Vec<Finding>,
+) {
+    check_jump(jump, index, component_index, findings);
+    check_repetition(jump, index, component_index, occurrences, unknown, findings);
 }
 
 fn check_jump(
@@ -277,7 +290,7 @@ fn check_repetition(
             .iter()
             .filter(|&&entry| entry == (kind, rotations))
             .count()
-            == 3
+            > 2
         {
             findings.push(finding(
                 FindingKind::Violation,

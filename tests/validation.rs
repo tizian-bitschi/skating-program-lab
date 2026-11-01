@@ -355,3 +355,94 @@ fn incomplete_structures_and_repetitions_are_unknown_and_sequences_reported() {
             && f.rule_id.ends_with("combination-structure")
             && f.element_index == Some(1)));
 }
+
+#[test]
+fn combination_rules_have_independent_boundaries() {
+    let part = |kind| JumpPart::Jump(jump(Some(kind), Some(1)));
+    let combo = |parts| PlannedElement::Jump(JumpElement::Combination(parts));
+    let pair = || vec![part(JumpKind::Lutz), part(JumpKind::ToeLoop)];
+    let cases = [
+        (vec![combo(pair())], None),
+        (
+            vec![combo(pair()), combo(pair())],
+            Some("combination-count"),
+        ),
+        (
+            vec![combo(vec![
+                part(JumpKind::Lutz),
+                part(JumpKind::ToeLoop),
+                part(JumpKind::Flip),
+            ])],
+            Some("combination-structure"),
+        ),
+        (
+            vec![combo(vec![
+                part(JumpKind::Lutz),
+                JumpPart::Euler,
+                part(JumpKind::ToeLoop),
+            ])],
+            Some("combination-euler"),
+        ),
+    ];
+    for (elements, expected) in cases {
+        let result = validate_program(&program(AdultCategory::Bronze, elements));
+        assert_eq!(
+            result.findings.len(),
+            usize::from(expected.is_some()),
+            "{:?}",
+            result.findings
+        );
+        if let Some(rule) = expected {
+            assert!(result.findings[0].rule_id.ends_with(rule));
+        }
+    }
+}
+
+#[test]
+fn incomplete_jump_does_not_make_known_combination_length_unknown() {
+    let elements = vec![PlannedElement::Jump(JumpElement::Combination(vec![
+        JumpPart::Jump(jump(None, Some(1))),
+        JumpPart::Jump(jump(Some(JumpKind::Lutz), Some(1))),
+    ]))];
+    let result = validate_program(&program(AdultCategory::Bronze, elements));
+    assert_eq!(result.findings.len(), 2);
+    assert!(result
+        .findings
+        .iter()
+        .all(|f| f.kind == FindingKind::Unknown));
+    assert!(result
+        .findings
+        .iter()
+        .any(|f| f.rule_id.ends_with("jump-eligibility")));
+    assert!(result
+        .findings
+        .iter()
+        .any(|f| f.rule_id.ends_with("jump-repetition")));
+}
+
+#[test]
+fn each_excess_repetition_has_a_location_for_each_jump_type() {
+    for count in 2..=4 {
+        let result = validate_program(&program(
+            AdultCategory::Bronze,
+            vec![solo(Some(JumpKind::Lutz), Some(1)); count],
+        ));
+        let indices: Vec<_> = result
+            .findings
+            .iter()
+            .filter(|f| f.rule_id.ends_with("jump-repetition"))
+            .map(|f| f.element_index)
+            .collect();
+        assert_eq!(indices, (2..count).map(Some).collect::<Vec<_>>());
+    }
+    let mut elements = vec![solo(Some(JumpKind::Lutz), Some(1)); 3];
+    elements.extend(vec![solo(Some(JumpKind::Flip), Some(1)); 3]);
+    let result = validate_program(&program(AdultCategory::Bronze, elements));
+    let indices: Vec<_> = result
+        .findings
+        .iter()
+        .filter(|f| f.rule_id.ends_with("jump-repetition"))
+        .map(|f| f.element_index)
+        .collect();
+    assert_eq!(indices, vec![Some(2), Some(5)]);
+}
