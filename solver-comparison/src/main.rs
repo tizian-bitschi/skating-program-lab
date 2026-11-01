@@ -17,9 +17,12 @@ use z3::{
     Optimize, SatResult, Solver as Z3Solver,
 };
 
-fn pumpkin(exclude: bool) -> Option<(i32, Vec<[bool; 3]>)> {
+const SLOT_COUNT: usize = 3;
+const LZ_BASE_HUNDREDTHS: i32 = 60;
+
+fn pumpkin(exclude: bool) -> Option<(i32, Vec<[bool; SLOT_COUNT]>)> {
     let mut s = Solver::default();
-    let x = std::array::from_fn::<_, 3, _>(|_| s.new_bounded_integer(0, 1));
+    let x = std::array::from_fn::<_, SLOT_COUNT, _>(|_| s.new_bounded_integer(0, 1));
     let obj = s.new_bounded_integer(0, 3);
     let tag = s.new_constraint_tag();
     let mut terms = x.iter().map(|v| v.scaled(1)).collect::<Vec<_>>();
@@ -72,10 +75,10 @@ fn pumpkin(exclude: bool) -> Option<(i32, Vec<[bool; 3]>)> {
         }
     }
     solutions.sort();
-    Some((60 * optimum, solutions))
+    Some((LZ_BASE_HUNDREDTHS * optimum, solutions))
 }
 
-fn z3(exclude: bool) -> Option<(i32, Vec<[bool; 3]>)> {
+fn z3(exclude: bool) -> Option<(i32, Vec<[bool; SLOT_COUNT]>)> {
     let x = [
         Int::new_const("x0"),
         Int::new_const("x1"),
@@ -122,7 +125,7 @@ fn z3(exclude: bool) -> Option<(i32, Vec<[bool; 3]>)> {
             SatResult::Unknown => panic!("enumeration incomplete"),
             SatResult::Sat => {
                 let model = solver.get_model().unwrap();
-                let values = std::array::from_fn::<_, 3, _>(|i| {
+                let values = std::array::from_fn::<_, SLOT_COUNT, _>(|i| {
                     model.eval(&x[i], true).unwrap().as_i64().unwrap() == 1
                 });
                 let differences = x
@@ -136,35 +139,51 @@ fn z3(exclude: bool) -> Option<(i32, Vec<[bool; 3]>)> {
         }
     }
     solutions.sort();
-    Some(((60 * optimum) as i32, solutions))
+    Some((LZ_BASE_HUNDREDTHS * optimum as i32, solutions))
+}
+
+fn compare_with_reference(result: &Option<(i32, Vec<[bool; SLOT_COUNT]>)>, exclude: bool) {
+    let reference = enumerate_bronze_reference(exclude).unwrap();
+    assert_eq!(reference.domain.slot_start_seconds, [10, 20, 30]);
+    assert_eq!(reference.domain.slot_start_seconds.len(), SLOT_COUNT);
+    assert_eq!(reference.domain.duration_seconds, 100);
+    assert!(reference.domain.uninterrupted_timing_assumed);
+    assert!(reference.domain.no_event_exception_assumed);
+    assert!(reference.domain.clean_recognition_assumed);
+    assert_eq!(reference.domain.exclude_lutz, exclude);
+    match (result, reference.outcome) {
+        (
+            Some((score, slots)),
+            ReferenceOutcome::Optimal {
+                base_hundredths,
+                candidates,
+            },
+        ) => {
+            let mut expected = candidates.iter().map(|c| c.slots).collect::<Vec<_>>();
+            expected.sort();
+            assert_eq!((*score, slots), (i32::from(base_hundredths), &expected));
+        }
+        (None, ReferenceOutcome::Infeasible) => (),
+        _ => panic!("solver disagrees with reference"),
+    }
 }
 
 fn main() {
     for (name, solve) in [
         (
             "Pumpkin",
-            pumpkin as fn(bool) -> Option<(i32, Vec<[bool; 3]>)>,
+            pumpkin as fn(bool) -> Option<(i32, Vec<[bool; SLOT_COUNT]>)>,
         ),
         ("Z3", z3),
     ] {
         for exclude in [false, true] {
             let result = solve(exclude);
-            let reference = enumerate_bronze_reference(exclude).unwrap();
-            match (&result, reference.outcome) {
-                (
-                    Some((score, slots)),
-                    ReferenceOutcome::Optimal {
-                        base_hundredths,
-                        candidates,
-                    },
-                ) => {
-                    let mut expected = candidates.iter().map(|c| c.slots).collect::<Vec<_>>();
-                    expected.sort();
-                    assert_eq!((*score, slots), (i32::from(base_hundredths), &expected));
-                    println!("{name}: optimal_proven {score}; enumeration_complete {slots:?}");
+            compare_with_reference(&result, exclude);
+            match result {
+                Some((score, slots)) => {
+                    println!("{name}: optimal_proven {score}; enumeration_complete {slots:?}")
                 }
-                (None, ReferenceOutcome::Infeasible) => println!("{name}: infeasible_proven"),
-                _ => panic!("{name}: solver disagrees with reference"),
+                None => println!("{name}: infeasible_proven"),
             }
         }
     }
@@ -173,6 +192,15 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn solvers_match_exhaustive_reference() {
+        for solve in [pumpkin, z3] {
+            for exclude in [false, true] {
+                compare_with_reference(&solve(exclude), exclude);
+            }
+        }
+    }
 
     #[test]
     fn solvers_match_independent_fixtures() {
