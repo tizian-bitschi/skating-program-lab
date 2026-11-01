@@ -1,0 +1,10 @@
+[package]
+name = "solver-comparison"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+skating-program-lab = { path = ".." }
+pumpkin-solver = "=0.4.0"
+z3 = { version = "=0.22.0", features = ["gh-release"] }
