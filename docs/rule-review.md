@@ -1,6 +1,6 @@
 # Adult singles: source review
 
-This review covers the 16 July 2026 Adult announcement for Vernon 2026 and Oberstdorf 2027 and the sources listed in [rule-sources.md](rule-sources.md). The ISU Adult page lists the announcement on 17 August; the linked PDF itself states 16 July. The application does not yet validate programs or calculate scores.
+This review covers the 16 July 2026 Adult announcement for Vernon 2026 and Oberstdorf 2027 and the sources listed in [rule-sources.md](rule-sources.md). The ISU Adult page lists the announcement on 17 August; the linked PDF itself states 16 July. At the time of this source review, validation and scoring were not yet implemented. See [implementation status](implementation-status.md) for current support.
 
 ## Findings
 
@@ -16,3 +16,7 @@ This review covers the 16 July 2026 Adult announcement for Vernon 2026 and Obers
 An unfinished program may contain a selected jump whose rotation count has not yet been chosen, or a spin whose planned features have not yet been entered. Those values remain unspecified so the tool can retain the draft and identify the information needed for a complete check. The tool must not infer a jump, a call or a level from a missing field. An explicitly empty list of feature attempts means the skater has entered none; an unspecified list does not make that claim. Whether a user interface needs to expose this distinction is a product decision, not an ISU requirement.
 
 Issue #1 originally requested independent human domain review. The repository owner explicitly waived further human domain review and instructed the project to follow the ISU rules. The findings above document a source review; no independent human domain approval is claimed.
+
+## Subsequent reviews
+
+The repository owner accepted an independent AI source review for issue #3 and waived additional human domain review. The [review](https://chatgpt.com/c/6ae78664-5e84-83ed-b3f3-1266d7fd5e3d) covered the editions in [rule sources](rule-sources.md). The owner also accepted the independent AI review of issues #4 and #26–#28 and waived human review; the [review](https://chatgpt.com/c/6ae7a33d-8f5c-83ed-a99f-ba9c2bd45fe7) records that decision. Neither review is independent human domain approval.
