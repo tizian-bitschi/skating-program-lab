@@ -6,5 +6,5 @@ publish = false
 
 [dependencies]
 skating-program-lab = { path = ".." }
-pumpkin-solver = "=0.4.0"
+pumpkin-solver = "=0.5.0"
 z3 = { version = "=0.22.0", features = ["gh-release"] }

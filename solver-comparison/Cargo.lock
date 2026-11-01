@@ -470,22 +470,22 @@ checksum = "0e9c71c2167ca323c882b99918929403426e2373ea17242ff5653e0d5e1058be"
 
 [[package]]
 name = "enum-map"
-version = "2.7.3"
+version = "3.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6866f3bfdf8207509a033af1a75a7b08abda06bbaaeae6669323fd5a097df2e9"
+checksum = "d4532960034c15ba2f55e9eee631040ecc473c32e6c4b200828c759840f13a06"
 dependencies = [
  "enum-map-derive",
 ]
 
 [[package]]
 name = "enum-map-derive"
-version = "0.17.0"
+version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f282cfdfe92516eb26c2af8589c274c7c17681f5ecc03c18255fe741c6aa64eb"
+checksum = "7127272f64b3e098f7d81f350d672081b879bff896d219c42370dc858b1af9ff"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.119",
+ "syn 3.0.9",
 ]
 
 [[package]]
@@ -936,9 +936,9 @@ checksum = "a6cb138bb79a146c1bd460005623e142ef0181e3d0219cb493e02f7d08a35695"
 
 [[package]]
 name = "itertools"
-version = "0.14.0"
+version = "0.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2b192c782037fadd9cfa75548310488aabdbf3d2da73885b31bd0abd03351285"
+checksum = "8b4baf93f58d4425749ca49a51c50ebab072c5df6994d08fed93541c331481dc"
 dependencies = [
  "either",
 ]
@@ -1250,9 +1250,9 @@ dependencies = [
 
 [[package]]
 name = "pumpkin-checking"
-version = "0.4.0"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c34f2ff795bf0ae238d96fa720b9fc3345dfec61a336c4f03d72f822c7b34fe8"
+checksum = "9cd462643b0c69aa8dc9151209a13c129d9c7cde7004c015cd7ccf0872280f4e"
 dependencies = [
  "dyn-clone",
  "fnv",
@@ -1261,18 +1261,20 @@ dependencies = [
 
 [[package]]
 name = "pumpkin-conflict-resolvers"
-version = "0.4.0"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c664713ec65955bdfd4f176a6cf99af89346618ab37a5da53bfef406df0ebcf5"
+checksum = "aaa335cf8e033f15667c51615f409f87afe3fdc6b163571d5e4765b745db8970"
 dependencies = [
+ "itertools",
+ "log",
  "pumpkin-core",
 ]
 
 [[package]]
 name = "pumpkin-constraints"
-version = "0.4.0"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f4d553f105c231e8cc62da488a438a5b21c0df8edc69d80248c662c8b869e6ec"
+checksum = "8466a662d2e42675e7abdaa8c908aa035baa7c859f12f07162b596e45077e75e"
 dependencies = [
  "pumpkin-core",
  "pumpkin-propagators",
@@ -1280,9 +1282,9 @@ dependencies = [
 
 [[package]]
 name = "pumpkin-core"
-version = "0.4.0"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "07791b719f830f36e05536eeb91210b2ea988a746923f39222447870ae6c5b36"
+checksum = "9d5d345817b486d551d212ae0ddaac3df65daf8f8db8ee007e26088e1ff20a0e"
 dependencies = [
  "bitfield",
  "bitfield-struct",
@@ -1309,9 +1311,9 @@ dependencies = [
 
 [[package]]
 name = "pumpkin-propagators"
-version = "0.4.0"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "419516fd231dc3f26379cf0423c2dd8a0292ddc422492093e4d3fdb7f6a47a7d"
+checksum = "0843566f4346a9166d3e2dacbaf18d52b55ad69e61fecf6263867ce48ff07aad"
 dependencies = [
  "bitfield-struct",
  "clap",
@@ -1323,9 +1325,9 @@ dependencies = [
 
 [[package]]
 name = "pumpkin-solver"
-version = "0.4.0"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "149acf7c55208c269bd54466c90ca164b8f2ea19f330dc1e48e27112c7669d49"
+checksum = "fd800106eec3953536887fa9669b9eba4cec9d971c112d12e110d2916424edf5"
 dependencies = [
  "cc",
  "clap",

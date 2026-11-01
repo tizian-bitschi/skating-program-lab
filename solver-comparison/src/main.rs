@@ -25,20 +25,17 @@ fn pumpkin(exclude: bool) -> Option<(i32, Vec<[bool; 3]>)> {
     let mut terms = x.iter().map(|v| v.scaled(1)).collect::<Vec<_>>();
     terms.push(obj.scaled(-1));
     s.add_constraint(pumpkin_solver::equals(terms, 0, tag))
-        .post()
-        .expect("consistent constraint");
+        .post();
     let tag = s.new_constraint_tag();
     s.add_constraint(pumpkin_solver::greater_than_or_equals(x.to_vec(), 1, tag))
-        .post()
-        .expect("consistent constraint");
+        .post();
     let tag = s.new_constraint_tag();
     s.add_constraint(pumpkin_solver::less_than_or_equals(
         x.to_vec(),
         if exclude { 0 } else { 2 },
         tag,
     ))
-    .post()
-    .ok()?;
+    .post();
     let mut brancher = s.default_brancher();
     let mut resolver = ResolutionResolver::default();
     let callback = |_: &Solver,
@@ -59,8 +56,7 @@ fn pumpkin(exclude: bool) -> Option<(i32, Vec<[bool; 3]>)> {
     };
     let tag = s.new_constraint_tag();
     s.add_constraint(pumpkin_solver::equals(vec![obj], optimum, tag))
-        .post()
-        .expect("consistent constraint");
+        .post();
     let mut brancher = s.default_brancher();
     let mut resolver = ResolutionResolver::default();
     let mut termination = Indefinite;
