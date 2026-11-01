@@ -4,6 +4,9 @@
 
 use std::{fmt, str::FromStr};
 
+mod execution;
+pub use execution::*;
+
 mod plan;
 pub use plan::*;
 
