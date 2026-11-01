@@ -213,7 +213,7 @@ pub struct ProgramElement {
     pub annotations: Vec<ScoringAnnotation>,
     pub goe: i8,
     pub fall: Option<bool>,
-    /// Elapsed milliseconds from the program start; required for jumps.
+    /// Elapsed milliseconds from the program start; required for jumps and late programs.
     pub start_ms: Option<u32>,
 }
 
@@ -235,6 +235,8 @@ pub enum ProgramScoreError {
     UnsupportedCategory,
     UnknownFall,
     InvalidInput,
+    RulesetMismatch,
+    TimingConsequenceUnsupported,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -260,12 +262,17 @@ fn adult_source(location: &str) -> SourceReference {
     }
 }
 
-fn required_duration(category: crate::AdultCategory) -> (u32, &'static str) {
-    match category {
-        crate::AdultCategory::Bronze => (100, "p. 11"),
-        crate::AdultCategory::Silver => (120, "p. 10"),
-        crate::AdultCategory::Gold => (170, "p. 9"),
-        crate::AdultCategory::Masters => (180, "p. 8"),
+fn required_duration(
+    ruleset: crate::RulesetId,
+    category: crate::AdultCategory,
+) -> (u32, &'static str) {
+    match ruleset {
+        crate::RulesetId::IsuAdult2026_27July16 => match category {
+            crate::AdultCategory::Bronze => (100, "p. 11"),
+            crate::AdultCategory::Silver => (120, "p. 10"),
+            crate::AdultCategory::Gold => (170, "p. 9"),
+            crate::AdultCategory::Masters => (180, "p. 8"),
+        },
     }
 }
 
@@ -273,138 +280,213 @@ fn factored_base(hundredths: u16) -> u16 {
     ((u32::from(hundredths) * 11 + 5) / 10) as u16
 }
 
+fn time_deduction(
+    timing: Option<ProgramTiming>,
+    required: u32,
+    page: &str,
+) -> Result<Deduction, ProgramScoreError> {
+    let timing = timing
+        .filter(|t| t.ordinary_timing_confirmed && t.duration_seconds > 0)
+        .ok_or(ProgramScoreError::TimingUnknown)?;
+    let deviation = required
+        .abs_diff(timing.duration_seconds)
+        .saturating_sub(10);
+    let hundredths = deviation
+        .div_ceil(5)
+        .checked_mul(100)
+        .ok_or(ProgramScoreError::InvalidInput)?;
+    Ok(Deduction {
+        hundredths,
+        source: adult_source(&format!("p. 6, time deductions; {page}, required duration")),
+    })
+}
+
+fn fall_deduction(
+    category: crate::AdultCategory,
+    elements: &[ProgramElement],
+    outside_falls: Option<u32>,
+) -> Result<Deduction, ProgramScoreError> {
+    if category != crate::AdultCategory::Bronze {
+        return Err(ProgramScoreError::UnsupportedCategory);
+    }
+    if !elements.iter().all(|e| {
+        e.fall == Some(false)
+            || (e.fall == Some(true) && e.recognition.outcome == RecognitionOutcome::Recognized)
+    }) {
+        return Err(ProgramScoreError::UnknownFall);
+    }
+    let count = outside_falls.ok_or(ProgramScoreError::UnknownFall)?;
+    let hundredths = count
+        .checked_mul(50)
+        .ok_or(ProgramScoreError::InvalidInput)?;
+    Ok(Deduction {
+        hundredths,
+        source: adult_source("p. 11, Bronze fall deductions"),
+    })
+}
+
+// None means that the recognition does not establish whether the element is a jump.
+fn is_jump(element: &ProgramElement) -> Option<bool> {
+    if element.recognition.outcome != RecognitionOutcome::Recognized {
+        return None;
+    }
+    let details = element.recognition.details.as_ref()?;
+    Some(
+        details
+            .components()
+            .iter()
+            .any(|c| c.as_str().starts_with(char::is_numeric)),
+    )
+}
+
+fn element_score(
+    ruleset: crate::RulesetId,
+    table: ScoringTableId,
+    element: &ProgramElement,
+    timing: Option<ProgramTiming>,
+    required: u32,
+) -> Result<ElementScore, ProgramScoreError> {
+    if element.recognition.ruleset != ruleset {
+        return Err(ProgramScoreError::RulesetMismatch);
+    }
+    let timing = timing
+        .filter(|t| t.ordinary_timing_confirmed && t.duration_seconds > 0)
+        .ok_or(ProgramScoreError::TimingUnknown)?;
+    // Rule 502: thirty seconds below the lower limit means no marks.
+    if timing.duration_seconds <= required.saturating_sub(40) {
+        return Err(ProgramScoreError::TimingConsequenceUnsupported);
+    }
+    if let Some(start) = element.start_ms {
+        if u64::from(start) > u64::from(timing.duration_seconds) * 1000 {
+            return Err(ProgramScoreError::InvalidTiming);
+        }
+        if u64::from(start) > u64::from(required + 10) * 1000 {
+            return Err(ProgramScoreError::TimingConsequenceUnsupported);
+        }
+    } else if timing.duration_seconds > required + 10 {
+        return Err(ProgramScoreError::TimingUnknown);
+    }
+    // A single recorded x is only meaningful for a jump; timing determines credit.
+    let annotations = if is_jump(element) == Some(true)
+        && element.annotations == [ScoringAnnotation::SecondHalfCredit]
+    {
+        &[][..]
+    } else {
+        element.annotations.as_slice()
+    };
+    score_element(
+        table,
+        &element.recognition,
+        annotations,
+        element.goe,
+        element.fall,
+    )
+    .map_err(ProgramScoreError::Element)
+}
+
+fn second_half_selection(
+    elements: &[ProgramElement],
+    preliminary: &[Result<ElementScore, ProgramScoreError>],
+    timing: Option<ProgramTiming>,
+    required: u32,
+) -> Result<Vec<usize>, ProgramScoreError> {
+    let mut indices = Vec::new();
+    let mut previous = None;
+    for (i, (element, score)) in elements.iter().zip(preliminary).enumerate() {
+        if score.is_err() {
+            if is_jump(element) != Some(false) {
+                return Err(ProgramScoreError::TimingUnknown);
+            }
+            continue;
+        }
+        if is_jump(element) != Some(true) {
+            continue;
+        }
+        let timing = timing
+            .filter(|t| t.ordinary_timing_confirmed && t.duration_seconds > 0)
+            .ok_or(ProgramScoreError::TimingUnknown)?;
+        if !timing.second_half_default_confirmed {
+            return Err(ProgramScoreError::ExceptionUnresolved);
+        }
+        let start = element.start_ms.ok_or(ProgramScoreError::TimingUnknown)?;
+        if previous.is_some_and(|p| start < p) {
+            return Err(ProgramScoreError::InvalidTiming);
+        }
+        previous = Some(start);
+        if u64::from(start) * 2 >= u64::from(required) * 1000 {
+            indices.push(i);
+        }
+    }
+    let first = indices.len().saturating_sub(3);
+    Ok(indices[first..].to_vec())
+}
+
+fn apply_credit(score: ElementScore, second_half: bool) -> ProgramElementScore {
+    let credited_base_hundredths = if second_half {
+        factored_base(score.base.hundredths)
+    } else {
+        score.base.hundredths
+    };
+    let score_hundredths = credited_base_hundredths as i16 + score.goe_hundredths;
+    let second_half_source = second_half.then(|| SourceReference {
+        document: "ISU Sports Rules — Figure Skating".into(),
+        version: "2026-06-12".into(),
+        location: "p. 9, Rule 353.1(h)(iii)".into(),
+    });
+    ProgramElementScore {
+        unfactored: score,
+        second_half,
+        credited_base_hundredths,
+        score_hundredths,
+        second_half_source,
+    }
+}
+
 /// Calculate a partial-coverage scenario, not an official panel or segment score.
 /// Elements must be in program order; callers supply all recognized elements and falls.
 pub fn score_program(
+    ruleset: crate::RulesetId,
     category: crate::AdultCategory,
     table: ScoringTableId,
     elements: &[ProgramElement],
     outside_falls: Option<u32>,
     timing: Option<ProgramTiming>,
 ) -> ProgramScore {
-    let (required, page) = required_duration(category);
-    let timing_ok = timing.filter(|t| t.ordinary_timing_confirmed && t.duration_seconds > 0);
-    let time_deduction = match timing_ok {
-        None => Err(ProgramScoreError::TimingUnknown),
-        Some(t) => {
-            let deviation = required.abs_diff(t.duration_seconds).saturating_sub(10);
-            deviation
-                .div_ceil(5)
-                .checked_mul(100)
-                .map(|hundredths| Deduction {
-                    hundredths,
-                    source: adult_source(&format!(
-                        "p. 6, time deductions; {page}, required duration"
-                    )),
-                })
-                .ok_or(ProgramScoreError::InvalidInput)
-        }
-    };
-    let fall_deduction = match (
-        category,
-        outside_falls,
-        elements.iter().all(|e| {
-            e.fall == Some(false)
-                || (e.fall == Some(true) && e.recognition.outcome == RecognitionOutcome::Recognized)
-        }),
-    ) {
-        (crate::AdultCategory::Bronze, Some(count), true) => count
-            .checked_mul(50)
-            .map(|hundredths| Deduction {
-                hundredths,
-                source: adult_source("p. 11, Bronze fall deductions"),
-            })
-            .ok_or(ProgramScoreError::InvalidInput),
-        (crate::AdultCategory::Bronze, _, _) => Err(ProgramScoreError::UnknownFall),
-        _ => Err(ProgramScoreError::UnsupportedCategory),
-    };
+    let (required, page) = required_duration(ruleset, category);
     let preliminary: Vec<_> = elements
         .iter()
-        .map(|e| {
-            // The x annotation is a recorded claim, not evidence of eligibility.
-            score_element(table, &e.recognition, &[], e.goe, e.fall)
-                .map_err(ProgramScoreError::Element)
-        })
+        .map(|e| element_score(ruleset, table, e, timing, required))
         .collect();
-    let mut jump_indices = Vec::new();
-    let mut jump_error = None;
-    let mut previous_start = None;
-    for (i, (element, score)) in elements.iter().zip(&preliminary).enumerate() {
-        if let Ok(score) = score {
-            if score.base.notation == "1Lz" {
-                if let Some(start) = element.start_ms {
-                    if previous_start.is_some_and(|previous| start < previous) {
-                        jump_error = Some(ProgramScoreError::InvalidTiming);
-                    }
-                    previous_start = Some(start);
-                }
-                match (timing_ok, element.start_ms) {
-                    (None, _) | (_, None) => jump_error = Some(ProgramScoreError::TimingUnknown),
-                    (Some(t), Some(start))
-                        if u64::from(start) > u64::from(t.duration_seconds) * 1000 =>
-                    {
-                        jump_error = Some(ProgramScoreError::InvalidTiming)
-                    }
-                    (Some(t), _) if !t.second_half_default_confirmed => {
-                        jump_error = Some(ProgramScoreError::ExceptionUnresolved)
-                    }
-                    (Some(_), Some(start))
-                        if u64::from(start) * 2 >= u64::from(required) * 1000 =>
-                    {
-                        jump_indices.push(i)
-                    }
-                    _ => {}
-                }
-            }
-        }
-    }
-    // An unresolved element may itself affect which jumps are the last three.
-    if preliminary.iter().any(Result::is_err) && !jump_indices.is_empty() {
-        jump_error = Some(ProgramScoreError::TimingUnknown);
-    }
-    let selected = jump_indices.len().saturating_sub(3);
+    let selection = second_half_selection(elements, &preliminary, timing, required);
     let results: Vec<_> = preliminary
         .into_iter()
         .enumerate()
-        .map(|(i, result)| {
-            let score = result?;
-            let jump = score.base.notation == "1Lz";
-            if jump {
-                if let Some(error) = &jump_error {
-                    return Err(error.clone());
-                }
-            }
-            let second_half = jump_indices[selected..].contains(&i);
-            let credited = if second_half {
-                u32::from(factored_base(score.base.hundredths))
+        .map(|(i, score)| {
+            let score = score?;
+            let second_half = if is_jump(&elements[i]) == Some(true) {
+                selection.as_ref().map_err(Clone::clone)?.contains(&i)
             } else {
-                u32::from(score.base.hundredths)
-            } as u16;
-            let total = credited as i16 + score.goe_hundredths;
-            let source = second_half.then(|| SourceReference {
-                document: "ISU Sports Rules — Figure Skating".into(),
-                version: "2026-06-12".into(),
-                location: "p. 9, Rule 353.1(h)(iii)".into(),
-            });
-            Ok(ProgramElementScore {
-                unfactored: score,
-                second_half,
-                credited_base_hundredths: credited,
-                score_hundredths: total,
-                second_half_source: source,
-            })
+                false
+            };
+            Ok(apply_credit(score, second_half))
         })
         .collect();
-    let tes = results
+    let tes_hundredths = results
         .iter()
         .map(|r| r.as_ref().map(|s| i64::from(s.score_hundredths)))
         .sum::<Result<i64, _>>()
-        .ok();
+        .ok()
+        .filter(|_| !elements.is_empty())
+        .filter(|_| {
+            timing.is_some_and(|t| {
+                t.ordinary_timing_confirmed && t.duration_seconds > required.saturating_sub(40)
+            })
+        });
     ProgramScore {
         elements: results,
-        tes_hundredths: tes,
-        fall_deduction,
-        time_deduction,
+        tes_hundredths,
+        fall_deduction: fall_deduction(category, elements, outside_falls),
+        time_deduction: time_deduction(timing, required, page),
     }
 }
 

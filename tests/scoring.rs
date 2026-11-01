@@ -350,6 +350,7 @@ fn program_totals_keep_deductions_separate() {
         program_element("CSSp", Some(Level::One), 1, false, None),
     ];
     let result = score_program(
+        RulesetId::IsuAdult2026_27July16,
         AdultCategory::Bronze,
         TABLE,
         &elements,
@@ -367,10 +368,17 @@ fn program_totals_keep_deductions_separate() {
         (AdultCategory::Silver, 131, 100),
     ] {
         assert_eq!(
-            score_program(category, TABLE, &[], Some(0), ordinary(seconds))
-                .time_deduction
-                .unwrap()
-                .hundredths,
+            score_program(
+                RulesetId::IsuAdult2026_27July16,
+                category,
+                TABLE,
+                &[],
+                Some(0),
+                ordinary(seconds)
+            )
+            .time_deduction
+            .unwrap()
+            .hundredths,
             expected
         );
     }
@@ -378,12 +386,14 @@ fn program_totals_keep_deductions_separate() {
 
 #[test]
 fn second_half_uses_required_duration_last_three_and_unfactored_goe() {
+    // Synthetic selection test only: five repeated jumps do not form a legal Bronze program.
     // Rule 353.1(h)(iii), p. 9: last three jumps starting in second half.
     let elements: Vec<_> = [49_999, 50_000, 60_000, 70_000, 80_000]
         .into_iter()
         .map(|start| program_element("1Lz", None, 1, false, Some(start)))
         .collect();
     let result = score_program(
+        RulesetId::IsuAdult2026_27July16,
         AdultCategory::Bronze,
         TABLE,
         &elements,
@@ -421,6 +431,7 @@ fn unresolved_inputs_do_not_yield_exact_tes() {
         .push(ScoringAnnotation::SecondHalfCredit);
     assert_eq!(
         score_program(
+            RulesetId::IsuAdult2026_27July16,
             AdultCategory::Bronze,
             TABLE,
             &[element.clone()],
@@ -435,6 +446,7 @@ fn unresolved_inputs_do_not_yield_exact_tes() {
     t.second_half_default_confirmed = false;
     assert_eq!(
         score_program(
+            RulesetId::IsuAdult2026_27July16,
             AdultCategory::Bronze,
             TABLE,
             &[element.clone()],
@@ -447,6 +459,7 @@ fn unresolved_inputs_do_not_yield_exact_tes() {
     let unsupported = program_element("1T", None, 0, false, Some(70_000));
     assert_eq!(
         score_program(
+            RulesetId::IsuAdult2026_27July16,
             AdultCategory::Bronze,
             TABLE,
             &[element, unsupported],
@@ -456,11 +469,16 @@ fn unresolved_inputs_do_not_yield_exact_tes() {
         .tes_hundredths,
         None
     );
-    assert!(
-        score_program(AdultCategory::Bronze, TABLE, &[], Some(0), None)
-            .time_deduction
-            .is_err()
-    );
+    assert!(score_program(
+        RulesetId::IsuAdult2026_27July16,
+        AdultCategory::Bronze,
+        TABLE,
+        &[],
+        Some(0),
+        None
+    )
+    .time_deduction
+    .is_err());
 }
 
 #[test]
@@ -469,6 +487,7 @@ fn invalid_timing_and_falls_remain_unresolved() {
     let earlier = program_element("1Lz", None, 0, false, Some(60_000));
     assert_eq!(
         score_program(
+            RulesetId::IsuAdult2026_27July16,
             AdultCategory::Bronze,
             TABLE,
             &[later, earlier],
@@ -479,6 +498,7 @@ fn invalid_timing_and_falls_remain_unresolved() {
         None
     );
     assert!(score_program(
+        RulesetId::IsuAdult2026_27July16,
         AdultCategory::Bronze,
         TABLE,
         &[],
@@ -490,6 +510,7 @@ fn invalid_timing_and_falls_remain_unresolved() {
     let mut unknown = program_element("1Lz", None, -3, true, Some(30_000));
     unknown.recognition.outcome = RecognitionOutcome::Unknown;
     assert!(score_program(
+        RulesetId::IsuAdult2026_27July16,
         AdultCategory::Bronze,
         TABLE,
         &[unknown],
@@ -500,11 +521,140 @@ fn invalid_timing_and_falls_remain_unresolved() {
     .is_err());
     for (category, seconds) in [(AdultCategory::Gold, 181), (AdultCategory::Masters, 191)] {
         assert_eq!(
-            score_program(category, TABLE, &[], None, ordinary(seconds))
-                .time_deduction
-                .unwrap()
-                .hundredths,
+            score_program(
+                RulesetId::IsuAdult2026_27July16,
+                category,
+                TABLE,
+                &[],
+                None,
+                ordinary(seconds)
+            )
+            .time_deduction
+            .unwrap()
+            .hundredths,
             100
         );
     }
+}
+
+#[test]
+fn timing_rule_502_prevents_false_exact_scores() {
+    let rules = RulesetId::IsuAdult2026_27July16;
+    for (duration, start, expected_exact) in [
+        (112, 110_000, true),
+        (112, 111_000, false),
+        (60, 10_000, false),
+        (61, 10_000, true),
+    ] {
+        let jump = program_element("1Lz", None, 1, false, Some(start));
+        let result = score_program(
+            rules,
+            AdultCategory::Bronze,
+            TABLE,
+            &[jump],
+            Some(0),
+            ordinary(duration),
+        );
+        assert_eq!(
+            result.tes_hundredths.is_some(),
+            expected_exact,
+            "{duration} {start}"
+        );
+    }
+    let spin = program_element("CSSp", Some(Level::One), 1, false, None);
+    assert_eq!(
+        score_program(
+            rules,
+            AdultCategory::Bronze,
+            TABLE,
+            &[spin],
+            Some(0),
+            ordinary(112)
+        )
+        .tes_hundredths,
+        None
+    );
+    assert_eq!(
+        score_program(
+            rules,
+            AdultCategory::Bronze,
+            TABLE,
+            &[],
+            Some(0),
+            ordinary(60)
+        )
+        .tes_hundredths,
+        None
+    );
+}
+
+#[test]
+fn annotations_and_unresolved_nonjumps_are_isolated() {
+    let rules = RulesetId::IsuAdult2026_27July16;
+    let mut spin = program_element("CSSp", Some(Level::One), 1, false, None);
+    spin.annotations.push(ScoringAnnotation::SecondHalfCredit);
+    assert!(score_program(
+        rules,
+        AdultCategory::Bronze,
+        TABLE,
+        &[spin],
+        Some(0),
+        ordinary(100)
+    )
+    .elements[0]
+        .is_err());
+    let mut jump = program_element("1Lz", None, 1, false, Some(50_000));
+    jump.annotations.push(ScoringAnnotation::SecondHalfCredit);
+    let unsupported = program_element("CSSp", Some(Level::Two), 0, false, None);
+    let result = score_program(
+        rules,
+        AdultCategory::Bronze,
+        TABLE,
+        &[jump.clone(), unsupported],
+        Some(0),
+        ordinary(100),
+    );
+    assert_eq!(result.elements[0].as_ref().unwrap().score_hundredths, 72);
+    assert!(result.elements[1].is_err());
+    assert_eq!(result.tes_hundredths, None);
+    jump.annotations.push(ScoringAnnotation::SecondHalfCredit);
+    assert!(score_program(
+        rules,
+        AdultCategory::Bronze,
+        TABLE,
+        &[jump],
+        Some(0),
+        ordinary(100)
+    )
+    .elements[0]
+        .is_err());
+}
+
+#[test]
+fn bronze_boundary_fixture_uses_required_duration_and_unfactored_goe() {
+    // Two single Lutz jumps are within Bronze's jump-element and repetition limits.
+    let jumps = [
+        program_element("1Lz", None, 1, false, Some(49_999)),
+        program_element("1Lz", None, 1, false, Some(50_000)),
+    ];
+    let result = score_program(
+        RulesetId::IsuAdult2026_27July16,
+        AdultCategory::Bronze,
+        TABLE,
+        &jumps,
+        Some(0),
+        ordinary(110),
+    );
+    let first = result.elements[0].as_ref().unwrap();
+    let second = result.elements[1].as_ref().unwrap();
+    assert_eq!(
+        (
+            first.score_hundredths,
+            second.credited_base_hundredths,
+            second.unfactored.goe_hundredths,
+            second.score_hundredths
+        ),
+        (66, 66, 6, 72)
+    );
+    assert_eq!(result.tes_hundredths, Some(138));
 }
