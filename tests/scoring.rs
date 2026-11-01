@@ -804,3 +804,44 @@ fn repeated_program_scores_and_sources_match() {
     };
     assert_eq!(score(), score());
 }
+
+#[test]
+fn downgrade_and_fall_require_minimum_final_goe() {
+    for code in ["1Lz", "1A"] {
+        let r = recognition(code, None, Some(vec![PanelCall::Downgraded]));
+        for goe in [-3, -4] {
+            assert_eq!(
+                score_element(TABLE, &r, &[], goe, Some(true)),
+                Err(ElementScoreError::InconsistentFall)
+            );
+        }
+        assert_eq!(
+            score_element(TABLE, &r, &[], -5, Some(true))
+                .unwrap()
+                .score_hundredths,
+            0
+        );
+    }
+}
+
+#[test]
+fn no_value_before_half_or_known_nonjump_does_not_block_bonus() {
+    let mut zero = program_element("1S", None, 0, false, Some(20_000));
+    zero.recognition.outcome = RecognitionOutcome::NoValue;
+    let jump = program_element("1Lz", None, 1, false, Some(30_000));
+    let score = |elements: &[ProgramElement]| {
+        score_program(
+            RulesetId::IsuAdult2026_27July16,
+            AdultCategory::Bronze,
+            TABLE,
+            elements,
+            Some(0),
+            ordinary(100),
+        )
+    };
+    assert_eq!(score(&[zero, jump]).tes_hundredths, Some(66));
+    let mut spin = program_element("CSSp", Some(Level::One), 0, false, Some(60_000));
+    spin.recognition.outcome = RecognitionOutcome::NoValue;
+    let late_jump = program_element("1Lz", None, 1, false, Some(70_000));
+    assert_eq!(score(&[spin, late_jump]).tes_hundredths, Some(72));
+}

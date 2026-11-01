@@ -174,7 +174,9 @@ pub fn score_element(
     }
     match fall {
         None => return Err(ElementScoreError::UnknownFall),
-        Some(true) if goe > -3 => return Err(ElementScoreError::InconsistentFall),
+        Some(true) if goe > if row.notation.ends_with("<<") { -5 } else { -3 } => {
+            return Err(ElementScoreError::InconsistentFall);
+        }
         _ => {}
     }
     let goe_hundredths = goe_values[(goe + 5) as usize];
@@ -414,6 +416,18 @@ fn second_half_selection(
             score,
             Err(ProgramScoreError::Element(ElementScoreError::NoValue))
         ) {
+            let before_half = element
+                .start_ms
+                .is_some_and(|start| u64::from(start) * 2 < u64::from(required) * 1000);
+            let known_nonjump = element.recognition.details.as_ref().is_some_and(|details| {
+                details
+                    .components()
+                    .iter()
+                    .all(|c| !c.as_str().starts_with(char::is_numeric))
+            });
+            if before_half || known_nonjump {
+                continue;
+            }
             return Err(ProgramScoreError::TimingUnknown);
         }
         if score.is_err() {
