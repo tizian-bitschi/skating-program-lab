@@ -131,6 +131,7 @@ fn excluding_the_only_variant_is_infeasible() {
     assert_eq!(result.outcome, ReferenceOutcome::Infeasible);
 }
 
+#[cfg(feature = "optimizer")]
 #[test]
 fn pumpkin_matches_reference_and_respects_limits() {
     use std::time::Duration;
@@ -202,6 +203,7 @@ fn pumpkin_matches_reference_and_respects_limits() {
     assert!(!limited.enumeration_complete);
 }
 
+#[cfg(feature = "optimizer")]
 #[test]
 fn candidate_slots_narrow_the_domain() {
     let request = OptimizerRequest {
@@ -235,4 +237,106 @@ fn candidate_slots_narrow_the_domain() {
         optimize_bronze(&no_results),
         Err(ReferenceError::InvalidLimit)
     ));
+}
+
+#[cfg(feature = "optimizer")]
+#[test]
+fn all_slot_subsets_match_independent_enumeration() {
+    for enabled_mask in 0u8..8 {
+        for exclude in [false, true] {
+            let enabled_slots = std::array::from_fn(|i| enabled_mask & (1 << i) != 0);
+            let request = OptimizerRequest {
+                exclude_lutz: exclude,
+                enabled_slots,
+                ruleset: RulesetId::IsuAdult2026_27July16,
+                scoring_table: ScoringTableId::Isu2786June2_2026,
+                enumerate_equal_optima: true,
+                max_solutions: 8,
+                time_limit: None,
+            };
+            let result = optimize_bronze(&request).unwrap();
+            let mut choices = Vec::new();
+            for mask in 1u8..8 {
+                if exclude || mask & !enabled_mask != 0 || mask.count_ones() > 2 {
+                    continue;
+                }
+                choices.push((
+                    mask.count_ones() * 60,
+                    std::array::from_fn(|i| mask & (1 << i) != 0),
+                ));
+            }
+            if let Some(maximum) = choices.iter().map(|c| c.0).max() {
+                let mut expected = choices
+                    .into_iter()
+                    .filter_map(|(score, slots)| (score == maximum).then_some(slots))
+                    .collect::<Vec<_>>();
+                expected.sort();
+                assert_eq!(result.status, OptimizerStatus::OptimalProven);
+                assert!(result.enumeration_complete);
+                assert_eq!(
+                    result
+                        .candidates
+                        .iter()
+                        .map(|c| c.slots)
+                        .collect::<Vec<_>>(),
+                    expected
+                );
+                assert!(result
+                    .candidates
+                    .iter()
+                    .all(|c| u32::from(c.base_hundredths) == maximum
+                        && c.program.sources == result.sources));
+            } else {
+                assert_eq!(result.status, OptimizerStatus::InfeasibleProven);
+                assert!(result.candidates.is_empty());
+            }
+            assert_eq!(
+                result.objective,
+                OptimizerObjective::MaximizeUnfactoredBaseValueHundredths
+            );
+            assert!(result
+                .implemented_rules
+                .contains(&"isu-adult-2026-27-bronze-jump-repetition"));
+            assert!(result
+                .sources
+                .iter()
+                .any(|s| s.document == "ISU Communication 2786" && s.location.contains("row 1Lz")));
+            assert!(result.sources.iter().any(
+                |s| s.document.contains("Adult Figure Skating") && s.location.contains("p. 11")
+            ));
+        }
+    }
+}
+
+#[cfg(feature = "optimizer")]
+#[test]
+fn result_caps_and_disabled_enumeration_are_conservative() {
+    let request = OptimizerRequest {
+        exclude_lutz: false,
+        enabled_slots: [true; 3],
+        ruleset: RulesetId::IsuAdult2026_27July16,
+        scoring_table: ScoringTableId::Isu2786June2_2026,
+        enumerate_equal_optima: true,
+        max_solutions: 1,
+        time_limit: None,
+    };
+    for limit in [1, 2, 8] {
+        let result = optimize_bronze(&OptimizerRequest {
+            max_solutions: limit,
+            ..request.clone()
+        })
+        .unwrap();
+        assert_eq!(result.status, OptimizerStatus::OptimalProven);
+        assert_eq!(result.candidates.len(), limit.min(3));
+        assert_eq!(result.enumeration_complete, limit > 3);
+    }
+    let result = optimize_bronze(&OptimizerRequest {
+        enumerate_equal_optima: false,
+        max_solutions: 8,
+        ..request
+    })
+    .unwrap();
+    assert_eq!(result.status, OptimizerStatus::OptimalProven);
+    assert_eq!(result.candidates.len(), 1);
+    assert!(!result.enumeration_complete);
 }
