@@ -116,3 +116,6 @@ pub use validation::*;
 
 mod scoring;
 pub use scoring::*;
+
+mod optimizer;
+pub use optimizer::*;
