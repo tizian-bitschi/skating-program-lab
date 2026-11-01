@@ -25,6 +25,6 @@ Results must distinguish plan violations, recognition or input inconsistencies, 
 Correctness and source traceability take priority over convenience and speed. Use deterministic exact decimal or integer arithmetic and source-defined rounding. Version rules and tables with precise citations; unresolved questions block affected compliance or exact-score claims. Pure domain functions support independent tests and eventual native and WebAssembly use. Keep modules and dependencies small. No performance target is asserted before a representative workload exists.
 
 
-Identical input and explicit versions must produce identical results. Unknown versions must be rejected; adding a season must preserve earlier fixtures and sources. Incomplete or unsupported results must not claim complete compliance or an exact score.
+**AC-07 — Versioning:** Identical input and explicit versions must produce identical results. Unknown versions must be rejected; adding a season must preserve earlier fixtures and sources. Incomplete or unsupported results must not claim complete compliance or an exact score.
 
 See the [Adult rules](rules/isu-adult-2026-27.md), [scoring](specs/scoring.md) and [optimization](specs/optimization.md) specifications for detailed requirements and examples, and [implementation status](implementation-status.md) for current support.

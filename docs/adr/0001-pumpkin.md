@@ -1,5 +1,7 @@
 # ADR 0001: Pumpkin for a bounded native prototype
 
+Decision recorded: 2026-11-01 (solver comparison PR #30).
+
 Status: accepted for the bounded prototype; reassessment is required before a production commitment.
 
 ## Context

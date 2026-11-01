@@ -12,7 +12,7 @@ Report separately: proven optimum within the stated model; feasible incumbent wi
 
 These are target examples. Existing tests cover some cases only in part; see [implementation status](../implementation-status.md). Other findings may coexist. See [rule sources](../rule-sources.md) for source editions. Independent human domain review is required before claiming complete correctness.
 
-6. **Optimizer and uncertainty:** Within an explicitly complete Masters candidate domain obeying the Axel requirement, excluding all Axel types yields proven infeasibility only if the search proves it. On a small independently enumerated domain, returned optima match all distinct maxima when enumeration is proven complete. A time limit with a feasible incumbent reports unproven optimality; without one it reports incomplete, not infeasible. Unknown rules or unsupported input cannot yield a full compliance or exact-score claim.
+- **AC-06 — Optimizer and uncertainty:** Within an explicitly complete Masters candidate domain obeying the Axel requirement, excluding all Axel types yields proven infeasibility only if the search proves it. On a small independently enumerated domain, returned optima match all distinct maxima when enumeration is proven complete. A time limit with a feasible incumbent reports unproven optimality; without one it reports incomplete, not infeasible. Unknown rules or unsupported input cannot yield a full compliance or exact-score claim.
 
 ## Exhaustive Bronze reference domain
 
