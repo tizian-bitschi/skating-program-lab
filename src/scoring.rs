@@ -28,47 +28,97 @@ pub enum BaseValueError {
     Unsupported,
 }
 
+enum RowOrigin {
+    Catalog {
+        row: &'static crate::CatalogRow,
+        legacy_section: Option<&'static str>,
+    },
+    Combination {
+        rows: Vec<&'static crate::CatalogRow>,
+        reference: &'static crate::CatalogRow,
+    },
+    Repetition {
+        row: &'static crate::CatalogRow,
+    },
+}
+
 struct TableRow {
     hundredths: u16,
     goe: Option<[i16; 11]>,
     table: ScoringTableId,
     notation: String,
-    section: &'static str,
-    catalog_source: Option<crate::CatalogSource>,
-    goe_reference: Option<String>,
+    origin: RowOrigin,
+}
+
+fn catalog_source(row: &crate::CatalogRow, column: &str) -> SourceReference {
+    let mut source = row.source.reference(row.notation);
+    source.location.push_str(&format!(", {column}"));
+    source
 }
 
 impl TableRow {
     fn source(&self, column: &str) -> SourceReference {
-        if let Some(source) = self.catalog_source {
-            let mut reference = source.reference(&self.notation);
-            reference.location.push_str(&format!(", {column}"));
-            return reference;
+        match &self.origin {
+            RowOrigin::Catalog {
+                row,
+                legacy_section: Some(section),
+            } => self
+                .table
+                .source_reference(format!("{section}, {column}, row {}", row.notation)),
+            RowOrigin::Catalog {
+                row,
+                legacy_section: None,
+            } => catalog_source(row, column),
+            RowOrigin::Combination { rows, .. } => {
+                let components = rows
+                    .iter()
+                    .map(|row| catalog_source(row, column).location)
+                    .collect::<Vec<_>>()
+                    .join("; ");
+                self.table.source_reference(format!(
+                    "p. 14, remark 4, combination sum; component sources: {components}"
+                ))
+            }
+            RowOrigin::Repetition { row } => {
+                let mut source = catalog_source(row, column);
+                source
+                    .location
+                    .push_str("; p. 14, remark 5, 80% BASE rounded to two decimals");
+                source
+            }
         }
-        self.table
-            .source_reference(format!("{}, {column}, row {}", self.section, self.notation))
+    }
+    fn goe_source(&self, column: &str) -> SourceReference {
+        match &self.origin {
+            RowOrigin::Combination { reference, .. } => {
+                let mut source = catalog_source(reference, column);
+                source
+                    .location
+                    .push_str("; p. 14, remark 4, combination reference");
+                source
+            }
+            RowOrigin::Repetition { row } => {
+                let mut source = catalog_source(row, column);
+                source
+                    .location
+                    .push_str("; p. 14, remark 5, original reference");
+                source
+            }
+            RowOrigin::Catalog { .. } => self.source(column),
+        }
     }
     fn base(&self) -> BaseValue {
-        let source = if self.notation.ends_with("+REP") {
-            self.table.source_reference(format!(
-                "{}; p. 14, remark 5, 80% BASE of row {} rounded to two decimals",
-                self.section,
-                self.goe_reference.as_deref().expect("repetition reference")
-            ))
-        } else {
-            self.source("BASE column")
-        };
         BaseValue {
             hundredths: self.hundredths,
             table: self.table,
             notation: self.notation.clone(),
-            source,
+            source: self.source("BASE column"),
         }
     }
 }
 
-// Keep engine support at the existing single/double subset; catalog presence is data only.
-fn jump_row(table: ScoringTableId, notation: &str) -> Option<(u16, &'static str, [i16; 11])> {
+// Catalog presence alone does not expand the supported jump recognition subset.
+fn jump_row(table: ScoringTableId, notation: &str) -> Option<&'static crate::CatalogRow> {
     let unmarked = notation.trim_end_matches(['q', '<', '!', 'e']);
     if !matches!(
         unmarked,
@@ -76,15 +126,139 @@ fn jump_row(table: ScoringTableId, notation: &str) -> Option<(u16, &'static str,
     ) {
         return None;
     }
-    let row = crate::catalog_row(table, notation)?;
-    // Preserve existing public source descriptions during this data migration.
-    let section = match row.source.page {
-        2 => "p. 2, Jumps",
-        3 => "p. 3, Jumps",
-        4 => "p. 4, Jumps",
-        _ => return None,
+    crate::catalog_row(table, notation)
+}
+
+fn single_row(
+    table: ScoringTableId,
+    details: &crate::RecognitionDetails,
+    notation: String,
+) -> Result<TableRow, BaseValueError> {
+    if details.components().len() != 1 {
+        return Err(BaseValueError::Unsupported);
+    }
+    let component = details.components()[0].as_str();
+    if details.level().is_none() && (component.ends_with("Sp") || component == "StSq") {
+        return Err(BaseValueError::UnknownDetails);
+    }
+    let row = crate::catalog_row(table, &notation).ok_or(BaseValueError::Unsupported)?;
+    if row.discipline != CatalogDiscipline::SingleAndPair || row.level != details.level() {
+        return Err(BaseValueError::Unsupported);
+    }
+    let legacy_section = match row.family {
+        CatalogFamily::Jump if details.level().is_none() => {
+            jump_row(table, &notation).ok_or(BaseValueError::Unsupported)?;
+            Some(match row.source.page {
+                2 => "p. 2, Jumps",
+                3 => "p. 3, Jumps",
+                4 => "p. 4, Jumps",
+                _ => return Err(BaseValueError::Unsupported),
+            })
+        }
+        CatalogFamily::Spin
+        | CatalogFamily::StepSequence
+        | CatalogFamily::ChoreographicSpin
+        | CatalogFamily::ChoreographicSequence => match notation.as_str() {
+            "CSSp1" => Some("p. 8, Spins"),
+            "ChSp1" => Some("p. 14, Choreographic Elements"),
+            _ => None,
+        },
+        _ => return Err(BaseValueError::Unsupported),
     };
-    Some((row.base_hundredths, section, row.goe_hundredths))
+    Ok(TableRow {
+        hundredths: row.base_hundredths,
+        goe: Some(row.goe_hundredths),
+        table,
+        notation,
+        origin: RowOrigin::Catalog {
+            row,
+            legacy_section,
+        },
+    })
+}
+
+fn repetition_row(
+    table: ScoringTableId,
+    details: &crate::RecognitionDetails,
+    notation: String,
+) -> Result<TableRow, BaseValueError> {
+    if details.components().len() != 1
+        || details.level().is_some()
+        || !details.components()[0]
+            .as_str()
+            .starts_with(char::is_numeric)
+    {
+        return Err(BaseValueError::Unsupported);
+    }
+    let original = crate::RecognitionDetails::new(
+        details.components().to_vec(),
+        None,
+        Some(
+            details
+                .calls()
+                .ok_or(BaseValueError::UnknownCalls)?
+                .iter()
+                .filter(|entry| entry.call != PanelCall::Repetition)
+                .cloned()
+                .collect(),
+        ),
+    )
+    .map_err(|_| BaseValueError::Unsupported)?;
+    let original_notation = original.notation().ok_or(BaseValueError::UnknownCalls)?;
+    let mut resolved = single_row(table, &original, original_notation)?;
+    let RowOrigin::Catalog { row, .. } = resolved.origin else {
+        unreachable!("single catalog row")
+    };
+    resolved.hundredths = ((u32::from(resolved.hundredths) * 8 + 5) / 10) as u16;
+    resolved.origin = RowOrigin::Repetition { row };
+    resolved.notation = notation;
+    Ok(resolved)
+}
+
+fn combination_row(
+    table: ScoringTableId,
+    details: &crate::RecognitionDetails,
+    notation: String,
+) -> Result<TableRow, BaseValueError> {
+    if !(2..=3).contains(&details.components().len())
+        || details.level().is_some()
+        || details.components()[1..]
+            .iter()
+            .any(|code| !matches!(code.as_str(), "1T" | "2T" | "1Lo" | "2Lo"))
+    {
+        return Err(BaseValueError::Unsupported);
+    }
+    if details
+        .calls()
+        .ok_or(BaseValueError::UnknownCalls)?
+        .iter()
+        .any(|entry| !matches!(entry.target, crate::CallTarget::Component(_)))
+    {
+        return Err(BaseValueError::Unsupported);
+    }
+    let rows = notation
+        .split('+')
+        .map(|part| jump_row(table, part).ok_or(BaseValueError::Unsupported))
+        .collect::<Result<Vec<_>, _>>()?;
+    // Ties retain the first component, preserving reference selection.
+    let reference = rows
+        .iter()
+        .copied()
+        .reduce(|first, next| {
+            if next.base_hundredths > first.base_hundredths {
+                next
+            } else {
+                first
+            }
+        })
+        .ok_or(BaseValueError::Unsupported)?;
+    Ok(TableRow {
+        hundredths: rows.iter().map(|row| row.base_hundredths).sum(),
+        goe: Some(reference.goe_hundredths),
+        table,
+        notation,
+        origin: RowOrigin::Combination { rows, reference },
+    })
 }
 
 fn table_row(
@@ -101,125 +275,12 @@ fn table_row(
         .iter()
         .any(|entry| entry.call == PanelCall::Repetition)
     {
-        // Supplied final +REP recognition, not an inference from program repetitions.
-        if details.components().len() != 1
-            || details.level().is_some()
-            || !details.components()[0]
-                .as_str()
-                .starts_with(char::is_numeric)
-        {
-            return Err(BaseValueError::Unsupported);
-        }
-        let mut original = recognition.clone();
-        original.details = Some(
-            crate::RecognitionDetails::new(
-                details.components().to_vec(),
-                None,
-                Some(
-                    calls
-                        .iter()
-                        .filter(|entry| entry.call != PanelCall::Repetition)
-                        .cloned()
-                        .collect(),
-                ),
-            )
-            .map_err(|_| BaseValueError::Unsupported)?,
-        );
-        let mut row = table_row(table, &original)?;
-        row.hundredths = ((u32::from(row.hundredths) * 8 + 5) / 10) as u16;
-        row.goe_reference = Some(row.notation);
-        row.notation = notation;
-        return Ok(row);
+        repetition_row(table, details, notation)
+    } else if details.components().len() > 1 {
+        combination_row(table, details, notation)
+    } else {
+        single_row(table, details, notation)
     }
-    if (2..=3).contains(&details.components().len()) {
-        let components = details.components();
-        if components[1..]
-            .iter()
-            .any(|code| !matches!(code.as_str(), "1T" | "2T" | "1Lo" | "2Lo"))
-            || details.level().is_some()
-        {
-            return Err(BaseValueError::Unsupported);
-        }
-        let calls = details.calls().ok_or(BaseValueError::UnknownCalls)?;
-        if calls
-            .iter()
-            .any(|entry| !matches!(entry.target, crate::CallTarget::Component(_)))
-        {
-            return Err(BaseValueError::Unsupported);
-        }
-        let mut hundredths = 0;
-        let mut reference = "";
-        let mut reference_base = 0;
-        let mut goe = [0; 11];
-        for part in notation.split('+') {
-            let (base, _, values) = jump_row(table, part).ok_or(BaseValueError::Unsupported)?;
-            hundredths += base;
-            if reference.is_empty() || base > reference_base {
-                reference = part;
-                reference_base = base;
-                goe = values;
-            }
-        }
-        return Ok(TableRow {
-            hundredths,
-            goe: Some(goe),
-            table,
-            notation: notation.clone(),
-            section: "pp. 2–4, Jumps; p. 14, combination reference",
-            catalog_source: None,
-            goe_reference: Some(reference.to_owned()),
-        });
-    }
-    if details.components().len() != 1 {
-        return Err(BaseValueError::Unsupported);
-    }
-    let component = details.components()[0].as_str();
-    if details.level().is_none() && (component.ends_with("Sp") || component == "StSq") {
-        return Err(BaseValueError::UnknownDetails);
-    }
-    let catalog = crate::catalog_row(table, &notation).ok_or(BaseValueError::Unsupported)?;
-    if catalog.discipline != CatalogDiscipline::SingleAndPair || catalog.level != details.level() {
-        return Err(BaseValueError::Unsupported);
-    }
-    let (hundredths, section, goe) = match catalog.family {
-        CatalogFamily::Jump if details.level().is_none() => {
-            let (base, section, goe) =
-                jump_row(table, &notation).ok_or(BaseValueError::Unsupported)?;
-            (base, section, Some(goe))
-        }
-        CatalogFamily::Spin
-        | CatalogFamily::StepSequence
-        | CatalogFamily::ChoreographicSpin
-        | CatalogFamily::ChoreographicSequence => {
-            // Preserve source strings only for the previously supported public outputs.
-            let section = match notation.as_str() {
-                "CSSp1" => "p. 8, Spins",
-                "ChSp1" => "p. 14, Choreographic Elements",
-                _ => "",
-            };
-            (
-                catalog.base_hundredths,
-                section,
-                Some(catalog.goe_hundredths),
-            )
-        }
-        _ => return Err(BaseValueError::Unsupported),
-    };
-    Ok(TableRow {
-        hundredths,
-        goe,
-        table,
-        section,
-        catalog_source: if catalog.family == CatalogFamily::Jump
-            || matches!(notation.as_str(), "CSSp1" | "ChSp1")
-        {
-            None
-        } else {
-            Some(catalog.source)
-        },
-        notation,
-        goe_reference: None,
-    })
 }
 
 enum ResolvedRow {
@@ -329,7 +390,16 @@ fn goe_limits(calls: &[crate::RecordedCall]) -> Result<(i8, i8, bool), ElementSc
         1 => 2,
         _ => 3,
     };
-    let starting_max = if capped || errors > 1 { 2 } else { 5 };
+    // Judges Handbook pp. 2, 6: any error excludes +5; a single q starts at most +3.
+    let starting_max = if capped || errors > 1 {
+        2
+    } else if quarters == 1 {
+        3
+    } else if errors > 0 {
+        4
+    } else {
+        5
+    };
     Ok((
         (starting_max - reduction).max(-5),
         (2 - reduction - 5).max(-5),
@@ -377,22 +447,25 @@ pub fn score_element(
     } else {
         format!("GOE column {goe:+}")
     };
-    let mut goe_source = row.source(&column);
-    if let Some(reference) = &row.goe_reference {
-        goe_source.location = if row.notation.ends_with("+REP") {
-            format!(
-                "{}; p. 14, remark 5, original reference; {column}, row {reference}",
-                row.section
-            )
-        } else {
-            format!("p. 14, combination reference; {column}, row {reference}")
-        };
-    }
+    let goe_source = row.goe_source(&column);
     let base = row.base();
+    let handbook_limit = calls
+        .iter()
+        .filter(|entry| entry.call != PanelCall::Repetition)
+        .count()
+        == 1
+        && calls.iter().any(|entry| {
+            matches!(
+                entry.call,
+                PanelCall::Quarter | PanelCall::UnderRotated | PanelCall::UnclearEdge
+            )
+        });
     let consistency_source = SourceReference {
-        document: "ISU Communication 2788".into(),
+        document: if handbook_limit { "ISU Handbook for Referees and Judges" } else { "ISU Communication 2788" }.into(),
         version: "2026-05-19".into(),
-        location: if downgraded {
+        location: if handbook_limit {
+            "pp. 2, 6, maximum starting GOE for errors and q; Communication 2788 pp. 14, 16, call and fall reductions"
+        } else if downgraded {
             "pp. 14, 16, downgrade and fall reductions and maximum starting GOE"
         } else {
             "pp. 14, 16, call and fall reductions and maximum starting GOE"

@@ -3,6 +3,67 @@ use skating_program_lab::*;
 const TABLE: ScoringTableId = ScoringTableId::Isu2786June2_2026;
 
 #[test]
+fn single_q_starts_at_three_for_solo_combination_and_repetition() {
+    let solo = recognition("2Lo", None, Some(vec![PanelCall::Quarter]));
+    let mut combo = solo.clone();
+    combo.details = Some(
+        RecognitionDetails::new(
+            vec![
+                ComponentCode::try_from("2Lo").unwrap(),
+                ComponentCode::try_from("1T").unwrap(),
+            ],
+            None,
+            Some(vec![RecordedCall {
+                target: CallTarget::Component(0),
+                call: PanelCall::Quarter,
+            }]),
+        )
+        .unwrap(),
+    );
+    let mut repetition = solo.clone();
+    repetition.details = Some(
+        RecognitionDetails::new(
+            vec![ComponentCode::try_from("2Lo").unwrap()],
+            None,
+            Some(vec![
+                RecordedCall {
+                    target: CallTarget::Component(0),
+                    call: PanelCall::Quarter,
+                },
+                RecordedCall {
+                    target: CallTarget::Element,
+                    call: PanelCall::Repetition,
+                },
+            ]),
+        )
+        .unwrap(),
+    );
+    // Judges Handbook p. 6: starting +3 minus q reduction 2 => final at most +1.
+    for (r, expected_base) in [(solo, 170), (combo, 210), (repetition, 136)] {
+        let score = score_element(TABLE, &r, &[], 1, Some(false)).unwrap();
+        assert_eq!(
+            (score.base.hundredths, score.goe_hundredths),
+            (expected_base, 17)
+        );
+        assert_eq!(
+            score.consistency_source.document,
+            "ISU Handbook for Referees and Judges"
+        );
+        assert!(score
+            .consistency_source
+            .official_url()
+            .unwrap()
+            .contains("Handbook-for-Referees"));
+        for invalid in 2..=5 {
+            assert_eq!(
+                score_element(TABLE, &r, &[], invalid, Some(false)),
+                Err(ElementScoreError::UnsupportedMarks)
+            );
+        }
+    }
+}
+
+#[test]
 fn supplied_starred_whole_element_is_no_value_not_recognized_zero() {
     for (code, level) in [("1Lz", None), ("CSSp", Some(Level::Two)), ("ChSq1", None)] {
         let r = recognition(code, level, Some(vec![PanelCall::NotCounted]));
@@ -108,16 +169,25 @@ fn three_jump_combination_sums_components_and_uses_only_one_reference_goe() {
         .unwrap(),
     );
     // 2786 pp. 2–4, p. 14 remark 4; Sports Rule 353.1(h)(i): 144+130+170, reference 2Lo.
-    let score = score_element(TABLE, &r, &[], 3, Some(false)).unwrap();
+    let score = score_element(TABLE, &r, &[], 2, Some(false)).unwrap();
     assert_eq!(
         (
             score.base.hundredths,
             score.goe_hundredths,
             score.score_hundredths
         ),
-        (444, 51, 495)
+        (444, 34, 478)
     );
-    assert!(score.goe_source.location.contains("row 2Lo"));
+    assert!(score.goe_source.location.contains("code 2Lo"));
+    for source in [
+        "value row 54, code 2F<",
+        "value row 39, code 2T",
+        "value row 41, code 2Lo",
+    ] {
+        assert!(score.base.source.location.contains(source));
+    }
+    assert!(!score.base.source.location.contains("row 2F<+2T+2Lo"));
+    assert!(score.goe_source.location.contains("value row 41, code 2Lo"));
 }
 
 #[test]
@@ -1435,11 +1505,11 @@ fn marked_rows_and_call_boundaries() {
     use PanelCall::*;
     // Communication 2786 pp. 2–4 and 2788 pp. 14, 16.
     for (code, call, grade, base, adjustment) in [
-        ("2Lo", Quarter, 3, 170, 51),
+        ("2Lo", Quarter, 1, 170, 17),
         ("2T", UnderRotated, -3, 104, -31),
         ("2A", Downgraded, -3, 110, -33),
         ("2F", WrongEdge, 0, 144, 0),
-        ("1Lz", UnclearEdge, 4, 60, 24),
+        ("1Lz", UnclearEdge, 3, 60, 18),
     ] {
         let r = recognition(code, None, Some(vec![call]));
         let score = score_element(TABLE, &r, &[], grade, Some(false)).unwrap();
@@ -1495,10 +1565,10 @@ fn jump_value_does_not_depend_on_adult_category() {
 fn call_and_fall_limits_are_enforced() {
     use PanelCall::*;
     for (call, maximum, fall_maximum) in [
-        (Quarter, 3, -5),
-        (UnderRotated, 3, -5),
+        (Quarter, 1, -5),
+        (UnderRotated, 2, -5),
         (Downgraded, -1, -5),
-        (UnclearEdge, 4, -4),
+        (UnclearEdge, 3, -4),
         (WrongEdge, 0, -5),
     ] {
         let r = recognition("2F", None, Some(vec![call]));
