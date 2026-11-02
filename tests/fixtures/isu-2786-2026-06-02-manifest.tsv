@@ -394,11 +394,11 @@ isu-2786-2026-06-02	9	17	Spin Combination with change of position and change of 
 isu-2786-2026-06-02	9	18	Spin Combination with change of position and change of foot	SingleAndPair	Spin	FCCoSp2V	2	11	1,3,legend	render-cross-checked
 isu-2786-2026-06-02	9	19	Spin Combination with change of position and change of foot	SingleAndPair	Spin	FCCoSp3V	3	11	1,3,legend	render-cross-checked
 isu-2786-2026-06-02	9	20	Spin Combination with change of position and change of foot	SingleAndPair	Spin	FCCoSp4V	4	11	1,3,legend	render-cross-checked
-isu-2786-2026-06-02	9	21	Step Sequence	SingleAndPair	StepSequence	StSqB	B	11	1,legend	render-cross-checked
-isu-2786-2026-06-02	9	22	Step Sequence	SingleAndPair	StepSequence	StSq1	1	11	1,legend	render-cross-checked
-isu-2786-2026-06-02	9	23	Step Sequence	SingleAndPair	StepSequence	StSq2	2	11	1,legend	render-cross-checked
-isu-2786-2026-06-02	9	24	Step Sequence	SingleAndPair	StepSequence	StSq3	3	11	1,legend	render-cross-checked
-isu-2786-2026-06-02	9	25	Step Sequence	SingleAndPair	StepSequence	StSq4	4	11	1,legend	render-cross-checked
+isu-2786-2026-06-02	9	21	Step Sequence	SingleAndPair	StepSequence	StSqB	B	11	1	render-cross-checked
+isu-2786-2026-06-02	9	22	Step Sequence	SingleAndPair	StepSequence	StSq1	1	11	1	render-cross-checked
+isu-2786-2026-06-02	9	23	Step Sequence	SingleAndPair	StepSequence	StSq2	2	11	1	render-cross-checked
+isu-2786-2026-06-02	9	24	Step Sequence	SingleAndPair	StepSequence	StSq3	3	11	1	render-cross-checked
+isu-2786-2026-06-02	9	25	Step Sequence	SingleAndPair	StepSequence	StSq4	4	11	1	render-cross-checked
 isu-2786-2026-06-02	9	26	Lifts / Group 1	Pair	Lift	1LiB	B	11	1	render-cross-checked
 isu-2786-2026-06-02	9	27	Lifts / Group 1	Pair	Lift	1Li1	1	11	1	render-cross-checked
 isu-2786-2026-06-02	9	28	Lifts / Group 1	Pair	Lift	1Li2	2	11	1	render-cross-checked
