@@ -43,22 +43,17 @@ pub(crate) fn bronze_jump_source() -> SourceReference {
     category_source(AdultCategory::Bronze)
 }
 pub(crate) fn category_source(category: AdultCategory) -> SourceReference {
-    let location = match category {
-        AdultCategory::Bronze => "p. 11, Bronze Free Skating, jumps",
-        AdultCategory::Silver => "p. 10, Silver Free Skating, jumps",
-        AdultCategory::Gold => "p. 9, Gold Free Skating, jumps",
-        AdultCategory::Masters => "p. 8, Masters Free Skating, jumps",
-    };
-    SourceReference {
-        document: "International Adult Figure Skating Competitions Technical Announcement".into(),
-        version: "2026-07-16".into(),
-        location: location.into(),
-    }
+    crate::adult_profile(category)
+        .binding(crate::ProfileRule::Eligibility)
+        .source
+        .clone()
 }
-
-#[cfg(feature = "optimizer")]
-pub(crate) fn jump_rule_ids(category: AdultCategory) -> Vec<&'static str> {
+pub(crate) fn adult_bindings(
+    category: AdultCategory,
+    category_source: &SourceReference,
+) -> Vec<crate::RuleBinding> {
     [
+        Rule::Input,
         Rule::Eligibility,
         Rule::Count,
         Rule::CompoundCount,
@@ -69,14 +64,13 @@ pub(crate) fn jump_rule_ids(category: AdultCategory) -> Vec<&'static str> {
         Rule::Transition,
     ]
     .into_iter()
-    .filter(|rule| !matches!(rule, Rule::Axel) || category == AdultCategory::Masters)
-    .map(|rule| rule.id(category))
+    .map(|rule| crate::RuleBinding {
+        rule: rule.key(),
+        id: rule.id(category),
+        mechanism: crate::RuleMechanism::JumpPlanV1,
+        source: rule.source(category_source),
+    })
     .collect()
-}
-
-#[cfg(feature = "optimizer")]
-pub(crate) fn jump_rule_sources(category: AdultCategory) -> Vec<SourceReference> {
-    vec![category_source(category), Rule::Transition.source(category)]
 }
 #[derive(Clone, Copy)]
 enum Rule {
@@ -91,6 +85,20 @@ enum Rule {
     Transition,
 }
 impl Rule {
+    fn key(self) -> crate::ProfileRule {
+        match self {
+            Self::Input => crate::ProfileRule::Input,
+            Self::Eligibility => crate::ProfileRule::Eligibility,
+            Self::Count => crate::ProfileRule::Count,
+            Self::CompoundCount => crate::ProfileRule::CompoundCount,
+            Self::Structure => crate::ProfileRule::Structure,
+            Self::Euler => crate::ProfileRule::Euler,
+            Self::Repetition => crate::ProfileRule::Repetition,
+            Self::Axel => crate::ProfileRule::Axel,
+            Self::Transition => crate::ProfileRule::Transition,
+        }
+    }
+
     fn id(self, category: AdultCategory) -> &'static str {
         match (self, category) {
             (Self::Input, _) => "listed-jump-invalid-rotations",
@@ -116,7 +124,7 @@ impl Rule {
             (Self::Transition, _) => "isu-sports-2026-jump-transition",
         }
     }
-    fn source(self, category: AdultCategory) -> SourceReference {
+    fn source(self, category_source: &SourceReference) -> SourceReference {
         if matches!(self, Self::Input) {
             SourceReference {
                 document: "Skating Program Lab input contract".into(),
@@ -130,46 +138,7 @@ impl Rule {
                 location: "p. 65, Rule 610, jump combinations".into(),
             }
         } else {
-            category_source(category)
-        }
-    }
-}
-
-struct Policy {
-    category: AdultCategory,
-    max_jumps: usize,
-    max_compound_length: usize,
-}
-impl Policy {
-    fn new(category: AdultCategory) -> Self {
-        Self {
-            category,
-            max_jumps: if matches!(category, AdultCategory::Bronze | AdultCategory::Silver) {
-                4
-            } else {
-                5
-            },
-            max_compound_length: if category == AdultCategory::Bronze {
-                2
-            } else {
-                3
-            },
-        }
-    }
-    fn bronze(&self) -> bool {
-        self.category == AdultCategory::Bronze
-    }
-    fn prohibited(&self, jump: &ListedJump) -> bool {
-        match (self.category, jump.kind, jump.rotations) {
-            (AdultCategory::Bronze, Some(JumpKind::Axel), _) => true,
-            (AdultCategory::Bronze | AdultCategory::Silver, _, Some(n)) if n >= 2 => true,
-            (_, _, Some(n)) if n >= 3 => true,
-            (
-                AdultCategory::Gold,
-                Some(JumpKind::Flip | JumpKind::Lutz | JumpKind::Axel),
-                Some(2),
-            ) => true,
-            _ => false,
+            category_source.clone()
         }
     }
 }
@@ -180,8 +149,9 @@ struct Compound {
     length: usize,
     euler: bool,
 }
-struct Validator {
-    policy: Policy,
+struct Validator<'a> {
+    profile: &'a crate::RuleProfile,
+    policy: &'a crate::JumpPolicy,
     findings: Vec<Finding>,
     occurrences: Vec<(JumpKind, u8)>,
     compounds: Vec<Compound>,
@@ -192,10 +162,11 @@ struct Validator {
     axel: bool,
     axel_unknown: bool,
 }
-impl Validator {
-    fn new(category: AdultCategory) -> Self {
+impl<'a> Validator<'a> {
+    fn new(profile: &'a crate::RuleProfile) -> Self {
         Self {
-            policy: Policy::new(category),
+            profile,
+            policy: &profile.jumps,
             findings: vec![],
             occurrences: vec![],
             compounds: vec![],
@@ -207,6 +178,10 @@ impl Validator {
             axel_unknown: false,
         }
     }
+    fn bronze_diagnostics(&self) -> bool {
+        self.policy.bronze_diagnostics
+            && self.profile.provenance == crate::ProfileProvenance::Official
+    }
     fn add(
         &mut self,
         kind: FindingKind,
@@ -217,11 +192,11 @@ impl Validator {
     ) {
         self.findings.push(Finding {
             kind,
-            rule_id: rule.id(self.policy.category),
+            rule_id: self.profile.binding(rule.key()).id,
             element_index,
             component_index,
             explanation,
-            source: rule.source(self.policy.category),
+            source: self.profile.binding(rule.key()).source.clone(),
         });
     }
     fn jump(&mut self, jump: &ListedJump, index: usize, component: Option<usize>) {
@@ -244,12 +219,12 @@ impl Validator {
             );
         }
         if self.policy.prohibited(jump) {
-            let text = if self.policy.bronze() && jump.kind == Some(JumpKind::Axel) {
+            let text = if self.bronze_diagnostics() && jump.kind == Some(JumpKind::Axel) {
                 "Axel jumps are prohibited in Bronze."
-            } else if self.policy.bronze() {
+            } else if self.bronze_diagnostics() {
                 "Multi-rotation jumps are prohibited in Bronze."
             } else {
-                "This jump is prohibited in the selected category."
+                "This jump is prohibited in the selected profile."
             };
             self.add(
                 FindingKind::Violation,
@@ -259,16 +234,28 @@ impl Validator {
                 text,
             );
         }
-        if self.policy.bronze()
-            && jump.kind == Some(JumpKind::Axel)
-            && jump.rotations.is_some_and(|n| n >= 2)
+        if jump
+            .kind
+            .is_some_and(|kind| !self.policy.allowed.iter().any(|p| p.kind == kind))
+            && jump.rotations.is_some_and(|n| {
+                n > 0
+                    && !self
+                        .policy
+                        .allowed
+                        .iter()
+                        .any(|p| (p.min_rotations..=p.max_rotations).contains(&n))
+            })
         {
             self.add(
                 FindingKind::Violation,
                 Rule::Eligibility,
                 Some(index),
                 component,
-                "Multi-rotation jumps are prohibited in Bronze.",
+                if self.bronze_diagnostics() {
+                    "Multi-rotation jumps are prohibited in Bronze."
+                } else {
+                    "The rotation count exceeds the selected profile permissions."
+                },
             );
         }
         match (jump.kind, jump.rotations) {
@@ -284,14 +271,18 @@ impl Validator {
                 .iter()
                 .filter(|&&entry| entry == (kind, rotations))
                 .count()
-                > 2
+                > self.policy.max_repetitions
             {
                 self.add(
                     FindingKind::Violation,
                     Rule::Repetition,
                     Some(index),
                     component,
-                    "A listed jump may occur at most twice in the program.",
+                    if self.policy.max_repetitions == 2 {
+                        "A listed jump may occur at most twice in the program."
+                    } else {
+                        "A listed jump exceeds the selected profile repetition limit."
+                    },
                 );
             }
         } else {
@@ -303,13 +294,17 @@ impl Validator {
             match part {
                 JumpPart::Euler => {
                     self.eulers += 1;
-                    if self.policy.bronze() {
+                    if self.policy.max_eulers == 0 {
                         self.add(
                             FindingKind::Violation,
                             Rule::Euler,
                             Some(index),
                             Some(i),
-                            "Euler is prohibited in a Bronze combination.",
+                            if self.bronze_diagnostics() {
+                                "Euler is prohibited in a Bronze combination."
+                            } else {
+                                "The selected profile prohibits Euler."
+                            },
                         );
                     } else if !parts[..i].iter().any(|p| matches!(p, JumpPart::Jump(_)))
                         || !parts[i + 1..]
@@ -377,7 +372,7 @@ impl Validator {
                 _ => None,
             })
             .collect();
-        if !sequence || !self.policy.bronze() {
+        if !sequence || self.policy.max_sequences > 0 {
             self.compounds.push(Compound {
                 index,
                 sequence,
@@ -385,13 +380,17 @@ impl Validator {
                 euler: parts.iter().any(|p| matches!(p, JumpPart::Euler)),
             });
         }
-        if sequence && self.policy.bronze() {
+        if sequence && self.policy.max_sequences == 0 {
             self.add(
                 FindingKind::Violation,
                 Rule::Structure,
                 Some(index),
                 None,
-                "Bronze does not allow jump sequences.",
+                if self.bronze_diagnostics() {
+                    "Bronze does not allow jump sequences."
+                } else {
+                    "The selected profile prohibits jump sequences."
+                },
             );
         } else if listed.len() > self.policy.max_compound_length {
             self.add(
@@ -399,10 +398,10 @@ impl Validator {
                 Rule::Structure,
                 Some(index),
                 None,
-                if self.policy.bronze() {
+                if self.bronze_diagnostics() {
                     "A Bronze combination permits at most two listed jumps."
                 } else {
-                    "A combination or sequence permits at most three listed jumps."
+                    "The compound exceeds the selected profile listed-jump limit."
                 },
             );
         } else if listed.len() < 2 {
@@ -413,17 +412,17 @@ impl Validator {
                 Rule::Structure,
                 Some(index),
                 None,
-                if self.policy.bronze() {
+                if self.bronze_diagnostics() {
                     "Combination jump details are incomplete."
                 } else {
                     "Compound jump details are incomplete."
                 },
             );
         }
-        if !sequence || !self.policy.bronze() {
+        if !sequence || self.policy.max_sequences > 0 {
             self.transition(parts, index, sequence);
         }
-        if sequence && !self.policy.bronze() && listed.len() >= 2 {
+        if sequence && self.policy.max_sequences > 0 && listed.len() >= 2 {
             let later = &listed[1..];
             if !later.iter().any(|j| j.kind == Some(JumpKind::Axel)) {
                 self.add(
@@ -450,26 +449,26 @@ impl Validator {
     fn program_checks(&mut self) {
         let sequences = self.compounds.iter().filter(|c| c.sequence).count();
         let combinations = self.compounds.len() - sequences;
-        if (self.policy.bronze() && combinations > 1)
-            || (!self.policy.bronze()
-                && (combinations > 2 || sequences > 1 || self.compounds.len() > 2))
+        if combinations > self.policy.max_combinations
+            || sequences > self.policy.max_sequences
+            || self.compounds.len() > self.policy.max_compounds
         {
             self.add(
                 FindingKind::Violation,
                 Rule::CompoundCount,
                 None,
                 None,
-                if self.policy.bronze() {
+                if self.bronze_diagnostics() {
                     "Bronze permits at most one jump combination."
                 } else {
-                    "At most two combinations, or one combination and one sequence, are permitted."
+                    "The program exceeds the selected profile combination, sequence or compound limit."
                 },
             );
-        } else if (self.policy.bronze() && combinations + self.unspecified > 1)
-            || (!self.policy.bronze()
-                && self.unspecified > 0
-                && (self.compounds.len() + self.unspecified > 2
-                    || sequences + self.unspecified > 1))
+        } else if self.unspecified > 0
+            && (combinations + self.unspecified > self.policy.max_combinations
+                || self.compounds.len() + self.unspecified > self.policy.max_compounds
+                || (self.policy.max_sequences > 0
+                    && sequences + self.unspecified > self.policy.max_sequences))
         {
             self.add(
                 FindingKind::Unknown,
@@ -479,28 +478,31 @@ impl Validator {
                 "An unspecified element may be a jump combination.",
             );
         }
-        if self.compounds.iter().filter(|c| c.length == 3).count() > 1 && !self.policy.bronze() {
+        if self.policy.max_compound_length >= 3
+            && self.compounds.iter().filter(|c| c.length == 3).count()
+                > self.policy.max_three_jump_compounds
+        {
             self.add(
                 FindingKind::Violation,
                 Rule::Structure,
                 None,
                 None,
-                "Only one combination or sequence may have three listed jumps.",
+                "The program exceeds the selected profile three-jump compound limit.",
             );
         }
-        if self.eulers > 1 && !self.policy.bronze() {
+        if self.eulers > self.policy.max_eulers && self.policy.max_eulers > 0 {
             self.add(
                 FindingKind::Violation,
                 Rule::Euler,
                 None,
                 None,
-                "Euler may be executed only once per program.",
+                "The program exceeds the selected profile Euler limit.",
             );
         }
         let conflict_indices: Vec<_> = self
             .compounds
             .iter()
-            .filter(|c| sequences > 0 && !c.sequence && c.euler && !self.policy.bronze())
+            .filter(|c| sequences > 0 && !c.sequence && c.euler && self.policy.max_sequences > 0)
             .map(|c| c.index)
             .collect();
         for index in conflict_indices {
@@ -527,10 +529,10 @@ impl Validator {
                 Rule::Count,
                 None,
                 None,
-                if self.policy.bronze() {
+                if self.bronze_diagnostics() {
                     "Bronze permits at most four jump elements."
                 } else {
-                    "The program exceeds the category's jump element limit."
+                    "The program exceeds the selected profile jump element limit."
                 },
             );
         } else if self.jump_count + self.unspecified > self.policy.max_jumps {
@@ -542,7 +544,7 @@ impl Validator {
                 "An unspecified element may exceed the jump element limit.",
             );
         }
-        if self.policy.category == AdultCategory::Masters && !self.axel {
+        if self.policy.require_axel && !self.axel {
             self.add(
                 if self.axel_unknown {
                     FindingKind::Unknown
@@ -552,7 +554,7 @@ impl Validator {
                 Rule::Axel,
                 None,
                 None,
-                "Masters requires an Axel-type jump.",
+                "The selected profile requires an Axel-type jump.",
             );
         }
     }
@@ -583,8 +585,15 @@ pub fn validate_program(program: &Program) -> ValidationResult {
             }],
         };
     }
-    let mut validator = Validator::new(program.category);
-    for (index, element) in program.elements.iter().enumerate() {
+    validate_elements(&program.elements, &crate::adult_profile(program.category))
+}
+
+pub(crate) fn validate_elements(
+    elements: &[PlannedElement],
+    profile: &crate::RuleProfile,
+) -> ValidationResult {
+    let mut validator = Validator::new(profile);
+    for (index, element) in elements.iter().enumerate() {
         match element {
             PlannedElement::Unspecified => {
                 validator.unspecified += 1;
@@ -600,6 +609,37 @@ pub fn validate_program(program: &Program) -> ValidationResult {
                 }
             }
             _ => {}
+        }
+    }
+    for (index, element) in elements.iter().enumerate() {
+        if crate::ProfileElementFamily::of(element)
+            .is_some_and(|family| !profile.families.allowed.contains(&family))
+        {
+            validator.add(
+                FindingKind::Violation,
+                Rule::Eligibility,
+                Some(index),
+                None,
+                "The selected profile prohibits this element family or variant.",
+            );
+        }
+    }
+    for required in &profile.families.required {
+        if !elements
+            .iter()
+            .any(|e| crate::ProfileElementFamily::of(e) == Some(*required))
+        {
+            validator.add(
+                if validator.unspecified > 0 {
+                    FindingKind::Unknown
+                } else {
+                    FindingKind::Violation
+                },
+                Rule::Eligibility,
+                None,
+                None,
+                "A required element family or variant is missing or unspecified.",
+            );
         }
     }
     validator.program_checks();

@@ -805,30 +805,6 @@ pub struct ProgramScore {
     pub time_deduction: Result<Deduction, ProgramScoreError>,
 }
 
-fn adult_source(location: &str) -> SourceReference {
-    SourceReference {
-        document: "International Adult Figure Skating Competitions Technical Announcement".into(),
-        version: "2026-07-16".into(),
-        location: location.into(),
-    }
-}
-
-fn required_duration(
-    ruleset: crate::RulesetId,
-    category: crate::AdultCategory,
-) -> (u32, &'static str) {
-    match ruleset {
-        crate::RulesetId::IsuAdult2026_27July16 => match category {
-            crate::AdultCategory::Bronze => (100, "p. 11"),
-            crate::AdultCategory::Silver => (120, "p. 10"),
-            crate::AdultCategory::Gold => (170, "p. 9"),
-            crate::AdultCategory::Masters => (180, "p. 8"),
-        },
-        #[cfg(test)]
-        crate::RulesetId::TestOther => unreachable!("test identity has no scoring rules"),
-    }
-}
-
 fn factored_base(hundredths: u16) -> u16 {
     ((u32::from(hundredths) * 11 + 5) / 10) as u16
 }
@@ -836,7 +812,7 @@ fn factored_base(hundredths: u16) -> u16 {
 fn time_deduction(
     timing: Option<ProgramTiming>,
     required: u32,
-    page: &str,
+    source: &SourceReference,
 ) -> Result<Deduction, ProgramScoreError> {
     let timing = timing
         .filter(|t| t.ordinary_timing_confirmed && t.duration_seconds > 0)
@@ -850,28 +826,28 @@ fn time_deduction(
         .ok_or(ProgramScoreError::InvalidInput)?;
     Ok(Deduction {
         hundredths,
-        source: adult_source(&format!("p. 6, time deductions; {page}, required duration")),
+        source: source.clone(),
     })
 }
 
 fn fall_deduction(
-    category: crate::AdultCategory,
+    policy: &crate::ProfileScoringPolicy,
     falls_confirmed: bool,
     outside_falls: Option<u32>,
 ) -> Result<Deduction, ProgramScoreError> {
-    if category != crate::AdultCategory::Bronze {
-        return Err(ProgramScoreError::UnsupportedCategory);
-    }
+    let per_fall = policy
+        .fall_hundredths
+        .ok_or(ProgramScoreError::UnsupportedCategory)?;
     if !falls_confirmed {
         return Err(ProgramScoreError::UnknownFall);
     }
     let count = outside_falls.ok_or(ProgramScoreError::UnknownFall)?;
     let hundredths = count
-        .checked_mul(50)
+        .checked_mul(per_fall)
         .ok_or(ProgramScoreError::InvalidInput)?;
     Ok(Deduction {
         hundredths,
-        source: adult_source("p. 11, Bronze fall deductions"),
+        source: policy.fall_source.clone(),
     })
 }
 
@@ -1172,7 +1148,7 @@ pub fn score_program(
 ) -> ProgramScore {
     score_program_internal(
         ruleset,
-        category,
+        &crate::adult_profile(category).scoring,
         table,
         elements,
         outside_falls,
@@ -1194,7 +1170,7 @@ pub fn score_program_with_execution(
 ) -> ProgramScore {
     score_program_internal(
         ruleset,
-        category,
+        &crate::adult_profile(category).scoring,
         table,
         elements,
         outside_falls,
@@ -1203,9 +1179,9 @@ pub fn score_program_with_execution(
     )
 }
 
-fn score_program_internal(
+pub(crate) fn score_program_internal(
     ruleset: crate::RulesetId,
-    category: crate::AdultCategory,
+    policy: &crate::ProfileScoringPolicy,
     table: ScoringTableId,
     elements: &[ProgramElement],
     outside_falls: Option<u32>,
@@ -1220,7 +1196,7 @@ fn score_program_internal(
             time_deduction: Err(ProgramScoreError::InvalidInput),
         };
     }
-    let (required, page) = required_duration(ruleset, category);
+    let required = policy.duration_seconds;
     let mut previous_start = None;
     let mut falls_confirmed = true;
     let preliminary: Vec<_> = elements
@@ -1283,8 +1259,8 @@ fn score_program_internal(
     ProgramScore {
         elements: results,
         tes_hundredths,
-        fall_deduction: fall_deduction(category, falls_confirmed, outside_falls),
-        time_deduction: time_deduction(timing, required, page),
+        fall_deduction: fall_deduction(policy, falls_confirmed, outside_falls),
+        time_deduction: time_deduction(timing, required, &policy.time_deduction_source),
     }
 }
 

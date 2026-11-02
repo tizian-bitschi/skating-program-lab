@@ -36,3 +36,18 @@ A published [ISU protocol](https://isu-d8g8b4b7ece7aphs.a03.azurefd.net/isudamco
 [ISU Sports Rules 2026, Rule 610, p. 65](https://isu-d8g8b4b7ece7aphs.a03.azurefd.net/isudamcontainer/CMS/Corporate-Site/Governance/Isu-Regulations/2026-FS---Pair-Sports-Rules-FINAL-20260513-1778685370-9916.pdf) define a combination using the landing foot as the next take-off foot. The [U.S. Figure Skating judges' manual, p. 43](https://www.usfigureskating.org/system/files/Test%20Judge%20Manual%20for%20Singles%20Pairs.pdf), describes the usual back outside landing edge and the matching take-off edge for a loop or toe loop, with mirrored feet for clockwise skaters. This supports the bounded same-direction direct transition ending in a toe loop or loop; a plan does not establish the actual landing, transition or panel recognition. Other direct transitions remain unknown, not automatically illegal. The implementation does not infer Euler footwork or sequence steps from a jump name.
 
 [Sports Rules Rule 353.1(h)(i), p. 9](https://isu-d8g8b4b7ece7aphs.a03.azurefd.net/isudamcontainer/CMS/Corporate-Site/Governance/Isu-Regulations/2026-FS---Pair-Sports-Rules-FINAL-20260513-1778685370-9916.pdf) gives one GOE for the most difficult jump after summing combination base values. Communication 2786 p. 14 identifies difficulty by the applicable reduced base value. For example, a recognized clean `1Lz+1T` has BV 1.00 and GOE +2 of 0.12, giving 1.12 before timing credit. This calculation is not a panel decision and requires independent domain review.
+
+## Registering a new official profile
+
+Follow the [profile ADR](adr/0002-rule-profiles-proposal.md). Verify the exact
+edition and event/federation applicability of each source before registering
+policy. Bind rule identifiers to precise citations; record the qualified
+precedence and explicitly scoped replacement for every event override. Supply
+independent source-derived fixtures, review the supported mechanism versions
+and retain unsupported or ambiguous semantics explicitly. Structural registry
+validation does not verify authority or resolve a regulatory dispute.
+
+Create a new profile version for policy or source changes and keep prior entries.
+Select SOV editions separately; category eligibility does not alter catalog
+values. Synthetic test provenance never establishes an official class. The
+current Adult definitions reuse the editions and limitations documented above.

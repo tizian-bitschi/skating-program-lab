@@ -127,9 +127,18 @@ fn value(
     }
 }
 
+#[cfg(test)]
 fn checked_candidate(
     request: &JumpOptimizerRequest,
     elements: &[JumpElement],
+) -> Result<Option<ReferenceCandidate>, JumpOptimizerError> {
+    checked_profile_candidate(request, elements, &crate::adult_profile(request.category))
+}
+
+fn checked_profile_candidate(
+    request: &JumpOptimizerRequest,
+    elements: &[JumpElement],
+    profile: &crate::RuleProfile,
 ) -> Result<Option<ReferenceCandidate>, JumpOptimizerError> {
     if !request_allows(request, elements)? {
         return Ok(None);
@@ -142,10 +151,14 @@ fn checked_candidate(
         category: request.category,
         ruleset: request.ruleset,
         scoring_table: request.scoring_table,
-        sources: crate::validation::jump_rule_sources(request.category),
+        sources: profile
+            .jump_bindings()
+            .iter()
+            .map(|b| b.source.clone())
+            .collect(),
         elements: elements.iter().cloned().map(PlannedElement::Jump).collect(),
     };
-    let validation = validate_program(&program);
+    let validation = crate::validation::validate_elements(&program.elements, profile);
     if validation
         .findings
         .iter()
@@ -207,6 +220,114 @@ pub fn optimize_jumps(
     request: &JumpOptimizerRequest,
 ) -> Result<JumpOptimizerResult, JumpOptimizerError> {
     model::optimize(request)
+}
+
+/// The same finite-domain solver controls as the legacy request, with profile selection.
+#[derive(Debug, Clone)]
+pub struct ProfileJumpOptimizerRequest {
+    pub profile: crate::ProfileId,
+    pub scoring_table: ScoringTableId,
+    pub allowed_jumps: Vec<ListedJump>,
+    pub combinations: Vec<JumpElement>,
+    pub exclusions: Vec<ListedJump>,
+    pub excluded_kinds: Vec<JumpKind>,
+    pub max_elements: usize,
+    pub require_nonempty: bool,
+    pub max_search_nodes: usize,
+    pub enumerate_equal_optima: bool,
+    pub max_solutions: usize,
+    pub time_limit: Option<Duration>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ProfileJumpCandidate {
+    pub program: crate::ProfileProgram,
+    pub base_hundredths: u16,
+    pub coverage: Coverage,
+}
+
+#[derive(Debug, Clone)]
+pub struct ProfileJumpOptimizerResult {
+    pub request: ProfileJumpOptimizerRequest,
+    pub universe: Vec<JumpElement>,
+    pub omitted_variants: &'static str,
+    pub equivalence: &'static str,
+    pub proof_scope: &'static str,
+    pub objective: OptimizerObjective,
+    pub implemented_rules: Vec<&'static str>,
+    pub sources: Vec<SourceReference>,
+    pub examined_subsections: usize,
+    pub status: OptimizerStatus,
+    pub enumeration_complete: bool,
+    pub termination_reason: JumpTerminationReason,
+    pub candidates: Vec<ProfileJumpCandidate>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ProfileJumpOptimizerError {
+    Selection(crate::ProfileSelectionError),
+    Search {
+        profile: crate::ProfileId,
+        reason: JumpOptimizerError,
+    },
+}
+
+pub fn optimize_profile_jumps(
+    registry: &crate::ProfileRegistry,
+    request: &ProfileJumpOptimizerRequest,
+) -> Result<ProfileJumpOptimizerResult, ProfileJumpOptimizerError> {
+    let profile = registry
+        .resolve(&request.profile, request.scoring_table)
+        .map_err(ProfileJumpOptimizerError::Selection)?;
+    // The internal legacy carrier supplies domain controls only; policy comes from profile.
+    let controls = JumpOptimizerRequest {
+        category: AdultCategory::Bronze,
+        ruleset: profile.scoring.recognition_ruleset,
+        scoring_table: request.scoring_table,
+        allowed_jumps: request.allowed_jumps.clone(),
+        combinations: request.combinations.clone(),
+        exclusions: request.exclusions.clone(),
+        excluded_kinds: request.excluded_kinds.clone(),
+        max_elements: request.max_elements,
+        require_nonempty: request.require_nonempty,
+        max_search_nodes: request.max_search_nodes,
+        enumerate_equal_optima: request.enumerate_equal_optima,
+        max_solutions: request.max_solutions,
+        time_limit: request.time_limit,
+    };
+    let result = model::optimize_profile(&controls, profile).map_err(|reason| {
+        ProfileJumpOptimizerError::Search {
+            profile: profile.id.clone(),
+            reason,
+        }
+    })?;
+    Ok(ProfileJumpOptimizerResult {
+        request: request.clone(),
+        universe: result.universe,
+        omitted_variants: result.omitted_variants,
+        equivalence: result.equivalence,
+        proof_scope: result.proof_scope,
+        objective: result.objective,
+        implemented_rules: result.implemented_rules,
+        sources: result.sources,
+        examined_subsections: result.examined_subsections,
+        status: result.status,
+        enumeration_complete: result.enumeration_complete,
+        termination_reason: result.termination_reason,
+        candidates: result
+            .candidates
+            .into_iter()
+            .map(|candidate| ProfileJumpCandidate {
+                program: crate::ProfileProgram {
+                    profile: profile.id.clone(),
+                    scoring_table: request.scoring_table,
+                    elements: candidate.program.elements,
+                },
+                base_hundredths: candidate.base_hundredths,
+                coverage: candidate.coverage,
+            })
+            .collect(),
+    })
 }
 
 #[cfg(test)]

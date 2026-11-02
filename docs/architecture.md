@@ -31,3 +31,13 @@ Version rules and tables without mutating earlier versions. Use integer or exact
 ## Planned architecture
 
 A UI, native host or service may consume the library later. Full validation, complete scoring and broader optimization domains are planned. The [Pumpkin ADR](adr/0001-pumpkin.md) records the bounded solver choice. Domain and architecture changes require human review; passing tests alone does not establish domain correctness. The [source review](rule-review.md) records existing review waivers.
+
+## Versioned rule profiles
+
+The accepted [profile ADR](adr/0002-rule-profiles-proposal.md) defines the additive
+migration. `src/profiles.rs` owns profile identities, immutable registration,
+source bindings and explicit event overrides. Validation, numerical scoring and
+the bounded jump solver share profile policy through additive entry points;
+legacy APIs select built-in Adult definitions. SOV values remain in the catalog.
+Unknown identities retain the request and error reason. Missing sources,
+conflicting overrides and unsupported mechanisms never fall back to Adult rules.
