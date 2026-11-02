@@ -139,10 +139,13 @@ fn unknown_and_unsupported_do_not_become_zero() {
         )
         .unwrap(),
     );
-    assert_eq!(
+    assert!(matches!(
         lookup_base_value(TABLE, &combination, &[]),
-        Err(BaseValueError::Unsupported)
-    );
+        Ok(BaseValueOutcome::Value(BaseValue {
+            hundredths: 100,
+            ..
+        }))
+    ));
 }
 
 #[test]
@@ -298,8 +301,10 @@ fn score_preserves_outcomes_and_rejects_unknowns_and_combinations() {
         .unwrap(),
     );
     assert_eq!(
-        score_element(TABLE, &combo, &[], 0, Some(false)),
-        Err(ElementScoreError::BaseValue(BaseValueError::Unsupported))
+        score_element(TABLE, &combo, &[], 0, Some(false))
+            .unwrap()
+            .score_hundredths,
+        100
     );
     assert_eq!(
         RecognitionDetails::new(
@@ -1088,4 +1093,113 @@ fn call_and_fall_limits_are_enforced() {
             Err(ElementScoreError::InconsistentFall)
         );
     }
+}
+
+#[test]
+fn recognized_pair_sums_base_and_uses_one_reference_goe() {
+    let mut combo = recognition("1Lz", None, Some(vec![]));
+    combo.details = Some(
+        RecognitionDetails::new(
+            vec![
+                ComponentCode::try_from("1Lz").unwrap(),
+                ComponentCode::try_from("1T").unwrap(),
+            ],
+            None,
+            Some(vec![]),
+        )
+        .unwrap(),
+    );
+    // ISU 2786 p. 2: 0.60 + 0.40; Rule 353.1(h)(i): GOE +2 of 1Lz is +0.12 once.
+    let score = score_element(TABLE, &combo, &[], 2, Some(false)).unwrap();
+    assert_eq!(
+        (
+            score.base.hundredths,
+            score.goe_hundredths,
+            score.score_hundredths
+        ),
+        (100, 12, 112)
+    );
+    assert!(score.goe_source.location.contains("1Lz"));
+    assert_eq!(score.base.source.version, "2026-06-02");
+    combo.details = Some(
+        RecognitionDetails::new(
+            vec![
+                ComponentCode::try_from("1Lz").unwrap(),
+                ComponentCode::try_from("1T").unwrap(),
+            ],
+            None,
+            Some(vec![RecordedCall {
+                target: CallTarget::Component(0),
+                call: PanelCall::UnderRotated,
+            }]),
+        )
+        .unwrap(),
+    );
+    let score = score_element(TABLE, &combo, &[], 2, Some(false)).unwrap();
+    assert_eq!((score.base.hundredths, score.goe_hundredths), (88, 10));
+    combo.details = Some(
+        RecognitionDetails::new(
+            vec![
+                ComponentCode::try_from("1Lz").unwrap(),
+                ComponentCode::try_from("1F").unwrap(),
+            ],
+            None,
+            Some(vec![]),
+        )
+        .unwrap(),
+    );
+    assert_eq!(
+        score_element(TABLE, &combo, &[], 0, Some(false)),
+        Err(ElementScoreError::BaseValue(BaseValueError::Unsupported))
+    );
+}
+
+#[test]
+fn second_component_can_set_combination_goe_reference() {
+    let mut combo = recognition("1T", None, Some(vec![]));
+    combo.details = Some(
+        RecognitionDetails::new(
+            vec![
+                ComponentCode::try_from("1T").unwrap(),
+                ComponentCode::try_from("2Lo").unwrap(),
+            ],
+            None,
+            Some(vec![]),
+        )
+        .unwrap(),
+    );
+    let result = score_element(TABLE, &combo, &[], 2, Some(false)).unwrap();
+    assert_eq!(
+        (
+            result.base.hundredths,
+            result.goe_hundredths,
+            result.score_hundredths
+        ),
+        (210, 34, 244)
+    );
+    assert!(result.goe_source.location.contains("2Lo"));
+    combo.details = Some(
+        RecognitionDetails::new(
+            vec![
+                ComponentCode::try_from("1T").unwrap(),
+                ComponentCode::try_from("2Lo").unwrap(),
+            ],
+            None,
+            Some(vec![RecordedCall {
+                target: CallTarget::Component(1),
+                call: PanelCall::UnderRotated,
+            }]),
+        )
+        .unwrap(),
+    );
+    let result = score_element(TABLE, &combo, &[], 2, Some(false)).unwrap();
+    assert_eq!(
+        (
+            result.base.hundredths,
+            result.goe_hundredths,
+            result.score_hundredths
+        ),
+        (176, 27, 203)
+    );
+    assert!(result.goe_source.location.contains("2Lo<"));
 }

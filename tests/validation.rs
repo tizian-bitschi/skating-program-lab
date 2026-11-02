@@ -67,7 +67,7 @@ fn missing_fields_and_multiple_combination_findings_are_preserved() {
             .iter()
             .filter(|f| f.kind == FindingKind::Unknown && f.rule_id.ends_with("jump-eligibility"))
             .count(),
-        4
+        3
     );
     assert_eq!(
         result
@@ -131,9 +131,11 @@ fn bronze_counts_jump_elements_independently_of_local_findings() {
     assert_eq!(count.source.version, "2026-07-16");
     assert_eq!(count.source.location, "p. 11, Bronze Free Skating, jumps");
     assert_eq!(result.coverage, Coverage::Partial);
-    let unsupported = validate_program(&program(AdultCategory::Silver, vec![single(); 5]));
-    assert_eq!(unsupported.findings.len(), 1);
-    assert_eq!(unsupported.findings[0].kind, FindingKind::Unsupported);
+    let silver = validate_program(&program(AdultCategory::Silver, vec![single(); 5]));
+    assert!(silver
+        .findings
+        .iter()
+        .any(|f| f.rule_id.ends_with("jump-element-count") && f.kind == FindingKind::Violation));
 }
 
 #[test]
@@ -180,28 +182,6 @@ fn sequence_occupies_one_jump_element_slot() {
 
 #[test]
 fn unsupported_category_and_season_are_explicit() {
-    for category in [
-        AdultCategory::Silver,
-        AdultCategory::Gold,
-        AdultCategory::Masters,
-    ] {
-        let result = validate_program(&program(
-            category,
-            vec![solo(Some(JumpKind::Axel), Some(1))],
-        ));
-        assert_eq!(result.findings.len(), 1);
-        assert_eq!(result.findings[0].kind, FindingKind::Unsupported);
-        assert_eq!(result.findings[0].rule_id, "validator-scope");
-        assert_eq!(
-            result.findings[0].source,
-            SourceReference {
-                document: "Skating Program Lab architecture".into(),
-                version: "issue-13".into(),
-                location: "Current state, validator scope".into()
-            }
-        );
-        assert_eq!(result.coverage, Coverage::Partial);
-    }
     let mut other_season = program(
         AdultCategory::Bronze,
         vec![solo(Some(JumpKind::Axel), Some(1))],
@@ -371,7 +351,7 @@ fn combination_rules_have_independent_boundaries() {
             vec![combo(vec![
                 part(JumpKind::Lutz),
                 part(JumpKind::ToeLoop),
-                part(JumpKind::Flip),
+                part(JumpKind::Loop),
             ])],
             Some("combination-structure"),
         ),
@@ -402,7 +382,7 @@ fn combination_rules_have_independent_boundaries() {
 fn incomplete_jump_does_not_make_known_combination_length_unknown() {
     let elements = vec![PlannedElement::Jump(JumpElement::Combination(vec![
         JumpPart::Jump(jump(None, Some(1))),
-        JumpPart::Jump(jump(Some(JumpKind::Lutz), Some(1))),
+        JumpPart::Jump(jump(Some(JumpKind::ToeLoop), Some(1))),
     ]))];
     let result = validate_program(&program(AdultCategory::Bronze, elements));
     assert_eq!(result.findings.len(), 2);
@@ -445,4 +425,328 @@ fn each_excess_repetition_has_a_location_for_each_jump_type() {
         .map(|f| f.element_index)
         .collect();
     assert_eq!(indices, vec![Some(2), Some(5)]);
+}
+
+#[test]
+fn category_jump_types_and_element_boundaries() {
+    for (category, kind, rotations, forbidden) in [
+        (AdultCategory::Bronze, JumpKind::Axel, 1, true),
+        (AdultCategory::Silver, JumpKind::Axel, 1, false),
+        (AdultCategory::Silver, JumpKind::ToeLoop, 2, true),
+        (AdultCategory::Gold, JumpKind::ToeLoop, 2, false),
+        (AdultCategory::Gold, JumpKind::Loop, 2, false),
+        (AdultCategory::Gold, JumpKind::Flip, 2, true),
+        (AdultCategory::Gold, JumpKind::Lutz, 2, true),
+    ] {
+        let result = validate_program(&program(category, vec![solo(Some(kind), Some(rotations))]));
+        assert_eq!(
+            result.findings.iter().any(
+                |f| f.rule_id.ends_with("jump-eligibility") && f.kind == FindingKind::Violation
+            ),
+            forbidden
+        );
+    }
+    for (category, limit) in [
+        (AdultCategory::Bronze, 4),
+        (AdultCategory::Silver, 4),
+        (AdultCategory::Gold, 5),
+        (AdultCategory::Masters, 5),
+    ] {
+        for count in [limit, limit + 1] {
+            let result = validate_program(&program(
+                category,
+                vec![solo(Some(JumpKind::ToeLoop), Some(1)); count],
+            ));
+            assert_eq!(
+                result
+                    .findings
+                    .iter()
+                    .any(|f| f.rule_id.ends_with("jump-element-count")
+                        && f.kind == FindingKind::Violation),
+                count > limit
+            );
+        }
+    }
+    let result = validate_program(&program(AdultCategory::Masters, vec![]));
+    assert!(result
+        .findings
+        .iter()
+        .any(|f| f.rule_id.ends_with("axel-required") && f.kind == FindingKind::Violation));
+}
+
+#[test]
+fn compound_limits_repetitions_and_uncertainty() {
+    let part = |kind| JumpPart::Jump(jump(Some(kind), Some(1)));
+    let combo = |parts| PlannedElement::Jump(JumpElement::Combination(parts));
+    let seq = |parts| PlannedElement::Jump(JumpElement::Sequence(parts));
+    let result = validate_program(&program(
+        AdultCategory::Silver,
+        vec![
+            solo(Some(JumpKind::Lutz), Some(1)),
+            combo(vec![
+                part(JumpKind::Lutz),
+                part(JumpKind::ToeLoop),
+                part(JumpKind::Loop),
+            ]),
+            seq(vec![
+                part(JumpKind::Lutz),
+                part(JumpKind::Axel),
+                part(JumpKind::ToeLoop),
+            ]),
+        ],
+    ));
+    for rule in ["jump-repetition", "combination-structure"] {
+        assert!(result
+            .findings
+            .iter()
+            .any(|f| f.rule_id.ends_with(rule) && f.kind == FindingKind::Violation));
+    }
+    assert!(result
+        .findings
+        .iter()
+        .any(|f| f.kind == FindingKind::Unknown && f.explanation.contains("direct step")));
+    let result = validate_program(&program(
+        AdultCategory::Gold,
+        vec![
+            combo(vec![
+                part(JumpKind::Lutz),
+                JumpPart::Euler,
+                part(JumpKind::Salchow),
+            ]),
+            seq(vec![part(JumpKind::ToeLoop), part(JumpKind::Axel)]),
+        ],
+    ));
+    assert!(result
+        .findings
+        .iter()
+        .any(|f| f.kind == FindingKind::Violation && f.explanation.contains("must not use Euler")));
+    assert!(result
+        .findings
+        .iter()
+        .any(|f| f.kind == FindingKind::Unknown && f.explanation.contains("foot transition")));
+    let result = validate_program(&program(
+        AdultCategory::Silver,
+        vec![combo(vec![part(JumpKind::Lutz), part(JumpKind::Flip)])],
+    ));
+    assert!(result
+        .findings
+        .iter()
+        .any(|f| f.kind == FindingKind::Unknown
+            && f.explanation.contains("verified combination subset")));
+}
+
+#[test]
+fn explicit_transitions_are_unknown_with_sports_rule_source_in_all_categories() {
+    for category in [
+        AdultCategory::Bronze,
+        AdultCategory::Silver,
+        AdultCategory::Gold,
+        AdultCategory::Masters,
+    ] {
+        let result = validate_program(&program(
+            category,
+            vec![PlannedElement::Jump(JumpElement::Combination(vec![
+                JumpPart::Jump(jump(Some(JumpKind::Lutz), Some(1))),
+                JumpPart::OtherTransition("three-turn".into()),
+                JumpPart::Jump(jump(Some(JumpKind::ToeLoop), Some(1))),
+            ]))],
+        ));
+        let finding = result
+            .findings
+            .iter()
+            .find(|f| f.rule_id == "isu-sports-2026-jump-transition")
+            .unwrap();
+        assert_eq!(finding.kind, FindingKind::Unknown);
+        assert_eq!(finding.component_index, Some(1));
+        assert_eq!(finding.source.version, "2026-06-12");
+        assert!(finding.source.location.contains("Rule 610"));
+    }
+}
+
+#[test]
+fn masters_axel_requirement_distinguishes_missing_type_from_rotation() {
+    for (kind, rotations, expected) in [
+        (Some(JumpKind::ToeLoop), None, FindingKind::Violation),
+        (None, Some(1), FindingKind::Unknown),
+        (Some(JumpKind::Axel), None, FindingKind::Unknown),
+    ] {
+        let result = validate_program(&program(
+            AdultCategory::Masters,
+            vec![solo(kind, rotations)],
+        ));
+        assert_eq!(
+            result
+                .findings
+                .iter()
+                .find(|f| f.rule_id.ends_with("axel-required"))
+                .unwrap()
+                .kind,
+            expected
+        );
+    }
+}
+
+#[test]
+fn missing_and_invalid_rotations_and_unspecified_element_limits_are_distinct() {
+    for category in [
+        AdultCategory::Bronze,
+        AdultCategory::Silver,
+        AdultCategory::Gold,
+        AdultCategory::Masters,
+    ] {
+        for (rotations, expected) in [
+            (None, FindingKind::Unknown),
+            (Some(0), FindingKind::Violation),
+        ] {
+            let result = validate_program(&program(
+                category,
+                vec![solo(Some(JumpKind::ToeLoop), rotations)],
+            ));
+            let rule = if rotations.is_none() {
+                "jump-eligibility"
+            } else {
+                "invalid-rotations"
+            };
+            assert!(result
+                .findings
+                .iter()
+                .any(|f| f.rule_id.ends_with(rule) && f.kind == expected));
+        }
+        let limit = if matches!(category, AdultCategory::Bronze | AdultCategory::Silver) {
+            4
+        } else {
+            5
+        };
+        let mut elements = vec![solo(Some(JumpKind::ToeLoop), Some(1)); limit];
+        elements.push(PlannedElement::Unspecified);
+        let result = validate_program(&program(category, elements));
+        assert!(result
+            .findings
+            .iter()
+            .any(|f| f.rule_id.ends_with("jump-element-count") && f.kind == FindingKind::Unknown));
+    }
+}
+
+#[test]
+fn euler_with_unknown_intervening_transition_is_not_a_proven_violation() {
+    let result = validate_program(&program(
+        AdultCategory::Silver,
+        vec![PlannedElement::Jump(JumpElement::Combination(vec![
+            JumpPart::Jump(jump(Some(JumpKind::Lutz), Some(1))),
+            JumpPart::Euler,
+            JumpPart::OtherTransition("unknown footwork".into()),
+            JumpPart::Jump(jump(Some(JumpKind::Salchow), Some(1))),
+        ]))],
+    ));
+    assert!(result
+        .findings
+        .iter()
+        .any(|f| f.rule_id.ends_with("combination-euler") && f.kind == FindingKind::Unknown));
+    assert!(!result
+        .findings
+        .iter()
+        .any(|f| f.rule_id.ends_with("combination-euler") && f.kind == FindingKind::Violation));
+}
+
+#[test]
+fn unspecified_elements_only_make_counts_unknown_when_limit_can_be_crossed() {
+    for (category, limit) in [
+        (AdultCategory::Bronze, 4),
+        (AdultCategory::Silver, 4),
+        (AdultCategory::Gold, 5),
+        (AdultCategory::Masters, 5),
+    ] {
+        let result = validate_program(&program(category, vec![PlannedElement::Unspecified]));
+        assert!(!result
+            .findings
+            .iter()
+            .any(|f| f.rule_id.ends_with("jump-element-count")
+                || f.rule_id.ends_with("combination-count")));
+        let mut elements = vec![solo(Some(JumpKind::ToeLoop), Some(1)); limit];
+        elements.push(PlannedElement::Unspecified);
+        let result = validate_program(&program(category, elements));
+        assert!(result
+            .findings
+            .iter()
+            .any(|f| f.rule_id.ends_with("jump-element-count") && f.kind == FindingKind::Unknown));
+    }
+    let result = validate_program(&program(
+        AdultCategory::Silver,
+        vec![PlannedElement::Unspecified; 2],
+    ));
+    assert!(result
+        .findings
+        .iter()
+        .any(|f| f.rule_id.ends_with("combination-count") && f.kind == FindingKind::Unknown));
+}
+
+#[test]
+fn invalid_axel_does_not_meet_masters_requirement() {
+    let result = validate_program(&program(
+        AdultCategory::Masters,
+        vec![solo(Some(JumpKind::Axel), Some(0))],
+    ));
+    assert!(result
+        .findings
+        .iter()
+        .any(|f| f.rule_id == "listed-jump-invalid-rotations" && f.kind == FindingKind::Violation));
+    assert!(result
+        .findings
+        .iter()
+        .any(|f| f.rule_id.ends_with("axel-required") && f.kind == FindingKind::Violation));
+}
+
+#[test]
+fn compound_and_euler_count_boundaries_are_source_linked() {
+    let part = |kind| JumpPart::Jump(jump(Some(kind), Some(1)));
+    let combo = || {
+        PlannedElement::Jump(JumpElement::Combination(vec![
+            part(JumpKind::Lutz),
+            part(JumpKind::ToeLoop),
+        ]))
+    };
+    let seq = || {
+        PlannedElement::Jump(JumpElement::Sequence(vec![
+            part(JumpKind::Lutz),
+            part(JumpKind::Axel),
+        ]))
+    };
+    let euler_combo = || {
+        PlannedElement::Jump(JumpElement::Combination(vec![
+            part(JumpKind::Lutz),
+            JumpPart::Euler,
+            part(JumpKind::Salchow),
+        ]))
+    };
+    for (elements, rule, violated) in [
+        (vec![combo(), combo()], "combination-count", false),
+        (vec![combo(), combo(), combo()], "combination-count", true),
+        (vec![seq()], "combination-count", false),
+        (vec![seq(), seq()], "combination-count", true),
+        (vec![euler_combo()], "combination-euler", false),
+        (
+            vec![euler_combo(), euler_combo()],
+            "combination-euler",
+            true,
+        ),
+        (
+            vec![PlannedElement::Jump(JumpElement::Sequence(vec![
+                part(JumpKind::Lutz),
+                part(JumpKind::ToeLoop),
+            ]))],
+            "combination-structure",
+            true,
+        ),
+    ] {
+        let result = validate_program(&program(AdultCategory::Silver, elements));
+        let finding = result
+            .findings
+            .iter()
+            .find(|f| f.rule_id.ends_with(rule) && f.kind == FindingKind::Violation);
+        assert_eq!(finding.is_some(), violated, "{rule}: {:?}", result.findings);
+        if let Some(f) = finding {
+            assert_eq!(f.source.version, "2026-07-16");
+            assert!(f.source.location.contains("p. 10"));
+        }
+    }
 }
