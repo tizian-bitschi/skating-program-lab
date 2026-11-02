@@ -1,7 +1,7 @@
 //! Source-backed, unfactored base values for a deliberately limited catalog.
 use crate::{
-    Level, PanelCall, PanelRecognition, RecognitionOutcome, ScoringAnnotation, ScoringTableId,
-    SourceReference,
+    CatalogDiscipline, CatalogFamily, PanelCall, PanelRecognition, RecognitionOutcome,
+    ScoringAnnotation, ScoringTableId, SourceReference,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -120,25 +120,37 @@ fn table_row(
     if details.components().len() != 1 {
         return Err(BaseValueError::Unsupported);
     }
-    let (hundredths, section, goe) = match table {
-        ScoringTableId::Isu2786June2_2026 => match (notation.as_str(), details.level()) {
-            ("CSSp1", Some(Level::One)) | ("ChSp1", None) => {
-                let row =
-                    crate::catalog_row(table, &notation).ok_or(BaseValueError::Unsupported)?;
-                let section = if notation == "CSSp1" {
-                    "p. 8, Spins"
-                } else {
-                    "p. 14, Choreographic Elements"
-                };
-                (row.base_hundredths, section, Some(row.goe_hundredths))
-            }
-            (name, None) => {
-                let (base, section, goe) =
-                    jump_row(table, name).ok_or(BaseValueError::Unsupported)?;
-                (base, section, Some(goe))
-            }
-            _ => return Err(BaseValueError::Unsupported),
-        },
+    let catalog = crate::catalog_row(table, &notation).ok_or(BaseValueError::Unsupported)?;
+    if catalog.discipline != CatalogDiscipline::SingleAndPair || catalog.level != details.level() {
+        return Err(BaseValueError::Unsupported);
+    }
+    let (hundredths, section, goe) = match catalog.family {
+        CatalogFamily::Jump if details.level().is_none() => {
+            let (base, section, goe) =
+                jump_row(table, &notation).ok_or(BaseValueError::Unsupported)?;
+            (base, section, Some(goe))
+        }
+        CatalogFamily::Spin
+        | CatalogFamily::StepSequence
+        | CatalogFamily::ChoreographicSpin
+        | CatalogFamily::ChoreographicSequence => {
+            let section = match catalog.source.page {
+                5 => "p. 5, Spins",
+                6 => "p. 6, Spins",
+                7 => "p. 7, Spins",
+                8 => "p. 8, Spins",
+                9 if catalog.family == CatalogFamily::StepSequence => "p. 9, Step Sequence",
+                9 => "p. 9, Spins",
+                14 => "p. 14, Choreographic Elements",
+                _ => return Err(BaseValueError::Unsupported),
+            };
+            (
+                catalog.base_hundredths,
+                section,
+                Some(catalog.goe_hundredths),
+            )
+        }
+        _ => return Err(BaseValueError::Unsupported),
     };
     Ok(TableRow {
         hundredths,
@@ -235,6 +247,7 @@ pub fn score_element(
     let (max_grade, fall_max, downgraded) = match calls {
         [] => (5, -3, false),
         [entry] => match entry.call {
+            PanelCall::ReducedSpinValue => (5, -3, false),
             PanelCall::Quarter | PanelCall::UnderRotated => (3, -5, false),
             PanelCall::UnclearEdge => (4, -4, false),
             PanelCall::WrongEdge => (0, -5, false),

@@ -14,7 +14,7 @@ Jump transitions are distinct from listed jumps. Regular spins distinguish flyin
 
 ## Scoring
 
-`src/scoring.rs` covers the 12 clean singles and doubles from 1T to 2A and their q, < and << rows. Flip/Lutz ! and e base values are available, including combinations with rotation calls; scoring combined calls remains unsupported. Single calls are scored with applicable final-GOE consistency limits. Inapplicable edge marks and other variants return unsupported; missing evidence remains unknown. CSSp1, ChSp1, recognized zero, ignored and no-value outcomes retain their distinctions. Timestamp-free and timed scenarios remain hypothetical. Recognized two-jump combinations with a toe loop or loop as the second jump use the sum of component base values and one GOE adjustment based on the highest component value. Three-jump, Euler, sequence, repetition and starred consequences remain unsupported. Category eligibility, triple and quadruple jumps, other categories' fall deductions, PCS and official results remain outside this scoring slice. See the [variant matrix](specs/scoring.md#implemented-scoring-details) for sources and error semantics. `tests/scoring.rs` covers source rows and timing; its five-jump selection fixture is not a legal Bronze program.
+`src/scoring.rs` covers the 12 clean singles and doubles from 1T to 2A and their q, < and << rows. Flip/Lutz ! and e base values are available, including combinations with rotation calls; scoring combined calls remains unsupported. Single calls are scored with applicable final-GOE consistency limits. Inapplicable edge marks and other variants return unsupported; missing evidence remains unknown. All 167 representable regular/V spin, StSq and choreographic rows now use the common catalog, including B and numbered levels where published. The scorer accepts supplied levels and calls without inferring recognition; V alone does not identify its GOE error cause. Falls retain the -3 final-GOE ceiling. Recognized zero, ignored and no-value outcomes retain their distinctions. Timestamp-free and timed scenarios remain hypothetical. Recognized two-jump combinations with a toe loop or loop as the second jump use the sum of component base values and one GOE adjustment based on the highest component value. Three-jump, Euler, sequence, repetition and starred consequences remain unsupported. Category eligibility, triple and quadruple jumps, other categories' fall deductions, PCS and official results remain outside this scoring slice. See the [variant matrix](specs/scoring.md#implemented-scoring-details) for sources and error semantics. `tests/scoring.rs` covers source rows and timing; its five-jump selection fixture is not a legal Bronze program.
 
 ## Optimization
 
@@ -32,9 +32,10 @@ all 223 Pair-specific rows and the complete numerical audit. Exact-version
 BASE, all GOE adjustments and printed page/value-row/code provenance. Unknown
 notation returns `None`; unknown editions keep `UnknownVersion` without fallback.
 
-The scorer reads its previous single/double jump and CSSp1/ChSp1 values from the
-catalog; duplicate hard-coded value arrays are removed. Recognition, scoring,
-validation and optimizer support do not expand. Pair rows are retrievable data
+The scorer reads single/double jumps and the 167 representable non-jump rows from
+the catalog; duplicate hard-coded value arrays are removed. Issue #46 expands
+spin/V, StSq and choreographic numerical scoring with an independent all-column
+fixture audit. Recognition, validation and optimizer support do not expand. Pair rows are retrievable data
 only. A known catalog row can still have explicitly unsupported engine behavior.
 
 The independently reviewed source inventory is separate from production data.
