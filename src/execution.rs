@@ -16,6 +16,38 @@ pub struct ObservedElement {
     pub fall: Option<bool>,
 }
 
+/// Separately supplied execution observations, never inferred panel calls.
+/// Component indices refer to the ordered supplied recognition, including Euler.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum JumpExecutionError {
+    Fall {
+        component: usize,
+    },
+    StepOut {
+        component: usize,
+    },
+    /// Its exact GOE classification is not established by the supported sources.
+    TouchDownWithWeightTransfer {
+        component: usize,
+    },
+    /// One full revolution is permitted structurally; more than one interrupts a unit.
+    /// Numeric GOE consequences are verified only for exactly one full revolution.
+    FullRevolutionBetween {
+        before_component: usize,
+        full_revolutions: u8,
+    },
+    EulerStepOver {
+        component: usize,
+    },
+}
+
+/// Complete observations of these additional execution errors, separate from panel marks.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct ElementExecutionEvidence {
+    /// None means unknown. Some(empty) explicitly confirms none of these errors/falls.
+    pub errors: Option<Vec<JumpExecutionError>>,
+}
+
 /// A user-supplied decision. Indices refer to the corresponding plan and
 /// observation lists; associations and supplied fields are not validated.
 #[derive(Debug, Clone, PartialEq, Eq)]

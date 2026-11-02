@@ -4,6 +4,8 @@ use crate::{
     ScoringAnnotation, ScoringTableId, SourceReference,
 };
 
+mod execution_evidence;
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BaseValue {
     /// Hundredths of a point, without second-half credit.
@@ -66,7 +68,7 @@ fn component_sources(rows: &[ComponentRow], column: &str) -> String {
 
 struct JumpUnitShape {
     kind: JumpUnitKind,
-    interrupted: bool,
+    interrupted: Option<usize>,
 }
 
 enum RowOrigin {
@@ -78,12 +80,12 @@ enum RowOrigin {
         rows: Vec<ComponentRow>,
         reference: &'static crate::CatalogRow,
         kind: JumpUnitKind,
-        interrupted: bool,
+        interrupted: Option<usize>,
     },
     Repetition {
         rows: Vec<ComponentRow>,
         reference: &'static crate::CatalogRow,
-        interrupted: bool,
+        interrupted: Option<usize>,
     },
 }
 
@@ -102,9 +104,9 @@ fn catalog_source(row: &crate::CatalogRow, column: &str) -> SourceReference {
 }
 
 impl TableRow {
-    fn interrupted(&self) -> bool {
+    fn interruption(&self) -> Option<usize> {
         match self.origin {
-            RowOrigin::Catalog { .. } => false,
+            RowOrigin::Catalog { .. } => None,
             RowOrigin::JumpUnit { interrupted, .. } | RowOrigin::Repetition { interrupted, .. } => {
                 interrupted
             }
@@ -268,7 +270,7 @@ fn repetition_row(
         }
     };
     let (rows, reference, interrupted) = match resolved.origin {
-        RowOrigin::Catalog { row, .. } => (vec![ComponentRow { row, counted: true }], row, false),
+        RowOrigin::Catalog { row, .. } => (vec![ComponentRow { row, counted: true }], row, None),
         RowOrigin::JumpUnit {
             rows,
             reference,
@@ -387,7 +389,7 @@ fn jump_unit_kind(details: &crate::RecognitionDetails) -> Result<JumpUnitShape, 
         } else {
             JumpUnitKind::Combination
         },
-        interrupted: interrupted_at.is_some(),
+        interrupted: interrupted_at,
     })
 }
 
@@ -569,11 +571,14 @@ struct GoeLimits {
     maximum: i8,
     fall_maximum: i8,
     downgraded: bool,
-    handbook_limit: bool,
+    handbook_source: bool,
 }
 
-fn goe_limits(calls: &[crate::RecordedCall]) -> GoeLimits {
-    let mut reduction = 0;
+fn goe_limits(
+    calls: &[crate::RecordedCall],
+    execution: Option<&execution_evidence::Adjustment>,
+) -> GoeLimits {
+    let mut reduction: i16 = 0;
     let mut errors = 0;
     let mut quarters = 0;
     let mut capped = false;
@@ -609,8 +614,13 @@ fn goe_limits(calls: &[crate::RecordedCall]) -> GoeLimits {
         1 => 2,
         _ => 3,
     };
+    if let Some(extra) = execution {
+        reduction += extra.minimum_reduction;
+        errors += extra.errors;
+    }
+    let fall_count = execution.map_or(1, |extra| i16::from(extra.fall_count));
     // Judges Handbook pp. 2, 6: any error excludes +5; a single q starts at most +3.
-    let starting_max = if capped || errors > 1 {
+    let mut starting_max = if capped || errors > 1 {
         2
     } else if quarters == 1 {
         3
@@ -619,11 +629,17 @@ fn goe_limits(calls: &[crate::RecordedCall]) -> GoeLimits {
     } else {
         5
     };
+    if let Some(extra) = execution {
+        starting_max = starting_max.min(extra.starting_cap);
+    }
     GoeLimits {
-        maximum: (starting_max - reduction).max(-5),
-        fall_maximum: (2 - reduction - 5).max(-5),
+        maximum: (starting_max - reduction).max(-5) as i8,
+        fall_maximum: (starting_max.min(2) - reduction - 5 * fall_count).max(-5) as i8,
         downgraded,
-        handbook_limit: errors == 1 && !capped,
+        handbook_source: (errors == 1
+            && !capped
+            && !execution.is_some_and(|extra| extra.errors > 0))
+            || execution.is_some_and(|extra| extra.handbook_source),
     }
 }
 
@@ -636,6 +652,38 @@ pub fn score_element(
     goe: i8,
     fall: Option<bool>,
 ) -> Result<ElementScore, ElementScoreError> {
+    score_element_internal(table, recognition, annotations, goe, fall, None)
+}
+
+/// Score using separately supplied complete observations of additional execution errors.
+/// Unknown evidence preserves the existing incomplete outcomes; no panel calls are inferred.
+pub fn score_element_with_execution(
+    table: ScoringTableId,
+    recognition: &PanelRecognition,
+    annotations: &[ScoringAnnotation],
+    goe: i8,
+    fall: Option<bool>,
+    execution: &crate::ElementExecutionEvidence,
+) -> Result<ElementScore, ElementScoreError> {
+    let resolved = execution_evidence::resolve(recognition, fall, Some(execution))?;
+    score_element_internal(
+        table,
+        recognition,
+        annotations,
+        goe,
+        resolved.fall,
+        resolved.adjustment.as_ref(),
+    )
+}
+
+fn score_element_internal(
+    table: ScoringTableId,
+    recognition: &PanelRecognition,
+    annotations: &[ScoringAnnotation],
+    goe: i8,
+    fall: Option<bool>,
+    execution: Option<&execution_evidence::Adjustment>,
+) -> Result<ElementScore, ElementScoreError> {
     if !(-5..=5).contains(&goe) {
         return Err(ElementScoreError::InvalidGoe);
     }
@@ -646,7 +694,9 @@ pub fn score_element(
             ResolvedRow::Value(row) => row,
         };
     // A structural interruption does not identify its execution error/cumulative GOE cap.
-    if row.interrupted() {
+    if row.interruption().is_some_and(|boundary| {
+        !execution.is_some_and(|extra| extra.break_positions.contains(&boundary))
+    }) {
         return Err(ElementScoreError::UnsupportedMarks);
     }
     let goe_values = row.goe.ok_or(ElementScoreError::UnsupportedMarks)?;
@@ -655,7 +705,7 @@ pub fn score_element(
         .as_ref()
         .and_then(|details| details.calls())
         .ok_or(ElementScoreError::BaseValue(BaseValueError::UnknownCalls))?;
-    let limits = goe_limits(calls);
+    let limits = goe_limits(calls, execution);
     if goe > limits.maximum {
         return Err(ElementScoreError::UnsupportedMarks);
     }
@@ -674,9 +724,11 @@ pub fn score_element(
     let goe_source = row.goe_source(&column);
     let base = row.base();
     let consistency_source = SourceReference {
-        document: if limits.handbook_limit { "ISU Handbook for Referees and Judges" } else { "ISU Communication 2788" }.into(),
+        document: if limits.handbook_source { "ISU Handbook for Referees and Judges" } else { "ISU Communication 2788" }.into(),
         version: "2026-05-19".into(),
-        location: if limits.handbook_limit {
+        location: if execution.is_some_and(|extra| extra.handbook_source) {
+            "pp. 2, 5–6, execution errors, full revolutions, Euler and maximum starting GOE; Communication 2788 pp. 14, 16, call and fall reductions"
+        } else if limits.handbook_source {
             "pp. 2, 6, maximum starting GOE for errors and q; Communication 2788 pp. 14, 16, call and fall reductions"
         } else if limits.downgraded {
             "pp. 14, 16, downgrade and fall reductions and maximum starting GOE"
@@ -804,16 +856,13 @@ fn time_deduction(
 
 fn fall_deduction(
     category: crate::AdultCategory,
-    elements: &[ProgramElement],
+    falls_confirmed: bool,
     outside_falls: Option<u32>,
 ) -> Result<Deduction, ProgramScoreError> {
     if category != crate::AdultCategory::Bronze {
         return Err(ProgramScoreError::UnsupportedCategory);
     }
-    if !elements.iter().all(|e| {
-        e.fall == Some(false)
-            || (e.fall == Some(true) && e.recognition.outcome == RecognitionOutcome::Recognized)
-    }) {
+    if !falls_confirmed {
         return Err(ProgramScoreError::UnknownFall);
     }
     let count = outside_falls.ok_or(ProgramScoreError::UnknownFall)?;
@@ -846,6 +895,8 @@ fn element_score(
     element: &ProgramElement,
     timing: Option<ProgramTiming>,
     required: u32,
+    observed_fall: Option<bool>,
+    execution: Option<&execution_evidence::Adjustment>,
 ) -> Result<ElementScore, ProgramScoreError> {
     if element.recognition.ruleset != ruleset {
         return Err(ProgramScoreError::RulesetMismatch);
@@ -867,13 +918,15 @@ fn element_score(
     } else if timing.duration_seconds > required + 10 {
         return Err(ProgramScoreError::TimingUnknown);
     }
-    unfactored_element_score(ruleset, table, element)
+    unfactored_element_score(ruleset, table, element, observed_fall, execution)
 }
 
 fn unfactored_element_score(
     ruleset: crate::RulesetId,
     table: ScoringTableId,
     element: &ProgramElement,
+    observed_fall: Option<bool>,
+    execution: Option<&execution_evidence::Adjustment>,
 ) -> Result<ElementScore, ProgramScoreError> {
     if element.recognition.ruleset != ruleset {
         return Err(ProgramScoreError::RulesetMismatch);
@@ -886,12 +939,13 @@ fn unfactored_element_score(
     } else {
         element.annotations.as_slice()
     };
-    score_element(
+    score_element_internal(
         table,
         &element.recognition,
         annotations,
         element.goe,
-        element.fall,
+        observed_fall,
+        execution,
     )
     .map_err(ProgramScoreError::Element)
 }
@@ -1004,12 +1058,57 @@ pub fn score_planning_scenario(
     elements: &[ProgramElement],
     second_half_boundary: Option<usize>,
 ) -> Result<PlanningScore, ProgramScoreError> {
+    score_planning_internal(ruleset, table, elements, second_half_boundary, None)
+}
+
+/// Timestamp-free scenario with execution evidence aligned to the ordered elements.
+pub fn score_planning_scenario_with_execution(
+    ruleset: crate::RulesetId,
+    table: ScoringTableId,
+    elements: &[ProgramElement],
+    second_half_boundary: Option<usize>,
+    execution: &[crate::ElementExecutionEvidence],
+) -> Result<PlanningScore, ProgramScoreError> {
+    score_planning_internal(
+        ruleset,
+        table,
+        elements,
+        second_half_boundary,
+        Some(execution),
+    )
+}
+
+fn score_planning_internal(
+    ruleset: crate::RulesetId,
+    table: ScoringTableId,
+    elements: &[ProgramElement],
+    second_half_boundary: Option<usize>,
+    execution: Option<&[crate::ElementExecutionEvidence]>,
+) -> Result<PlanningScore, ProgramScoreError> {
+    if execution.is_some_and(|values| values.len() != elements.len()) {
+        return Err(ProgramScoreError::InvalidInput);
+    }
     if second_half_boundary.is_some_and(|boundary| boundary > elements.len()) {
         return Err(ProgramScoreError::InvalidInput);
     }
     let preliminary: Vec<_> = elements
         .iter()
-        .map(|element| unfactored_element_score(ruleset, table, element))
+        .enumerate()
+        .map(|(index, element)| {
+            let resolved = execution_evidence::resolve(
+                &element.recognition,
+                element.fall,
+                execution.map(|values| &values[index]),
+            )
+            .map_err(ProgramScoreError::Element)?;
+            unfactored_element_score(
+                ruleset,
+                table,
+                element,
+                resolved.fall,
+                resolved.adjustment.as_ref(),
+            )
+        })
         .collect();
     let mut certain_later = 0usize;
     let mut possible_later = 0usize;
@@ -1071,20 +1170,95 @@ pub fn score_program(
     outside_falls: Option<u32>,
     timing: Option<ProgramTiming>,
 ) -> ProgramScore {
+    score_program_internal(
+        ruleset,
+        category,
+        table,
+        elements,
+        outside_falls,
+        timing,
+        None,
+    )
+}
+
+/// Timed scenario with execution evidence aligned to the ordered elements.
+/// A length mismatch rejects the input with InvalidInput and no exact total/deductions.
+pub fn score_program_with_execution(
+    ruleset: crate::RulesetId,
+    category: crate::AdultCategory,
+    table: ScoringTableId,
+    elements: &[ProgramElement],
+    outside_falls: Option<u32>,
+    timing: Option<ProgramTiming>,
+    execution: &[crate::ElementExecutionEvidence],
+) -> ProgramScore {
+    score_program_internal(
+        ruleset,
+        category,
+        table,
+        elements,
+        outside_falls,
+        timing,
+        Some(execution),
+    )
+}
+
+fn score_program_internal(
+    ruleset: crate::RulesetId,
+    category: crate::AdultCategory,
+    table: ScoringTableId,
+    elements: &[ProgramElement],
+    outside_falls: Option<u32>,
+    timing: Option<ProgramTiming>,
+    execution: Option<&[crate::ElementExecutionEvidence]>,
+) -> ProgramScore {
+    if execution.is_some_and(|values| values.len() != elements.len()) {
+        return ProgramScore {
+            elements: vec![Err(ProgramScoreError::InvalidInput); elements.len()],
+            tes_hundredths: None,
+            fall_deduction: Err(ProgramScoreError::InvalidInput),
+            time_deduction: Err(ProgramScoreError::InvalidInput),
+        };
+    }
     let (required, page) = required_duration(ruleset, category);
     let mut previous_start = None;
+    let mut falls_confirmed = true;
     let preliminary: Vec<_> = elements
         .iter()
-        .map(|e| {
-            if let Some(start) = e.start_ms {
-                let inconsistent = previous_start.is_some_and(|previous| start < previous);
+        .enumerate()
+        .map(|(index, element)| {
+            let invalid_timing = if let Some(start) = element.start_ms {
+                let invalid = previous_start.is_some_and(|previous| start < previous);
                 previous_start =
                     Some(previous_start.map_or(start, |previous: u32| previous.max(start)));
-                if inconsistent {
-                    return Err(ProgramScoreError::InvalidTiming);
-                }
+                invalid
+            } else {
+                false
+            };
+            let resolved = execution_evidence::resolve(
+                &element.recognition,
+                element.fall,
+                execution.map(|values| &values[index]),
+            );
+            if resolved.is_err() {
+                falls_confirmed = false;
             }
-            element_score(ruleset, table, e, timing, required)
+            let resolved = resolved.map_err(ProgramScoreError::Element)?;
+            falls_confirmed &= resolved.fall == Some(false)
+                || (resolved.fall == Some(true)
+                    && element.recognition.outcome == RecognitionOutcome::Recognized);
+            if invalid_timing {
+                return Err(ProgramScoreError::InvalidTiming);
+            }
+            element_score(
+                ruleset,
+                table,
+                element,
+                timing,
+                required,
+                resolved.fall,
+                resolved.adjustment.as_ref(),
+            )
         })
         .collect();
     let selection = second_half_selection(elements, &preliminary, timing, required);
@@ -1109,7 +1283,7 @@ pub fn score_program(
     ProgramScore {
         elements: results,
         tes_hundredths,
-        fall_deduction: fall_deduction(category, elements, outside_falls),
+        fall_deduction: fall_deduction(category, falls_confirmed, outside_falls),
         time_deduction: time_deduction(timing, required, page),
     }
 }
