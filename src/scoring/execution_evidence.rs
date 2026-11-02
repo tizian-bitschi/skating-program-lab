@@ -9,6 +9,7 @@ pub(super) struct Adjustment {
     pub starting_cap: i16,
     pub fall_count: u8,
     pub break_positions: Vec<usize>,
+    pub handbook_source: bool,
 }
 
 fn target(error: &JumpExecutionError) -> usize {
@@ -59,6 +60,7 @@ pub(super) fn validate(
         starting_cap: 5,
         fall_count: 0,
         break_positions: vec![],
+        handbook_source: false,
     };
     for (i, error) in errors.iter().enumerate() {
         let index = target(error);
@@ -106,6 +108,7 @@ pub(super) fn validate(
                     return Err(ElementScoreError::UnsupportedMarks);
                 }
                 // Judges Handbook p. 5: full revolution / two three turns, -3..-4.
+                result.handbook_source = true;
                 result.minimum_reduction += 3;
                 result.starting_cap = 2;
                 result.errors += 1;
@@ -118,6 +121,7 @@ pub(super) fn validate(
                     return Err(ElementScoreError::UnsupportedMarks);
                 }
                 // Communication 2788 p. 16; Judges Handbook p. 5: -2..-3.
+                result.handbook_source = true;
                 result.minimum_reduction += 2;
                 result.errors += 1;
             }

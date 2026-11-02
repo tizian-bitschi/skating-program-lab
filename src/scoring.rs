@@ -571,7 +571,7 @@ struct GoeLimits {
     maximum: i8,
     fall_maximum: i8,
     downgraded: bool,
-    handbook_limit: bool,
+    handbook_source: bool,
 }
 
 fn goe_limits(
@@ -634,7 +634,8 @@ fn goe_limits(
         maximum: (starting_max - reduction).max(-5) as i8,
         fall_maximum: (2 - reduction - 5 * fall_count).max(-5) as i8,
         downgraded,
-        handbook_limit: errors == 1 && !capped,
+        handbook_source: (errors == 1 && !capped)
+            || execution.is_some_and(|extra| extra.handbook_source),
     }
 }
 
@@ -722,10 +723,10 @@ fn score_element_internal(
     let goe_source = row.goe_source(&column);
     let base = row.base();
     let consistency_source = SourceReference {
-        document: if limits.handbook_limit { "ISU Handbook for Referees and Judges" } else { "ISU Communication 2788" }.into(),
+        document: if limits.handbook_source { "ISU Handbook for Referees and Judges" } else { "ISU Communication 2788" }.into(),
         version: "2026-05-19".into(),
-        location: if limits.handbook_limit {
-            "pp. 2, 5–6, maximum starting GOE for errors, Euler and q; Communication 2788 pp. 14, 16, call and fall reductions"
+        location: if limits.handbook_source {
+            "pp. 2, 5–6, execution errors, full revolutions, Euler and maximum starting GOE; Communication 2788 pp. 14, 16, call and fall reductions"
         } else if limits.downgraded {
             "pp. 14, 16, downgrade and fall reductions and maximum starting GOE"
         } else {

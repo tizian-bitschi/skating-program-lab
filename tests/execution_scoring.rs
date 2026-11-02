@@ -149,6 +149,14 @@ fn full_revolutions_and_euler_step_over_use_verified_distinct_rules() {
         (340, -21, 319)
     );
     assert_eq!(
+        score.consistency_source.document,
+        "ISU Handbook for Referees and Judges"
+    );
+    assert!(score
+        .consistency_source
+        .location
+        .contains("full revolutions"));
+    assert_eq!(
         score_element_with_execution(TABLE, &r, &[], 0, Some(false), &full),
         Err(ElementScoreError::UnsupportedMarks)
     );
