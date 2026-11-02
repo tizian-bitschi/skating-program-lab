@@ -107,7 +107,7 @@ fn unknown_and_unsupported_do_not_become_zero() {
         Err(BaseValueError::UnknownCalls)
     );
     assert_eq!(
-        lookup_base_value(TABLE, &recognition("1T", None, Some(vec![])), &[]),
+        lookup_base_value(TABLE, &recognition("3T", None, Some(vec![])), &[]),
         Err(BaseValueError::Unsupported)
     );
     assert_eq!(
@@ -242,7 +242,7 @@ fn scoring_rejects_incomplete_or_inconsistent_inputs() {
     );
     let marked = recognition("1Lz", None, Some(vec![PanelCall::UnderRotated]));
     assert_eq!(
-        score_element(TABLE, &marked, &[], 1, Some(false)),
+        score_element(TABLE, &marked, &[], 4, Some(false)),
         Err(ElementScoreError::UnsupportedMarks)
     );
     assert_eq!(
@@ -581,7 +581,7 @@ fn unresolved_inputs_do_not_yield_exact_tes() {
         .tes_hundredths,
         None
     );
-    let unsupported = program_element("1T", None, 0, false, Some(70_000));
+    let unsupported = program_element("3T", None, 0, false, Some(70_000));
     assert_eq!(
         score_program(
             RulesetId::IsuAdult2026_27July16,
@@ -967,4 +967,125 @@ fn no_value_before_half_or_known_nonjump_does_not_block_bonus() {
     spin.recognition.outcome = RecognitionOutcome::NoValue;
     let late_jump = program_element("1Lz", None, 1, false, Some(70_000));
     assert_eq!(score(&[spin, late_jump]).tes_hundredths, Some(72));
+}
+
+#[test]
+fn clean_jump_columns_match_june_table() {
+    // Communication 2786, 2 June 2026, pp. 2–3: BASE and each GOE column.
+    let fixtures = [
+        ("1T", 40, [-20, -16, -12, -8, -4, 0, 4, 8, 12, 16, 20]),
+        ("1S", 40, [-20, -16, -12, -8, -4, 0, 4, 8, 12, 16, 20]),
+        ("1Lo", 50, [-25, -20, -15, -10, -5, 0, 5, 10, 15, 20, 25]),
+        ("1F", 50, [-25, -20, -15, -10, -5, 0, 5, 10, 15, 20, 25]),
+        ("1Lz", 60, [-30, -24, -18, -12, -6, 0, 6, 12, 18, 24, 30]),
+        ("1A", 110, [-55, -44, -33, -22, -11, 0, 11, 22, 33, 44, 55]),
+        ("2T", 130, [-65, -52, -39, -26, -13, 0, 13, 26, 39, 52, 65]),
+        ("2S", 130, [-65, -52, -39, -26, -13, 0, 13, 26, 39, 52, 65]),
+        ("2Lo", 170, [-85, -68, -51, -34, -17, 0, 17, 34, 51, 68, 85]),
+        ("2F", 180, [-90, -72, -54, -36, -18, 0, 18, 36, 54, 72, 90]),
+        (
+            "2Lz",
+            210,
+            [-105, -84, -63, -42, -21, 0, 21, 42, 63, 84, 105],
+        ),
+        (
+            "2A",
+            330,
+            [-165, -132, -99, -66, -33, 0, 33, 66, 99, 132, 165],
+        ),
+    ];
+    for (code, base, expected_values) in fixtures {
+        let r = recognition(code, None, Some(vec![]));
+        for (grade, expected) in (-5i8..=5).zip(expected_values) {
+            let score = score_element(TABLE, &r, &[], grade, Some(false)).unwrap();
+            assert_eq!(
+                (score.base.hundredths, score.goe_hundredths),
+                (base, expected),
+                "{code} {grade}"
+            );
+        }
+    }
+}
+
+#[test]
+fn marked_rows_and_call_boundaries() {
+    use PanelCall::*;
+    // Communication 2786 pp. 2–4 and 2788 pp. 14, 16.
+    for (code, call, grade, base, adjustment) in [
+        ("2Lo", Quarter, 3, 170, 51),
+        ("2T", UnderRotated, -3, 104, -31),
+        ("2A", Downgraded, -3, 110, -33),
+        ("2F", WrongEdge, 0, 144, 0),
+        ("1Lz", UnclearEdge, 4, 60, 24),
+    ] {
+        let r = recognition(code, None, Some(vec![call]));
+        let score = score_element(TABLE, &r, &[], grade, Some(false)).unwrap();
+        assert_eq!(
+            (score.base.hundredths, score.goe_hundredths),
+            (base, adjustment)
+        );
+    }
+    for call in [WrongEdge, UnclearEdge] {
+        assert_eq!(
+            lookup_base_value(TABLE, &recognition("2T", None, Some(vec![call])), &[]),
+            Err(BaseValueError::Unsupported)
+        );
+    }
+    let combined = recognition("1Lz", None, Some(vec![WrongEdge, UnderRotated]));
+    assert_eq!(
+        score_element(TABLE, &combined, &[], -5, Some(false)),
+        Err(ElementScoreError::UnsupportedMarks)
+    );
+}
+
+#[test]
+fn jump_value_does_not_depend_on_adult_category() {
+    let jump = program_element("2Lo", None, 1, false, Some(10_000));
+    for (category, duration) in [
+        (AdultCategory::Bronze, 100),
+        (AdultCategory::Silver, 120),
+        (AdultCategory::Gold, 170),
+        (AdultCategory::Masters, 180),
+    ] {
+        let result = score_program(
+            RulesetId::IsuAdult2026_27July16,
+            category,
+            TABLE,
+            std::slice::from_ref(&jump),
+            Some(0),
+            ordinary(duration),
+        );
+        let score = result.elements[0].as_ref().unwrap();
+        assert_eq!(
+            (
+                score.unfactored.base.hundredths,
+                score.unfactored.goe_hundredths
+            ),
+            (170, 17)
+        );
+    }
+}
+
+#[test]
+fn call_and_fall_limits_are_enforced() {
+    use PanelCall::*;
+    for (call, maximum, fall_maximum) in [
+        (Quarter, 3, -5),
+        (UnderRotated, 3, -5),
+        (Downgraded, -1, -5),
+        (UnclearEdge, 4, -4),
+        (WrongEdge, 0, -5),
+    ] {
+        let r = recognition("2F", None, Some(vec![call]));
+        assert!(score_element(TABLE, &r, &[], maximum, Some(false)).is_ok());
+        assert_eq!(
+            score_element(TABLE, &r, &[], maximum + 1, Some(false)),
+            Err(ElementScoreError::UnsupportedMarks)
+        );
+        assert!(score_element(TABLE, &r, &[], fall_maximum, Some(true)).is_ok());
+        assert_eq!(
+            score_element(TABLE, &r, &[], fall_maximum + 1, Some(true)),
+            Err(ElementScoreError::InconsistentFall)
+        );
+    }
 }
