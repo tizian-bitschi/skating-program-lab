@@ -38,6 +38,7 @@ impl SourceReference {
     /// Resolve known source editions to their official ISU documents; unknown editions have no URL.
     pub fn official_url(&self) -> Option<&'static str> {
         match (self.document.as_str(), self.version.as_str()) {
+            ("ISU Handbook for Referees and Judges", "2026-05-19") => Some("https://isu-d8g8b4b7ece7aphs.a03.azurefd.net/isudamcontainer/CMS/Corporate-Site/Sports-Rules/Figure-Skating-Rules/Handbooks-Single-%26-Pair-Skating/Handbook-for-Referees-and-Judges-2026-27-1779278300-9402.pdf"),
             ("ISU Communication 2786", "2026-06-02") => Some("https://isu-d8g8b4b7ece7aphs.a03.azurefd.net/isudamcontainer/CMS/Corporate-Site/Governance/Transparency/ISU-Communications/2786-SinglesPairs-SOV-Update-260602-1780481099-6311.pdf"),
             ("ISU Communication 2788", "2026-05-19") => Some("https://isu-d8g8b4b7ece7aphs.a03.azurefd.net/isudamcontainer/CMS/Corporate-Site/Governance/Transparency/ISU-Communications/2788-SP-Levels-and-GOE-2026-Updated-MAY-19-1779351385-9626.pdf"),
             ("International Adult Figure Skating Competitions Technical Announcement", "2026-07-16") => Some("https://isu-d8g8b4b7ece7aphs.a03.azurefd.net/isudamcontainer/CMS/Fansite/Figure-Skating/2026-2027/Events/Adult-Skating/Documents/IAFSC-Technical-Announcement---2026-27--1--1786956273-6936.pdf"),
