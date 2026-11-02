@@ -94,6 +94,17 @@ pub enum ScoringTableId {
 }
 
 impl ScoringTableId {
+    pub(crate) fn source_reference(self, location: String) -> SourceReference {
+        let (document, version) = match self {
+            Self::Isu2786June2_2026 => ("ISU Communication 2786", "2026-06-02"),
+        };
+        SourceReference {
+            document: document.into(),
+            version: version.into(),
+            location,
+        }
+    }
+
     pub fn as_str(self) -> &'static str {
         match self {
             Self::Isu2786June2_2026 => "isu-2786-2026-06-02",
@@ -116,6 +127,9 @@ pub use validation::*;
 
 mod scoring;
 pub use scoring::*;
+
+mod catalog;
+pub use catalog::*;
 
 mod optimizer;
 pub use optimizer::*;

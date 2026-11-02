@@ -33,19 +33,14 @@ struct TableRow {
     goe: Option<[i16; 11]>,
     table: ScoringTableId,
     notation: String,
-    document: &'static str,
-    version: &'static str,
     section: &'static str,
     goe_reference: Option<String>,
 }
 
 impl TableRow {
     fn source(&self, column: &str) -> SourceReference {
-        SourceReference {
-            document: self.document.into(),
-            version: self.version.into(),
-            location: format!("{}, {column}, row {}", self.section, self.notation),
-        }
+        self.table
+            .source_reference(format!("{}, {column}, row {}", self.section, self.notation))
     }
     fn base(&self) -> BaseValue {
         BaseValue {
@@ -258,8 +253,6 @@ fn table_row(
             goe: Some(goe),
             table,
             notation: notation.clone(),
-            document: "ISU Communication 2786",
-            version: "2026-06-02",
             section: "pp. 2–4, Jumps; p. 14, combination reference",
             goe_reference: Some(reference.to_owned()),
         });
@@ -286,16 +279,11 @@ fn table_row(
             _ => return Err(BaseValueError::Unsupported),
         },
     };
-    let (document, version) = match table {
-        ScoringTableId::Isu2786June2_2026 => ("ISU Communication 2786", "2026-06-02"),
-    };
     Ok(TableRow {
         hundredths,
         goe,
         table,
         notation,
-        document,
-        version,
         section,
         goe_reference: None,
     })

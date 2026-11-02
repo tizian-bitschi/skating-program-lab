@@ -21,3 +21,18 @@ Jump transitions are distinct from listed jumps. Regular spins distinguish flyin
 The original reference and Bronze solver cover the finite 1Lz domain in the [optimization specification](specs/optimization.md). The separate category-aware `optimize_jumps` API searches explicit bounded jump-only domains in all four Adult categories. It supports clean singles and doubles and explicitly listed clean two-jump combinations ending in a toe loop or loop, subject to the shared validator and table. It does not optimize sequences, Euler, other transitions, calls, or full programs. Search interruption and incomplete tie enumeration remain distinct from proofs. The unfactored table-BV objective assumes clean recognition and does not resolve program-wide scoring consequences; see [category-aware optimization](specs/optimization.md#category-aware-jump-optimizer).
 
 Pumpkin is enabled by default; `--no-default-features` omits both solver APIs. These optimizers do not establish complete eligibility, a global maximum or WebAssembly compatibility.
+
+## Versioned SOV catalog (issue #45, slice A)
+
+The [catalog reference](catalog.md) records the June 2 source hash, all 625
+published value-row identifiers, numeric-column layout, notes and factors.
+`src/catalog.rs` adds the approved typed data contract and exact source-reference
+conversion. `tests/catalog_manifest.rs` checks the separate source inventory.
+No production catalog data or lookup is available in this slice; population and
+scorer migration follow in B, Pair data and final parity audit in C. Existing
+scoring and recognition support is unchanged. Catalog and scoring share the
+private table-source resolver. The inventory test compares every published code
+with a separately maintained reference and rejects corrupted code, level,
+discipline, family and note assignments. Downgrade-only rows reference the legend
+rather than remark 3. The inventory was visually checked
+by the implementation author; independent review is pending.

@@ -1,0 +1,28 @@
+# ISU Communication 2786, updated June 2, 2026.
+# Independently maintained code inventory, checked against rendered printed pages.
+# page|family|discipline|codes in printed order (headers and blank rows excluded)
+# Not generated from the manifest or production catalog. Change only after source review.
+2|Jump|SingleAndPair|Eu 1T 1S 1Lo 1F 1Lz 1Tq 1Sq 1Loq 1Fq 1Lzq 1T< 1S< 1Lo< 1F< 1Lz< 1T<< 1S<< 1Lo<< 1F<< 1Lz<< 1Fe 1Feq 1Fe< 1Fe<< 1Lze 1Lzeq 1Lze< 1Lze<< 1F! 1F!q 1F!< 1F!<< 1Lz! 1Lz!q 1Lz!< 1Lz!<< 1A 2T 2S 2Lo 2F 2Lz 1Aq 2Tq 2Sq 2Loq 2Fq 2Lzq 1A< 2T< 2S< 2Lo< 2F< 2Lz<
+3|Jump|SingleAndPair|1A<< 2T<< 2S<< 2Lo<< 2F<< 2Lz<< 2Fe 2Feq 2Fe< 2Fe<< 2Lze 2Lzeq 2Lze< 2Lze<< 2F! 2F!q 2F!< 2F!<< 2Lz! 2Lz!q 2Lz!< 2Lz!<< 2A 3T 3S 3Lo 3F 3Lz 2Ab 3Tb 3Sb 3Lob 3Fb 3Lzb 2Aq 3Tq 3Sq 3Loq 3Fq 3Lzq 2Aqb 3Tqb 3Sqb 3Loqb 3Fqb 3Lzqb 2A< 3T< 3S< 3Lo< 3F< 3Lz<
+4|Jump|SingleAndPair|2A<< 3T<< 3S<< 3Lo<< 3F<< 3Lz<< 3Fe 3Feq 3Fe< 3Fe<< 3Lze 3Lzeq 3Lze< 3Lze<< 3F! 3F!b 3F!q 3F!qb 3F!< 3F!<< 3Lz! 3Lz!b 3Lz!q 3Lz!qb 3Lz!< 3Lz!<< 3A 3Ab 4T 4S 4Lo 4F 4Lz 4A 3Aq 3Aqb 4Tq 4Sq 4Loq 4Fq 4Lzq 4Aq 3A< 4T< 4S< 4Lo< 4F< 4Lz< 3A<< 4T<< 4S<< 4Lo<< 4F<< 4Lz<<
+5|Jump|SingleAndPair|4Fe 4Feq 4Fe< 4Fe<< 4Lze 4Lzeq 4Lze< 4Lze<< 4F! 4F!q 4F!< 4F!<< 4Lz! 4Lz!q 4Lz!< 4Lz!<< 4A< 4A<< 5T 5S 5Lo 5F 5Lz 5Tq 5Sq 5Loq 5Fq 5Lzq 5T< 5S< 5Lo< 5F< 5Lz< 5T<< 5S<< 5Lo<< 5F<< 5Lz<< 5Fe 5Feq 5Fe< 5Fe<< 5Lze 5Lzeq 5Lze< 5Lze<< 5F! 5F!q 5F!< 5F!<< 5Lz! 5Lz!q 5Lz!< 5Lz!<<
+6|Spin|SingleAndPair|USpB USp1 USp2 USp3 USp4 LSpB LSp1 LSp2 LSp3 LSp4 CSpB CSp1 CSp2 CSp3 CSp4 SSpB SSp1 SSp2 SSp3 SSp4 FUSpB FUSp1 FUSp2 FUSp3 FUSp4 FUSpBV FUSp1V FUSp2V FUSp3V FUSp4V FLSpB FLSp1 FLSp2 FLSp3 FLSp4 FLSpBV FLSp1V FLSp2V FLSp3V FLSp4V FCSpB FCSp1 FCSp2 FCSp3 FCSp4 FCSpBV FCSp1V FCSp2V FCSp3V FCSp4V
+7|Spin|SingleAndPair|FSSpB FSSp1 FSSp2 FSSp3 FSSp4 FSSpBV FSSp1V FSSp2V FSSp3V FSSp4V CUSpB CUSp1 CUSp2 CUSp3 CUSp4 CUSpBV CUSp1V CUSp2V CUSp3V CUSp4V FCUSpB FCUSp1 FCUSp2 FCUSp3 FCUSp4 FCUSpBV FCUSp1V FCUSp2V FCUSp3V FCUSp4V CLSpB CLSp1 CLSp2 CLSp3 CLSp4 CLSpBV CLSp1V CLSp2V CLSp3V CLSp4V FCLSpB FCLSp1 FCLSp2 FCLSp3 FCLSp4 FCLSpBV FCLSp1V FCLSp2V FCLSp3V FCLSp4V CCSpB CCSp1 CCSp2 CCSp3 CCSp4
+8|Spin|SingleAndPair|CCSpBV CCSp1V CCSp2V CCSp3V CCSp4V FCCSpB FCCSp1 FCCSp2 FCCSp3 FCCSp4 FCCSpBV FCCSp1V FCCSp2V FCCSp3V FCCSp4V CSSpB CSSp1 CSSp2 CSSp3 CSSp4 CSSpBV CSSp1V CSSp2V CSSp3V CSSp4V FCSSpB FCSSp1 FCSSp2 FCSSp3 FCSSp4 FCSSpBV FCSSp1V FCSSp2V FCSSp3V FCSSp4V CoSpB CoSp1 CoSp2 CoSp3 CoSp4 CoSpBV CoSp1V CoSp2V CoSp3V CoSp4V FCoSpB FCoSp1 FCoSp2 FCoSp3 FCoSp4 FCoSpBV FCoSp1V FCoSp2V FCoSp3V FCoSp4V
+9|Spin|SingleAndPair|CCoSpB CCoSp1 CCoSp2 CCoSp3 CCoSp4 CCoSpBV CCoSp1V CCoSp2V CCoSp3V CCoSp4V FCCoSpB FCCoSp1 FCCoSp2 FCCoSp3 FCCoSp4 FCCoSpBV FCCoSp1V FCCoSp2V FCCoSp3V FCCoSp4V
+9|StepSequence|SingleAndPair|StSqB StSq1 StSq2 StSq3 StSq4
+9|Lift|Pair|1LiB 1Li1 1Li2 1Li3 1Li4 2LiB 2Li1 2Li2 2Li3 2Li4 3LiB 3Li1 3Li2 3Li3 3Li4 4LiB 4Li1 4Li2 4Li3 4Li4
+10|Lift|Pair|5SLiB 5SLi1 5SLi2 5SLi3 5SLi4 5TLiB 5TLi1 5TLi2 5TLi3 5TLi4 5BLiB 5BLi1 5BLi2 5BLi3 5BLi4 5ALiB 5ALi1 5ALi2 5ALi3 5ALi4 5RLiB 5RLi1 5RLi2 5RLi3 5RLi4
+10|TwistLift|Pair|1TwB 1Tw1 1Tw2 1Tw3 1Tw4 1TwB<< 1Tw1<< 1Tw2<< 1Tw3<< 1Tw4<< 2TwB 2Tw1 2Tw2 2Tw3 2Tw4 2TwB<< 2Tw1<< 2Tw2<< 2Tw3<< 2Tw4<<
+11|TwistLift|Pair|3TwB 3Tw1 3Tw2 3Tw3 3Tw4 3TwB<< 3Tw1<< 3Tw2<< 3Tw3<< 3Tw4<< 4TwB 4Tw1 4Tw2 4Tw3 4Tw4 4TwB<< 4Tw1<< 4Tw2<< 4Tw3<< 4Tw4<<
+11|ThrowJump|Pair|1TTh 1STh 1LoTh 1FTh 1LzTh 1TThq 1SThq 1LoThq 1FThq 1LzThq 1TTh< 1STh< 1LoTh< 1FTh< 1LzTh< 1TTh<< 1STh<< 1LoTh<< 1FTh<< 1LzTh<< 1ATh 2TTh 2STh 2LoTh 2FTh 2LzTh 1AThq 2TThq 2SThq 2LoThq 2FThq 2LzThq
+12|ThrowJump|Pair|1ATh< 2TTh< 2STh< 2LoTh< 2FTh< 2LzTh< 1ATh<< 2TTh<< 2STh<< 2LoTh<< 2FTh<< 2LzTh<< 2ATh 3TTh 3STh 3LoTh 3FTh 3LzTh 2AThq 3TThq 3SThq 3LoThq 3FThq 3LzThq 2ATh< 3TTh< 3STh< 3LoTh< 3FTh< 3LzTh< 2ATh<< 3TTh<< 3STh<< 3LoTh<< 3FTh<< 3LzTh<< 3ATh 4TTh 4STh 4LoTh 4FTh 4LzTh 3AThq 4TThq 4SThq 4LoThq 4FThq 4LzThq 3ATh< 4TTh< 4STh< 4LoTh< 4FTh< 4LzTh<
+13|ThrowJump|Pair|3ATh<< 4TTh<< 4STh<< 4LoTh<< 4FTh<< 4LzTh<<
+13|DeathSpiral|Pair|BiDsB BiDs1 BiDs2 BiDs3 BiDs4 FiDsB FiDs1 FiDs2 FiDs3 FiDs4 BoDsB BoDs1 BoDs2 BoDs3 BoDs4 FoDsB FoDs1 FoDs2 FoDs3 FoDs4 BiDs2b BiDs3b FiDs2b FiDs3b BoDs2b BoDs3b FoDs2b FoDs3b
+13|PivotFigure|Pair|PiF1
+13|PairSpin|Pair|PSpB PSp1 PSp2 PSp3 PSp4
+14|PairSpinCombination|Pair|PCoSpB PCoSp1 PCoSp2 PCoSp3 PCoSp4 PCoSpBV PCoSp1V PCoSp2V PCoSp3V PCoSp4V
+14|ChoreographicSequence|SingleAndPair|ChSq1
+14|ChoreographicSpin|SingleAndPair|ChSp1
+14|ChoreographicPairSpin|Pair|ChPSp1
+14|ChoreographicPairLift|Pair|ChPLi1

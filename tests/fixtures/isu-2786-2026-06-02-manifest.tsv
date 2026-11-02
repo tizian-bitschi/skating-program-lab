@@ -1,0 +1,626 @@
+table	page	row	section	discipline	family	code	level	numeric_columns	notes	verification
+isu-2786-2026-06-02	2	1	Jumps	SingleAndPair	Jump	Eu	-	11	1,4,5	render-cross-checked
+isu-2786-2026-06-02	2	2	Jumps	SingleAndPair	Jump	1T	-	11	1,4,5	render-cross-checked
+isu-2786-2026-06-02	2	3	Jumps	SingleAndPair	Jump	1S	-	11	1,4,5	render-cross-checked
+isu-2786-2026-06-02	2	4	Jumps	SingleAndPair	Jump	1Lo	-	11	1,4,5	render-cross-checked
+isu-2786-2026-06-02	2	5	Jumps	SingleAndPair	Jump	1F	-	11	1,4,5	render-cross-checked
+isu-2786-2026-06-02	2	6	Jumps	SingleAndPair	Jump	1Lz	-	11	1,4,5	render-cross-checked
+isu-2786-2026-06-02	2	7	Jumps	SingleAndPair	Jump	1Tq	-	11	1,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	2	8	Jumps	SingleAndPair	Jump	1Sq	-	11	1,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	2	9	Jumps	SingleAndPair	Jump	1Loq	-	11	1,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	2	10	Jumps	SingleAndPair	Jump	1Fq	-	11	1,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	2	11	Jumps	SingleAndPair	Jump	1Lzq	-	11	1,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	2	12	Jumps	SingleAndPair	Jump	1T<	-	11	1,3,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	2	13	Jumps	SingleAndPair	Jump	1S<	-	11	1,3,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	2	14	Jumps	SingleAndPair	Jump	1Lo<	-	11	1,3,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	2	15	Jumps	SingleAndPair	Jump	1F<	-	11	1,3,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	2	16	Jumps	SingleAndPair	Jump	1Lz<	-	11	1,3,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	2	17	Jumps	SingleAndPair	Jump	1T<<	-	11	1,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	2	18	Jumps	SingleAndPair	Jump	1S<<	-	11	1,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	2	19	Jumps	SingleAndPair	Jump	1Lo<<	-	11	1,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	2	20	Jumps	SingleAndPair	Jump	1F<<	-	11	1,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	2	21	Jumps	SingleAndPair	Jump	1Lz<<	-	11	1,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	2	22	Jumps	SingleAndPair	Jump	1Fe	-	11	1,3,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	2	23	Jumps	SingleAndPair	Jump	1Feq	-	11	1,3,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	2	24	Jumps	SingleAndPair	Jump	1Fe<	-	11	1,3,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	2	25	Jumps	SingleAndPair	Jump	1Fe<<	-	11	1,3,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	2	26	Jumps	SingleAndPair	Jump	1Lze	-	11	1,3,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	2	27	Jumps	SingleAndPair	Jump	1Lzeq	-	11	1,3,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	2	28	Jumps	SingleAndPair	Jump	1Lze<	-	11	1,3,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	2	29	Jumps	SingleAndPair	Jump	1Lze<<	-	11	1,3,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	2	30	Jumps	SingleAndPair	Jump	1F!	-	11	1,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	2	31	Jumps	SingleAndPair	Jump	1F!q	-	11	1,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	2	32	Jumps	SingleAndPair	Jump	1F!<	-	11	1,3,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	2	33	Jumps	SingleAndPair	Jump	1F!<<	-	11	1,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	2	34	Jumps	SingleAndPair	Jump	1Lz!	-	11	1,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	2	35	Jumps	SingleAndPair	Jump	1Lz!q	-	11	1,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	2	36	Jumps	SingleAndPair	Jump	1Lz!<	-	11	1,3,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	2	37	Jumps	SingleAndPair	Jump	1Lz!<<	-	11	1,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	2	38	Jumps	SingleAndPair	Jump	1A	-	11	1,4,5	render-cross-checked
+isu-2786-2026-06-02	2	39	Jumps	SingleAndPair	Jump	2T	-	11	1,4,5	render-cross-checked
+isu-2786-2026-06-02	2	40	Jumps	SingleAndPair	Jump	2S	-	11	1,4,5	render-cross-checked
+isu-2786-2026-06-02	2	41	Jumps	SingleAndPair	Jump	2Lo	-	11	1,4,5	render-cross-checked
+isu-2786-2026-06-02	2	42	Jumps	SingleAndPair	Jump	2F	-	11	1,4,5	render-cross-checked
+isu-2786-2026-06-02	2	43	Jumps	SingleAndPair	Jump	2Lz	-	11	1,4,5	render-cross-checked
+isu-2786-2026-06-02	2	44	Jumps	SingleAndPair	Jump	1Aq	-	11	1,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	2	45	Jumps	SingleAndPair	Jump	2Tq	-	11	1,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	2	46	Jumps	SingleAndPair	Jump	2Sq	-	11	1,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	2	47	Jumps	SingleAndPair	Jump	2Loq	-	11	1,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	2	48	Jumps	SingleAndPair	Jump	2Fq	-	11	1,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	2	49	Jumps	SingleAndPair	Jump	2Lzq	-	11	1,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	2	50	Jumps	SingleAndPair	Jump	1A<	-	11	1,3,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	2	51	Jumps	SingleAndPair	Jump	2T<	-	11	1,3,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	2	52	Jumps	SingleAndPair	Jump	2S<	-	11	1,3,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	2	53	Jumps	SingleAndPair	Jump	2Lo<	-	11	1,3,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	2	54	Jumps	SingleAndPair	Jump	2F<	-	11	1,3,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	2	55	Jumps	SingleAndPair	Jump	2Lz<	-	11	1,3,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	3	1	Jumps	SingleAndPair	Jump	1A<<	-	11	1,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	3	2	Jumps	SingleAndPair	Jump	2T<<	-	11	1,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	3	3	Jumps	SingleAndPair	Jump	2S<<	-	11	1,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	3	4	Jumps	SingleAndPair	Jump	2Lo<<	-	11	1,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	3	5	Jumps	SingleAndPair	Jump	2F<<	-	11	1,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	3	6	Jumps	SingleAndPair	Jump	2Lz<<	-	11	1,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	3	7	Jumps	SingleAndPair	Jump	2Fe	-	11	1,3,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	3	8	Jumps	SingleAndPair	Jump	2Feq	-	11	1,3,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	3	9	Jumps	SingleAndPair	Jump	2Fe<	-	11	1,3,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	3	10	Jumps	SingleAndPair	Jump	2Fe<<	-	11	1,3,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	3	11	Jumps	SingleAndPair	Jump	2Lze	-	11	1,3,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	3	12	Jumps	SingleAndPair	Jump	2Lzeq	-	11	1,3,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	3	13	Jumps	SingleAndPair	Jump	2Lze<	-	11	1,3,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	3	14	Jumps	SingleAndPair	Jump	2Lze<<	-	11	1,3,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	3	15	Jumps	SingleAndPair	Jump	2F!	-	11	1,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	3	16	Jumps	SingleAndPair	Jump	2F!q	-	11	1,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	3	17	Jumps	SingleAndPair	Jump	2F!<	-	11	1,3,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	3	18	Jumps	SingleAndPair	Jump	2F!<<	-	11	1,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	3	19	Jumps	SingleAndPair	Jump	2Lz!	-	11	1,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	3	20	Jumps	SingleAndPair	Jump	2Lz!q	-	11	1,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	3	21	Jumps	SingleAndPair	Jump	2Lz!<	-	11	1,3,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	3	22	Jumps	SingleAndPair	Jump	2Lz!<<	-	11	1,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	3	23	Jumps	SingleAndPair	Jump	2A	-	11	1,4,5	render-cross-checked
+isu-2786-2026-06-02	3	24	Jumps	SingleAndPair	Jump	3T	-	11	1,4,5	render-cross-checked
+isu-2786-2026-06-02	3	25	Jumps	SingleAndPair	Jump	3S	-	11	1,4,5	render-cross-checked
+isu-2786-2026-06-02	3	26	Jumps	SingleAndPair	Jump	3Lo	-	11	1,4,5	render-cross-checked
+isu-2786-2026-06-02	3	27	Jumps	SingleAndPair	Jump	3F	-	11	1,4,5	render-cross-checked
+isu-2786-2026-06-02	3	28	Jumps	SingleAndPair	Jump	3Lz	-	11	1,4,5	render-cross-checked
+isu-2786-2026-06-02	3	29	Jumps	SingleAndPair	Jump	2Ab	-	11	1,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	3	30	Jumps	SingleAndPair	Jump	3Tb	-	11	1,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	3	31	Jumps	SingleAndPair	Jump	3Sb	-	11	1,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	3	32	Jumps	SingleAndPair	Jump	3Lob	-	11	1,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	3	33	Jumps	SingleAndPair	Jump	3Fb	-	11	1,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	3	34	Jumps	SingleAndPair	Jump	3Lzb	-	11	1,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	3	35	Jumps	SingleAndPair	Jump	2Aq	-	11	1,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	3	36	Jumps	SingleAndPair	Jump	3Tq	-	11	1,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	3	37	Jumps	SingleAndPair	Jump	3Sq	-	11	1,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	3	38	Jumps	SingleAndPair	Jump	3Loq	-	11	1,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	3	39	Jumps	SingleAndPair	Jump	3Fq	-	11	1,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	3	40	Jumps	SingleAndPair	Jump	3Lzq	-	11	1,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	3	41	Jumps	SingleAndPair	Jump	2Aqb	-	11	1,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	3	42	Jumps	SingleAndPair	Jump	3Tqb	-	11	1,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	3	43	Jumps	SingleAndPair	Jump	3Sqb	-	11	1,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	3	44	Jumps	SingleAndPair	Jump	3Loqb	-	11	1,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	3	45	Jumps	SingleAndPair	Jump	3Fqb	-	11	1,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	3	46	Jumps	SingleAndPair	Jump	3Lzqb	-	11	1,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	3	47	Jumps	SingleAndPair	Jump	2A<	-	11	1,3,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	3	48	Jumps	SingleAndPair	Jump	3T<	-	11	1,3,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	3	49	Jumps	SingleAndPair	Jump	3S<	-	11	1,3,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	3	50	Jumps	SingleAndPair	Jump	3Lo<	-	11	1,3,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	3	51	Jumps	SingleAndPair	Jump	3F<	-	11	1,3,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	3	52	Jumps	SingleAndPair	Jump	3Lz<	-	11	1,3,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	4	1	Jumps	SingleAndPair	Jump	2A<<	-	11	1,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	4	2	Jumps	SingleAndPair	Jump	3T<<	-	11	1,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	4	3	Jumps	SingleAndPair	Jump	3S<<	-	11	1,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	4	4	Jumps	SingleAndPair	Jump	3Lo<<	-	11	1,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	4	5	Jumps	SingleAndPair	Jump	3F<<	-	11	1,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	4	6	Jumps	SingleAndPair	Jump	3Lz<<	-	11	1,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	4	7	Jumps	SingleAndPair	Jump	3Fe	-	11	1,3,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	4	8	Jumps	SingleAndPair	Jump	3Feq	-	11	1,3,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	4	9	Jumps	SingleAndPair	Jump	3Fe<	-	11	1,3,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	4	10	Jumps	SingleAndPair	Jump	3Fe<<	-	11	1,3,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	4	11	Jumps	SingleAndPair	Jump	3Lze	-	11	1,3,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	4	12	Jumps	SingleAndPair	Jump	3Lzeq	-	11	1,3,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	4	13	Jumps	SingleAndPair	Jump	3Lze<	-	11	1,3,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	4	14	Jumps	SingleAndPair	Jump	3Lze<<	-	11	1,3,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	4	15	Jumps	SingleAndPair	Jump	3F!	-	11	1,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	4	16	Jumps	SingleAndPair	Jump	3F!b	-	11	1,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	4	17	Jumps	SingleAndPair	Jump	3F!q	-	11	1,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	4	18	Jumps	SingleAndPair	Jump	3F!qb	-	11	1,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	4	19	Jumps	SingleAndPair	Jump	3F!<	-	11	1,3,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	4	20	Jumps	SingleAndPair	Jump	3F!<<	-	11	1,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	4	21	Jumps	SingleAndPair	Jump	3Lz!	-	11	1,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	4	22	Jumps	SingleAndPair	Jump	3Lz!b	-	11	1,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	4	23	Jumps	SingleAndPair	Jump	3Lz!q	-	11	1,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	4	24	Jumps	SingleAndPair	Jump	3Lz!qb	-	11	1,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	4	25	Jumps	SingleAndPair	Jump	3Lz!<	-	11	1,3,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	4	26	Jumps	SingleAndPair	Jump	3Lz!<<	-	11	1,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	4	27	Jumps	SingleAndPair	Jump	3A	-	11	1,4,5	render-cross-checked
+isu-2786-2026-06-02	4	28	Jumps	SingleAndPair	Jump	3Ab	-	11	1,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	4	29	Jumps	SingleAndPair	Jump	4T	-	11	1,4,5	render-cross-checked
+isu-2786-2026-06-02	4	30	Jumps	SingleAndPair	Jump	4S	-	11	1,4,5	render-cross-checked
+isu-2786-2026-06-02	4	31	Jumps	SingleAndPair	Jump	4Lo	-	11	1,4,5	render-cross-checked
+isu-2786-2026-06-02	4	32	Jumps	SingleAndPair	Jump	4F	-	11	1,4,5	render-cross-checked
+isu-2786-2026-06-02	4	33	Jumps	SingleAndPair	Jump	4Lz	-	11	1,4,5	render-cross-checked
+isu-2786-2026-06-02	4	34	Jumps	SingleAndPair	Jump	4A	-	11	1,4,5	render-cross-checked
+isu-2786-2026-06-02	4	35	Jumps	SingleAndPair	Jump	3Aq	-	11	1,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	4	36	Jumps	SingleAndPair	Jump	3Aqb	-	11	1,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	4	37	Jumps	SingleAndPair	Jump	4Tq	-	11	1,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	4	38	Jumps	SingleAndPair	Jump	4Sq	-	11	1,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	4	39	Jumps	SingleAndPair	Jump	4Loq	-	11	1,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	4	40	Jumps	SingleAndPair	Jump	4Fq	-	11	1,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	4	41	Jumps	SingleAndPair	Jump	4Lzq	-	11	1,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	4	42	Jumps	SingleAndPair	Jump	4Aq	-	11	1,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	4	43	Jumps	SingleAndPair	Jump	3A<	-	11	1,3,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	4	44	Jumps	SingleAndPair	Jump	4T<	-	11	1,3,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	4	45	Jumps	SingleAndPair	Jump	4S<	-	11	1,3,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	4	46	Jumps	SingleAndPair	Jump	4Lo<	-	11	1,3,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	4	47	Jumps	SingleAndPair	Jump	4F<	-	11	1,3,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	4	48	Jumps	SingleAndPair	Jump	4Lz<	-	11	1,3,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	4	49	Jumps	SingleAndPair	Jump	3A<<	-	11	1,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	4	50	Jumps	SingleAndPair	Jump	4T<<	-	11	1,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	4	51	Jumps	SingleAndPair	Jump	4S<<	-	11	1,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	4	52	Jumps	SingleAndPair	Jump	4Lo<<	-	11	1,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	4	53	Jumps	SingleAndPair	Jump	4F<<	-	11	1,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	4	54	Jumps	SingleAndPair	Jump	4Lz<<	-	11	1,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	5	1	Jumps	SingleAndPair	Jump	4Fe	-	11	1,3,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	5	2	Jumps	SingleAndPair	Jump	4Feq	-	11	1,3,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	5	3	Jumps	SingleAndPair	Jump	4Fe<	-	11	1,3,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	5	4	Jumps	SingleAndPair	Jump	4Fe<<	-	11	1,3,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	5	5	Jumps	SingleAndPair	Jump	4Lze	-	11	1,3,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	5	6	Jumps	SingleAndPair	Jump	4Lzeq	-	11	1,3,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	5	7	Jumps	SingleAndPair	Jump	4Lze<	-	11	1,3,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	5	8	Jumps	SingleAndPair	Jump	4Lze<<	-	11	1,3,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	5	9	Jumps	SingleAndPair	Jump	4F!	-	11	1,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	5	10	Jumps	SingleAndPair	Jump	4F!q	-	11	1,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	5	11	Jumps	SingleAndPair	Jump	4F!<	-	11	1,3,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	5	12	Jumps	SingleAndPair	Jump	4F!<<	-	11	1,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	5	13	Jumps	SingleAndPair	Jump	4Lz!	-	11	1,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	5	14	Jumps	SingleAndPair	Jump	4Lz!q	-	11	1,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	5	15	Jumps	SingleAndPair	Jump	4Lz!<	-	11	1,3,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	5	16	Jumps	SingleAndPair	Jump	4Lz!<<	-	11	1,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	5	17	Jumps	SingleAndPair	Jump	4A<	-	11	1,3,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	5	18	Jumps	SingleAndPair	Jump	4A<<	-	11	1,4,5,legend	render-cross-checked
+isu-2786-2026-06-02	5	19	Jumps	SingleAndPair	Jump	5T	-	11	1,4,5,6	render-cross-checked
+isu-2786-2026-06-02	5	20	Jumps	SingleAndPair	Jump	5S	-	11	1,4,5,6	render-cross-checked
+isu-2786-2026-06-02	5	21	Jumps	SingleAndPair	Jump	5Lo	-	11	1,4,5,6	render-cross-checked
+isu-2786-2026-06-02	5	22	Jumps	SingleAndPair	Jump	5F	-	11	1,4,5,6	render-cross-checked
+isu-2786-2026-06-02	5	23	Jumps	SingleAndPair	Jump	5Lz	-	11	1,4,5,6	render-cross-checked
+isu-2786-2026-06-02	5	24	Jumps	SingleAndPair	Jump	5Tq	-	11	1,4,5,6,legend	render-cross-checked
+isu-2786-2026-06-02	5	25	Jumps	SingleAndPair	Jump	5Sq	-	11	1,4,5,6,legend	render-cross-checked
+isu-2786-2026-06-02	5	26	Jumps	SingleAndPair	Jump	5Loq	-	11	1,4,5,6,legend	render-cross-checked
+isu-2786-2026-06-02	5	27	Jumps	SingleAndPair	Jump	5Fq	-	11	1,4,5,6,legend	render-cross-checked
+isu-2786-2026-06-02	5	28	Jumps	SingleAndPair	Jump	5Lzq	-	11	1,4,5,6,legend	render-cross-checked
+isu-2786-2026-06-02	5	29	Jumps	SingleAndPair	Jump	5T<	-	11	1,3,4,5,6,legend	render-cross-checked
+isu-2786-2026-06-02	5	30	Jumps	SingleAndPair	Jump	5S<	-	11	1,3,4,5,6,legend	render-cross-checked
+isu-2786-2026-06-02	5	31	Jumps	SingleAndPair	Jump	5Lo<	-	11	1,3,4,5,6,legend	render-cross-checked
+isu-2786-2026-06-02	5	32	Jumps	SingleAndPair	Jump	5F<	-	11	1,3,4,5,6,legend	render-cross-checked
+isu-2786-2026-06-02	5	33	Jumps	SingleAndPair	Jump	5Lz<	-	11	1,3,4,5,6,legend	render-cross-checked
+isu-2786-2026-06-02	5	34	Jumps	SingleAndPair	Jump	5T<<	-	11	1,4,5,6,legend	render-cross-checked
+isu-2786-2026-06-02	5	35	Jumps	SingleAndPair	Jump	5S<<	-	11	1,4,5,6,legend	render-cross-checked
+isu-2786-2026-06-02	5	36	Jumps	SingleAndPair	Jump	5Lo<<	-	11	1,4,5,6,legend	render-cross-checked
+isu-2786-2026-06-02	5	37	Jumps	SingleAndPair	Jump	5F<<	-	11	1,4,5,6,legend	render-cross-checked
+isu-2786-2026-06-02	5	38	Jumps	SingleAndPair	Jump	5Lz<<	-	11	1,4,5,6,legend	render-cross-checked
+isu-2786-2026-06-02	5	39	Jumps	SingleAndPair	Jump	5Fe	-	11	1,3,4,5,6,legend	render-cross-checked
+isu-2786-2026-06-02	5	40	Jumps	SingleAndPair	Jump	5Feq	-	11	1,3,4,5,6,legend	render-cross-checked
+isu-2786-2026-06-02	5	41	Jumps	SingleAndPair	Jump	5Fe<	-	11	1,3,4,5,6,legend	render-cross-checked
+isu-2786-2026-06-02	5	42	Jumps	SingleAndPair	Jump	5Fe<<	-	11	1,3,4,5,6,legend	render-cross-checked
+isu-2786-2026-06-02	5	43	Jumps	SingleAndPair	Jump	5Lze	-	11	1,3,4,5,6,legend	render-cross-checked
+isu-2786-2026-06-02	5	44	Jumps	SingleAndPair	Jump	5Lzeq	-	11	1,3,4,5,6,legend	render-cross-checked
+isu-2786-2026-06-02	5	45	Jumps	SingleAndPair	Jump	5Lze<	-	11	1,3,4,5,6,legend	render-cross-checked
+isu-2786-2026-06-02	5	46	Jumps	SingleAndPair	Jump	5Lze<<	-	11	1,3,4,5,6,legend	render-cross-checked
+isu-2786-2026-06-02	5	47	Jumps	SingleAndPair	Jump	5F!	-	11	1,4,5,6,legend	render-cross-checked
+isu-2786-2026-06-02	5	48	Jumps	SingleAndPair	Jump	5F!q	-	11	1,4,5,6,legend	render-cross-checked
+isu-2786-2026-06-02	5	49	Jumps	SingleAndPair	Jump	5F!<	-	11	1,3,4,5,6,legend	render-cross-checked
+isu-2786-2026-06-02	5	50	Jumps	SingleAndPair	Jump	5F!<<	-	11	1,4,5,6,legend	render-cross-checked
+isu-2786-2026-06-02	5	51	Jumps	SingleAndPair	Jump	5Lz!	-	11	1,4,5,6,legend	render-cross-checked
+isu-2786-2026-06-02	5	52	Jumps	SingleAndPair	Jump	5Lz!q	-	11	1,4,5,6,legend	render-cross-checked
+isu-2786-2026-06-02	5	53	Jumps	SingleAndPair	Jump	5Lz!<	-	11	1,3,4,5,6,legend	render-cross-checked
+isu-2786-2026-06-02	5	54	Jumps	SingleAndPair	Jump	5Lz!<<	-	11	1,4,5,6,legend	render-cross-checked
+isu-2786-2026-06-02	6	1	Spin in one position and no change of foot (upright, layback, camel or sit)	SingleAndPair	Spin	USpB	B	11	1	render-cross-checked
+isu-2786-2026-06-02	6	2	Spin in one position and no change of foot (upright, layback, camel or sit)	SingleAndPair	Spin	USp1	1	11	1	render-cross-checked
+isu-2786-2026-06-02	6	3	Spin in one position and no change of foot (upright, layback, camel or sit)	SingleAndPair	Spin	USp2	2	11	1	render-cross-checked
+isu-2786-2026-06-02	6	4	Spin in one position and no change of foot (upright, layback, camel or sit)	SingleAndPair	Spin	USp3	3	11	1	render-cross-checked
+isu-2786-2026-06-02	6	5	Spin in one position and no change of foot (upright, layback, camel or sit)	SingleAndPair	Spin	USp4	4	11	1	render-cross-checked
+isu-2786-2026-06-02	6	6	Spin in one position and no change of foot (upright, layback, camel or sit)	SingleAndPair	Spin	LSpB	B	11	1	render-cross-checked
+isu-2786-2026-06-02	6	7	Spin in one position and no change of foot (upright, layback, camel or sit)	SingleAndPair	Spin	LSp1	1	11	1	render-cross-checked
+isu-2786-2026-06-02	6	8	Spin in one position and no change of foot (upright, layback, camel or sit)	SingleAndPair	Spin	LSp2	2	11	1	render-cross-checked
+isu-2786-2026-06-02	6	9	Spin in one position and no change of foot (upright, layback, camel or sit)	SingleAndPair	Spin	LSp3	3	11	1	render-cross-checked
+isu-2786-2026-06-02	6	10	Spin in one position and no change of foot (upright, layback, camel or sit)	SingleAndPair	Spin	LSp4	4	11	1	render-cross-checked
+isu-2786-2026-06-02	6	11	Spins with change of foot	SingleAndPair	Spin	CSpB	B	11	1	render-cross-checked
+isu-2786-2026-06-02	6	12	Spins with change of foot	SingleAndPair	Spin	CSp1	1	11	1	render-cross-checked
+isu-2786-2026-06-02	6	13	Spins with change of foot	SingleAndPair	Spin	CSp2	2	11	1	render-cross-checked
+isu-2786-2026-06-02	6	14	Spins with change of foot	SingleAndPair	Spin	CSp3	3	11	1	render-cross-checked
+isu-2786-2026-06-02	6	15	Spins with change of foot	SingleAndPair	Spin	CSp4	4	11	1	render-cross-checked
+isu-2786-2026-06-02	6	16	Spin in one position and no change of foot (upright, layback, camel or sit)	SingleAndPair	Spin	SSpB	B	11	1	render-cross-checked
+isu-2786-2026-06-02	6	17	Spin in one position and no change of foot (upright, layback, camel or sit)	SingleAndPair	Spin	SSp1	1	11	1	render-cross-checked
+isu-2786-2026-06-02	6	18	Spin in one position and no change of foot (upright, layback, camel or sit)	SingleAndPair	Spin	SSp2	2	11	1	render-cross-checked
+isu-2786-2026-06-02	6	19	Spin in one position and no change of foot (upright, layback, camel or sit)	SingleAndPair	Spin	SSp3	3	11	1	render-cross-checked
+isu-2786-2026-06-02	6	20	Spin in one position and no change of foot (upright, layback, camel or sit)	SingleAndPair	Spin	SSp4	4	11	1	render-cross-checked
+isu-2786-2026-06-02	6	21	Flying Spin (any position - upright, layback, camel or sit)	SingleAndPair	Spin	FUSpB	B	11	1	render-cross-checked
+isu-2786-2026-06-02	6	22	Flying Spin (any position - upright, layback, camel or sit)	SingleAndPair	Spin	FUSp1	1	11	1	render-cross-checked
+isu-2786-2026-06-02	6	23	Flying Spin (any position - upright, layback, camel or sit)	SingleAndPair	Spin	FUSp2	2	11	1	render-cross-checked
+isu-2786-2026-06-02	6	24	Flying Spin (any position - upright, layback, camel or sit)	SingleAndPair	Spin	FUSp3	3	11	1	render-cross-checked
+isu-2786-2026-06-02	6	25	Flying Spin (any position - upright, layback, camel or sit)	SingleAndPair	Spin	FUSp4	4	11	1	render-cross-checked
+isu-2786-2026-06-02	6	26	Flying Spin (any position - upright, layback, camel or sit)	SingleAndPair	Spin	FUSpBV	B	11	1,3,legend	render-cross-checked
+isu-2786-2026-06-02	6	27	Flying Spin (any position - upright, layback, camel or sit)	SingleAndPair	Spin	FUSp1V	1	11	1,3,legend	render-cross-checked
+isu-2786-2026-06-02	6	28	Flying Spin (any position - upright, layback, camel or sit)	SingleAndPair	Spin	FUSp2V	2	11	1,3,legend	render-cross-checked
+isu-2786-2026-06-02	6	29	Flying Spin (any position - upright, layback, camel or sit)	SingleAndPair	Spin	FUSp3V	3	11	1,3,legend	render-cross-checked
+isu-2786-2026-06-02	6	30	Flying Spin (any position - upright, layback, camel or sit)	SingleAndPair	Spin	FUSp4V	4	11	1,3,legend	render-cross-checked
+isu-2786-2026-06-02	6	31	Flying Spin (any position - upright, layback, camel or sit)	SingleAndPair	Spin	FLSpB	B	11	1	render-cross-checked
+isu-2786-2026-06-02	6	32	Flying Spin (any position - upright, layback, camel or sit)	SingleAndPair	Spin	FLSp1	1	11	1	render-cross-checked
+isu-2786-2026-06-02	6	33	Flying Spin (any position - upright, layback, camel or sit)	SingleAndPair	Spin	FLSp2	2	11	1	render-cross-checked
+isu-2786-2026-06-02	6	34	Flying Spin (any position - upright, layback, camel or sit)	SingleAndPair	Spin	FLSp3	3	11	1	render-cross-checked
+isu-2786-2026-06-02	6	35	Flying Spin (any position - upright, layback, camel or sit)	SingleAndPair	Spin	FLSp4	4	11	1	render-cross-checked
+isu-2786-2026-06-02	6	36	Flying Spin (any position - upright, layback, camel or sit)	SingleAndPair	Spin	FLSpBV	B	11	1,3,legend	render-cross-checked
+isu-2786-2026-06-02	6	37	Flying Spin (any position - upright, layback, camel or sit)	SingleAndPair	Spin	FLSp1V	1	11	1,3,legend	render-cross-checked
+isu-2786-2026-06-02	6	38	Flying Spin (any position - upright, layback, camel or sit)	SingleAndPair	Spin	FLSp2V	2	11	1,3,legend	render-cross-checked
+isu-2786-2026-06-02	6	39	Flying Spin (any position - upright, layback, camel or sit)	SingleAndPair	Spin	FLSp3V	3	11	1,3,legend	render-cross-checked
+isu-2786-2026-06-02	6	40	Flying Spin (any position - upright, layback, camel or sit)	SingleAndPair	Spin	FLSp4V	4	11	1,3,legend	render-cross-checked
+isu-2786-2026-06-02	6	41	Spins with change of foot	SingleAndPair	Spin	FCSpB	B	11	1	render-cross-checked
+isu-2786-2026-06-02	6	42	Spins with change of foot	SingleAndPair	Spin	FCSp1	1	11	1	render-cross-checked
+isu-2786-2026-06-02	6	43	Spins with change of foot	SingleAndPair	Spin	FCSp2	2	11	1	render-cross-checked
+isu-2786-2026-06-02	6	44	Spins with change of foot	SingleAndPair	Spin	FCSp3	3	11	1	render-cross-checked
+isu-2786-2026-06-02	6	45	Spins with change of foot	SingleAndPair	Spin	FCSp4	4	11	1	render-cross-checked
+isu-2786-2026-06-02	6	46	Spins with change of foot	SingleAndPair	Spin	FCSpBV	B	11	1,3,legend	render-cross-checked
+isu-2786-2026-06-02	6	47	Spins with change of foot	SingleAndPair	Spin	FCSp1V	1	11	1,3,legend	render-cross-checked
+isu-2786-2026-06-02	6	48	Spins with change of foot	SingleAndPair	Spin	FCSp2V	2	11	1,3,legend	render-cross-checked
+isu-2786-2026-06-02	6	49	Spins with change of foot	SingleAndPair	Spin	FCSp3V	3	11	1,3,legend	render-cross-checked
+isu-2786-2026-06-02	6	50	Spins with change of foot	SingleAndPair	Spin	FCSp4V	4	11	1,3,legend	render-cross-checked
+isu-2786-2026-06-02	7	1	Flying Spin (any position - upright, layback, camel or sit)	SingleAndPair	Spin	FSSpB	B	11	1	render-cross-checked
+isu-2786-2026-06-02	7	2	Flying Spin (any position - upright, layback, camel or sit)	SingleAndPair	Spin	FSSp1	1	11	1	render-cross-checked
+isu-2786-2026-06-02	7	3	Flying Spin (any position - upright, layback, camel or sit)	SingleAndPair	Spin	FSSp2	2	11	1	render-cross-checked
+isu-2786-2026-06-02	7	4	Flying Spin (any position - upright, layback, camel or sit)	SingleAndPair	Spin	FSSp3	3	11	1	render-cross-checked
+isu-2786-2026-06-02	7	5	Flying Spin (any position - upright, layback, camel or sit)	SingleAndPair	Spin	FSSp4	4	11	1	render-cross-checked
+isu-2786-2026-06-02	7	6	Flying Spin (any position - upright, layback, camel or sit)	SingleAndPair	Spin	FSSpBV	B	11	1,3,legend	render-cross-checked
+isu-2786-2026-06-02	7	7	Flying Spin (any position - upright, layback, camel or sit)	SingleAndPair	Spin	FSSp1V	1	11	1,3,legend	render-cross-checked
+isu-2786-2026-06-02	7	8	Flying Spin (any position - upright, layback, camel or sit)	SingleAndPair	Spin	FSSp2V	2	11	1,3,legend	render-cross-checked
+isu-2786-2026-06-02	7	9	Flying Spin (any position - upright, layback, camel or sit)	SingleAndPair	Spin	FSSp3V	3	11	1,3,legend	render-cross-checked
+isu-2786-2026-06-02	7	10	Flying Spin (any position - upright, layback, camel or sit)	SingleAndPair	Spin	FSSp4V	4	11	1,3,legend	render-cross-checked
+isu-2786-2026-06-02	7	11	Spins with change of foot	SingleAndPair	Spin	CUSpB	B	11	1	render-cross-checked
+isu-2786-2026-06-02	7	12	Spins with change of foot	SingleAndPair	Spin	CUSp1	1	11	1	render-cross-checked
+isu-2786-2026-06-02	7	13	Spins with change of foot	SingleAndPair	Spin	CUSp2	2	11	1	render-cross-checked
+isu-2786-2026-06-02	7	14	Spins with change of foot	SingleAndPair	Spin	CUSp3	3	11	1	render-cross-checked
+isu-2786-2026-06-02	7	15	Spins with change of foot	SingleAndPair	Spin	CUSp4	4	11	1	render-cross-checked
+isu-2786-2026-06-02	7	16	Spins with change of foot	SingleAndPair	Spin	CUSpBV	B	11	1,3,legend	render-cross-checked
+isu-2786-2026-06-02	7	17	Spins with change of foot	SingleAndPair	Spin	CUSp1V	1	11	1,3,legend	render-cross-checked
+isu-2786-2026-06-02	7	18	Spins with change of foot	SingleAndPair	Spin	CUSp2V	2	11	1,3,legend	render-cross-checked
+isu-2786-2026-06-02	7	19	Spins with change of foot	SingleAndPair	Spin	CUSp3V	3	11	1,3,legend	render-cross-checked
+isu-2786-2026-06-02	7	20	Spins with change of foot	SingleAndPair	Spin	CUSp4V	4	11	1,3,legend	render-cross-checked
+isu-2786-2026-06-02	7	21	Spins with change of foot	SingleAndPair	Spin	FCUSpB	B	11	1	render-cross-checked
+isu-2786-2026-06-02	7	22	Spins with change of foot	SingleAndPair	Spin	FCUSp1	1	11	1	render-cross-checked
+isu-2786-2026-06-02	7	23	Spins with change of foot	SingleAndPair	Spin	FCUSp2	2	11	1	render-cross-checked
+isu-2786-2026-06-02	7	24	Spins with change of foot	SingleAndPair	Spin	FCUSp3	3	11	1	render-cross-checked
+isu-2786-2026-06-02	7	25	Spins with change of foot	SingleAndPair	Spin	FCUSp4	4	11	1	render-cross-checked
+isu-2786-2026-06-02	7	26	Spins with change of foot	SingleAndPair	Spin	FCUSpBV	B	11	1,3,legend	render-cross-checked
+isu-2786-2026-06-02	7	27	Spins with change of foot	SingleAndPair	Spin	FCUSp1V	1	11	1,3,legend	render-cross-checked
+isu-2786-2026-06-02	7	28	Spins with change of foot	SingleAndPair	Spin	FCUSp2V	2	11	1,3,legend	render-cross-checked
+isu-2786-2026-06-02	7	29	Spins with change of foot	SingleAndPair	Spin	FCUSp3V	3	11	1,3,legend	render-cross-checked
+isu-2786-2026-06-02	7	30	Spins with change of foot	SingleAndPair	Spin	FCUSp4V	4	11	1,3,legend	render-cross-checked
+isu-2786-2026-06-02	7	31	Spins with change of foot	SingleAndPair	Spin	CLSpB	B	11	1	render-cross-checked
+isu-2786-2026-06-02	7	32	Spins with change of foot	SingleAndPair	Spin	CLSp1	1	11	1	render-cross-checked
+isu-2786-2026-06-02	7	33	Spins with change of foot	SingleAndPair	Spin	CLSp2	2	11	1	render-cross-checked
+isu-2786-2026-06-02	7	34	Spins with change of foot	SingleAndPair	Spin	CLSp3	3	11	1	render-cross-checked
+isu-2786-2026-06-02	7	35	Spins with change of foot	SingleAndPair	Spin	CLSp4	4	11	1	render-cross-checked
+isu-2786-2026-06-02	7	36	Spins with change of foot	SingleAndPair	Spin	CLSpBV	B	11	1,3,legend	render-cross-checked
+isu-2786-2026-06-02	7	37	Spins with change of foot	SingleAndPair	Spin	CLSp1V	1	11	1,3,legend	render-cross-checked
+isu-2786-2026-06-02	7	38	Spins with change of foot	SingleAndPair	Spin	CLSp2V	2	11	1,3,legend	render-cross-checked
+isu-2786-2026-06-02	7	39	Spins with change of foot	SingleAndPair	Spin	CLSp3V	3	11	1,3,legend	render-cross-checked
+isu-2786-2026-06-02	7	40	Spins with change of foot	SingleAndPair	Spin	CLSp4V	4	11	1,3,legend	render-cross-checked
+isu-2786-2026-06-02	7	41	Spins with change of foot	SingleAndPair	Spin	FCLSpB	B	11	1	render-cross-checked
+isu-2786-2026-06-02	7	42	Spins with change of foot	SingleAndPair	Spin	FCLSp1	1	11	1	render-cross-checked
+isu-2786-2026-06-02	7	43	Spins with change of foot	SingleAndPair	Spin	FCLSp2	2	11	1	render-cross-checked
+isu-2786-2026-06-02	7	44	Spins with change of foot	SingleAndPair	Spin	FCLSp3	3	11	1	render-cross-checked
+isu-2786-2026-06-02	7	45	Spins with change of foot	SingleAndPair	Spin	FCLSp4	4	11	1	render-cross-checked
+isu-2786-2026-06-02	7	46	Spins with change of foot	SingleAndPair	Spin	FCLSpBV	B	11	1,3,legend	render-cross-checked
+isu-2786-2026-06-02	7	47	Spins with change of foot	SingleAndPair	Spin	FCLSp1V	1	11	1,3,legend	render-cross-checked
+isu-2786-2026-06-02	7	48	Spins with change of foot	SingleAndPair	Spin	FCLSp2V	2	11	1,3,legend	render-cross-checked
+isu-2786-2026-06-02	7	49	Spins with change of foot	SingleAndPair	Spin	FCLSp3V	3	11	1,3,legend	render-cross-checked
+isu-2786-2026-06-02	7	50	Spins with change of foot	SingleAndPair	Spin	FCLSp4V	4	11	1,3,legend	render-cross-checked
+isu-2786-2026-06-02	7	51	Spins with change of foot	SingleAndPair	Spin	CCSpB	B	11	1	render-cross-checked
+isu-2786-2026-06-02	7	52	Spins with change of foot	SingleAndPair	Spin	CCSp1	1	11	1	render-cross-checked
+isu-2786-2026-06-02	7	53	Spins with change of foot	SingleAndPair	Spin	CCSp2	2	11	1	render-cross-checked
+isu-2786-2026-06-02	7	54	Spins with change of foot	SingleAndPair	Spin	CCSp3	3	11	1	render-cross-checked
+isu-2786-2026-06-02	7	55	Spins with change of foot	SingleAndPair	Spin	CCSp4	4	11	1	render-cross-checked
+isu-2786-2026-06-02	8	1	Spins with change of foot	SingleAndPair	Spin	CCSpBV	B	11	1,3,legend	render-cross-checked
+isu-2786-2026-06-02	8	2	Spins with change of foot	SingleAndPair	Spin	CCSp1V	1	11	1,3,legend	render-cross-checked
+isu-2786-2026-06-02	8	3	Spins with change of foot	SingleAndPair	Spin	CCSp2V	2	11	1,3,legend	render-cross-checked
+isu-2786-2026-06-02	8	4	Spins with change of foot	SingleAndPair	Spin	CCSp3V	3	11	1,3,legend	render-cross-checked
+isu-2786-2026-06-02	8	5	Spins with change of foot	SingleAndPair	Spin	CCSp4V	4	11	1,3,legend	render-cross-checked
+isu-2786-2026-06-02	8	6	Spins with change of foot	SingleAndPair	Spin	FCCSpB	B	11	1	render-cross-checked
+isu-2786-2026-06-02	8	7	Spins with change of foot	SingleAndPair	Spin	FCCSp1	1	11	1	render-cross-checked
+isu-2786-2026-06-02	8	8	Spins with change of foot	SingleAndPair	Spin	FCCSp2	2	11	1	render-cross-checked
+isu-2786-2026-06-02	8	9	Spins with change of foot	SingleAndPair	Spin	FCCSp3	3	11	1	render-cross-checked
+isu-2786-2026-06-02	8	10	Spins with change of foot	SingleAndPair	Spin	FCCSp4	4	11	1	render-cross-checked
+isu-2786-2026-06-02	8	11	Spins with change of foot	SingleAndPair	Spin	FCCSpBV	B	11	1,3,legend	render-cross-checked
+isu-2786-2026-06-02	8	12	Spins with change of foot	SingleAndPair	Spin	FCCSp1V	1	11	1,3,legend	render-cross-checked
+isu-2786-2026-06-02	8	13	Spins with change of foot	SingleAndPair	Spin	FCCSp2V	2	11	1,3,legend	render-cross-checked
+isu-2786-2026-06-02	8	14	Spins with change of foot	SingleAndPair	Spin	FCCSp3V	3	11	1,3,legend	render-cross-checked
+isu-2786-2026-06-02	8	15	Spins with change of foot	SingleAndPair	Spin	FCCSp4V	4	11	1,3,legend	render-cross-checked
+isu-2786-2026-06-02	8	16	Spins with change of foot	SingleAndPair	Spin	CSSpB	B	11	1	render-cross-checked
+isu-2786-2026-06-02	8	17	Spins with change of foot	SingleAndPair	Spin	CSSp1	1	11	1	render-cross-checked
+isu-2786-2026-06-02	8	18	Spins with change of foot	SingleAndPair	Spin	CSSp2	2	11	1	render-cross-checked
+isu-2786-2026-06-02	8	19	Spins with change of foot	SingleAndPair	Spin	CSSp3	3	11	1	render-cross-checked
+isu-2786-2026-06-02	8	20	Spins with change of foot	SingleAndPair	Spin	CSSp4	4	11	1	render-cross-checked
+isu-2786-2026-06-02	8	21	Spins with change of foot	SingleAndPair	Spin	CSSpBV	B	11	1,3,legend	render-cross-checked
+isu-2786-2026-06-02	8	22	Spins with change of foot	SingleAndPair	Spin	CSSp1V	1	11	1,3,legend	render-cross-checked
+isu-2786-2026-06-02	8	23	Spins with change of foot	SingleAndPair	Spin	CSSp2V	2	11	1,3,legend	render-cross-checked
+isu-2786-2026-06-02	8	24	Spins with change of foot	SingleAndPair	Spin	CSSp3V	3	11	1,3,legend	render-cross-checked
+isu-2786-2026-06-02	8	25	Spins with change of foot	SingleAndPair	Spin	CSSp4V	4	11	1,3,legend	render-cross-checked
+isu-2786-2026-06-02	8	26	Spins with change of foot	SingleAndPair	Spin	FCSSpB	B	11	1	render-cross-checked
+isu-2786-2026-06-02	8	27	Spins with change of foot	SingleAndPair	Spin	FCSSp1	1	11	1	render-cross-checked
+isu-2786-2026-06-02	8	28	Spins with change of foot	SingleAndPair	Spin	FCSSp2	2	11	1	render-cross-checked
+isu-2786-2026-06-02	8	29	Spins with change of foot	SingleAndPair	Spin	FCSSp3	3	11	1	render-cross-checked
+isu-2786-2026-06-02	8	30	Spins with change of foot	SingleAndPair	Spin	FCSSp4	4	11	1	render-cross-checked
+isu-2786-2026-06-02	8	31	Spins with change of foot	SingleAndPair	Spin	FCSSpBV	B	11	1,3,legend	render-cross-checked
+isu-2786-2026-06-02	8	32	Spins with change of foot	SingleAndPair	Spin	FCSSp1V	1	11	1,3,legend	render-cross-checked
+isu-2786-2026-06-02	8	33	Spins with change of foot	SingleAndPair	Spin	FCSSp2V	2	11	1,3,legend	render-cross-checked
+isu-2786-2026-06-02	8	34	Spins with change of foot	SingleAndPair	Spin	FCSSp3V	3	11	1,3,legend	render-cross-checked
+isu-2786-2026-06-02	8	35	Spins with change of foot	SingleAndPair	Spin	FCSSp4V	4	11	1,3,legend	render-cross-checked
+isu-2786-2026-06-02	8	36	Spin Combination with change of position and no change of foot	SingleAndPair	Spin	CoSpB	B	11	1	render-cross-checked
+isu-2786-2026-06-02	8	37	Spin Combination with change of position and no change of foot	SingleAndPair	Spin	CoSp1	1	11	1	render-cross-checked
+isu-2786-2026-06-02	8	38	Spin Combination with change of position and no change of foot	SingleAndPair	Spin	CoSp2	2	11	1	render-cross-checked
+isu-2786-2026-06-02	8	39	Spin Combination with change of position and no change of foot	SingleAndPair	Spin	CoSp3	3	11	1	render-cross-checked
+isu-2786-2026-06-02	8	40	Spin Combination with change of position and no change of foot	SingleAndPair	Spin	CoSp4	4	11	1	render-cross-checked
+isu-2786-2026-06-02	8	41	Spin Combination with change of position and no change of foot	SingleAndPair	Spin	CoSpBV	B	11	1,3,legend	render-cross-checked
+isu-2786-2026-06-02	8	42	Spin Combination with change of position and no change of foot	SingleAndPair	Spin	CoSp1V	1	11	1,3,legend	render-cross-checked
+isu-2786-2026-06-02	8	43	Spin Combination with change of position and no change of foot	SingleAndPair	Spin	CoSp2V	2	11	1,3,legend	render-cross-checked
+isu-2786-2026-06-02	8	44	Spin Combination with change of position and no change of foot	SingleAndPair	Spin	CoSp3V	3	11	1,3,legend	render-cross-checked
+isu-2786-2026-06-02	8	45	Spin Combination with change of position and no change of foot	SingleAndPair	Spin	CoSp4V	4	11	1,3,legend	render-cross-checked
+isu-2786-2026-06-02	8	46	Spin Combination with change of position and no change of foot	SingleAndPair	Spin	FCoSpB	B	11	1	render-cross-checked
+isu-2786-2026-06-02	8	47	Spin Combination with change of position and no change of foot	SingleAndPair	Spin	FCoSp1	1	11	1	render-cross-checked
+isu-2786-2026-06-02	8	48	Spin Combination with change of position and no change of foot	SingleAndPair	Spin	FCoSp2	2	11	1	render-cross-checked
+isu-2786-2026-06-02	8	49	Spin Combination with change of position and no change of foot	SingleAndPair	Spin	FCoSp3	3	11	1	render-cross-checked
+isu-2786-2026-06-02	8	50	Spin Combination with change of position and no change of foot	SingleAndPair	Spin	FCoSp4	4	11	1	render-cross-checked
+isu-2786-2026-06-02	8	51	Spin Combination with change of position and no change of foot	SingleAndPair	Spin	FCoSpBV	B	11	1,3,legend	render-cross-checked
+isu-2786-2026-06-02	8	52	Spin Combination with change of position and no change of foot	SingleAndPair	Spin	FCoSp1V	1	11	1,3,legend	render-cross-checked
+isu-2786-2026-06-02	8	53	Spin Combination with change of position and no change of foot	SingleAndPair	Spin	FCoSp2V	2	11	1,3,legend	render-cross-checked
+isu-2786-2026-06-02	8	54	Spin Combination with change of position and no change of foot	SingleAndPair	Spin	FCoSp3V	3	11	1,3,legend	render-cross-checked
+isu-2786-2026-06-02	8	55	Spin Combination with change of position and no change of foot	SingleAndPair	Spin	FCoSp4V	4	11	1,3,legend	render-cross-checked
+isu-2786-2026-06-02	9	1	Spin Combination with change of position and change of foot	SingleAndPair	Spin	CCoSpB	B	11	1	render-cross-checked
+isu-2786-2026-06-02	9	2	Spin Combination with change of position and change of foot	SingleAndPair	Spin	CCoSp1	1	11	1	render-cross-checked
+isu-2786-2026-06-02	9	3	Spin Combination with change of position and change of foot	SingleAndPair	Spin	CCoSp2	2	11	1	render-cross-checked
+isu-2786-2026-06-02	9	4	Spin Combination with change of position and change of foot	SingleAndPair	Spin	CCoSp3	3	11	1	render-cross-checked
+isu-2786-2026-06-02	9	5	Spin Combination with change of position and change of foot	SingleAndPair	Spin	CCoSp4	4	11	1	render-cross-checked
+isu-2786-2026-06-02	9	6	Spin Combination with change of position and change of foot	SingleAndPair	Spin	CCoSpBV	B	11	1,3,legend	render-cross-checked
+isu-2786-2026-06-02	9	7	Spin Combination with change of position and change of foot	SingleAndPair	Spin	CCoSp1V	1	11	1,3,legend	render-cross-checked
+isu-2786-2026-06-02	9	8	Spin Combination with change of position and change of foot	SingleAndPair	Spin	CCoSp2V	2	11	1,3,legend	render-cross-checked
+isu-2786-2026-06-02	9	9	Spin Combination with change of position and change of foot	SingleAndPair	Spin	CCoSp3V	3	11	1,3,legend	render-cross-checked
+isu-2786-2026-06-02	9	10	Spin Combination with change of position and change of foot	SingleAndPair	Spin	CCoSp4V	4	11	1,3,legend	render-cross-checked
+isu-2786-2026-06-02	9	11	Spin Combination with change of position and change of foot	SingleAndPair	Spin	FCCoSpB	B	11	1	render-cross-checked
+isu-2786-2026-06-02	9	12	Spin Combination with change of position and change of foot	SingleAndPair	Spin	FCCoSp1	1	11	1	render-cross-checked
+isu-2786-2026-06-02	9	13	Spin Combination with change of position and change of foot	SingleAndPair	Spin	FCCoSp2	2	11	1	render-cross-checked
+isu-2786-2026-06-02	9	14	Spin Combination with change of position and change of foot	SingleAndPair	Spin	FCCoSp3	3	11	1	render-cross-checked
+isu-2786-2026-06-02	9	15	Spin Combination with change of position and change of foot	SingleAndPair	Spin	FCCoSp4	4	11	1	render-cross-checked
+isu-2786-2026-06-02	9	16	Spin Combination with change of position and change of foot	SingleAndPair	Spin	FCCoSpBV	B	11	1,3,legend	render-cross-checked
+isu-2786-2026-06-02	9	17	Spin Combination with change of position and change of foot	SingleAndPair	Spin	FCCoSp1V	1	11	1,3,legend	render-cross-checked
+isu-2786-2026-06-02	9	18	Spin Combination with change of position and change of foot	SingleAndPair	Spin	FCCoSp2V	2	11	1,3,legend	render-cross-checked
+isu-2786-2026-06-02	9	19	Spin Combination with change of position and change of foot	SingleAndPair	Spin	FCCoSp3V	3	11	1,3,legend	render-cross-checked
+isu-2786-2026-06-02	9	20	Spin Combination with change of position and change of foot	SingleAndPair	Spin	FCCoSp4V	4	11	1,3,legend	render-cross-checked
+isu-2786-2026-06-02	9	21	Step Sequence	SingleAndPair	StepSequence	StSqB	B	11	1	render-cross-checked
+isu-2786-2026-06-02	9	22	Step Sequence	SingleAndPair	StepSequence	StSq1	1	11	1	render-cross-checked
+isu-2786-2026-06-02	9	23	Step Sequence	SingleAndPair	StepSequence	StSq2	2	11	1	render-cross-checked
+isu-2786-2026-06-02	9	24	Step Sequence	SingleAndPair	StepSequence	StSq3	3	11	1	render-cross-checked
+isu-2786-2026-06-02	9	25	Step Sequence	SingleAndPair	StepSequence	StSq4	4	11	1	render-cross-checked
+isu-2786-2026-06-02	9	26	Lifts / Group 1	Pair	Lift	1LiB	B	11	1	render-cross-checked
+isu-2786-2026-06-02	9	27	Lifts / Group 1	Pair	Lift	1Li1	1	11	1	render-cross-checked
+isu-2786-2026-06-02	9	28	Lifts / Group 1	Pair	Lift	1Li2	2	11	1	render-cross-checked
+isu-2786-2026-06-02	9	29	Lifts / Group 1	Pair	Lift	1Li3	3	11	1	render-cross-checked
+isu-2786-2026-06-02	9	30	Lifts / Group 1	Pair	Lift	1Li4	4	11	1	render-cross-checked
+isu-2786-2026-06-02	9	31	Lifts / Group 2	Pair	Lift	2LiB	B	11	1	render-cross-checked
+isu-2786-2026-06-02	9	32	Lifts / Group 2	Pair	Lift	2Li1	1	11	1	render-cross-checked
+isu-2786-2026-06-02	9	33	Lifts / Group 2	Pair	Lift	2Li2	2	11	1	render-cross-checked
+isu-2786-2026-06-02	9	34	Lifts / Group 2	Pair	Lift	2Li3	3	11	1	render-cross-checked
+isu-2786-2026-06-02	9	35	Lifts / Group 2	Pair	Lift	2Li4	4	11	1	render-cross-checked
+isu-2786-2026-06-02	9	36	Lifts / Group 3	Pair	Lift	3LiB	B	11	1	render-cross-checked
+isu-2786-2026-06-02	9	37	Lifts / Group 3	Pair	Lift	3Li1	1	11	1	render-cross-checked
+isu-2786-2026-06-02	9	38	Lifts / Group 3	Pair	Lift	3Li2	2	11	1	render-cross-checked
+isu-2786-2026-06-02	9	39	Lifts / Group 3	Pair	Lift	3Li3	3	11	1	render-cross-checked
+isu-2786-2026-06-02	9	40	Lifts / Group 3	Pair	Lift	3Li4	4	11	1	render-cross-checked
+isu-2786-2026-06-02	9	41	Lifts / Group 4	Pair	Lift	4LiB	B	11	1	render-cross-checked
+isu-2786-2026-06-02	9	42	Lifts / Group 4	Pair	Lift	4Li1	1	11	1	render-cross-checked
+isu-2786-2026-06-02	9	43	Lifts / Group 4	Pair	Lift	4Li2	2	11	1	render-cross-checked
+isu-2786-2026-06-02	9	44	Lifts / Group 4	Pair	Lift	4Li3	3	11	1	render-cross-checked
+isu-2786-2026-06-02	9	45	Lifts / Group 4	Pair	Lift	4Li4	4	11	1	render-cross-checked
+isu-2786-2026-06-02	10	1	Lifts / Group 5S	Pair	Lift	5SLiB	B	11	1	render-cross-checked
+isu-2786-2026-06-02	10	2	Lifts / Group 5S	Pair	Lift	5SLi1	1	11	1	render-cross-checked
+isu-2786-2026-06-02	10	3	Lifts / Group 5S	Pair	Lift	5SLi2	2	11	1	render-cross-checked
+isu-2786-2026-06-02	10	4	Lifts / Group 5S	Pair	Lift	5SLi3	3	11	1	render-cross-checked
+isu-2786-2026-06-02	10	5	Lifts / Group 5S	Pair	Lift	5SLi4	4	11	1	render-cross-checked
+isu-2786-2026-06-02	10	6	Lifts / Group 5T	Pair	Lift	5TLiB	B	11	1	render-cross-checked
+isu-2786-2026-06-02	10	7	Lifts / Group 5T	Pair	Lift	5TLi1	1	11	1	render-cross-checked
+isu-2786-2026-06-02	10	8	Lifts / Group 5T	Pair	Lift	5TLi2	2	11	1	render-cross-checked
+isu-2786-2026-06-02	10	9	Lifts / Group 5T	Pair	Lift	5TLi3	3	11	1	render-cross-checked
+isu-2786-2026-06-02	10	10	Lifts / Group 5T	Pair	Lift	5TLi4	4	11	1	render-cross-checked
+isu-2786-2026-06-02	10	11	Lifts / Group 5B	Pair	Lift	5BLiB	B	11	1	render-cross-checked
+isu-2786-2026-06-02	10	12	Lifts / Group 5B	Pair	Lift	5BLi1	1	11	1	render-cross-checked
+isu-2786-2026-06-02	10	13	Lifts / Group 5B	Pair	Lift	5BLi2	2	11	1	render-cross-checked
+isu-2786-2026-06-02	10	14	Lifts / Group 5B	Pair	Lift	5BLi3	3	11	1	render-cross-checked
+isu-2786-2026-06-02	10	15	Lifts / Group 5B	Pair	Lift	5BLi4	4	11	1	render-cross-checked
+isu-2786-2026-06-02	10	16	Lifts / Group 5A	Pair	Lift	5ALiB	B	11	1	render-cross-checked
+isu-2786-2026-06-02	10	17	Lifts / Group 5A	Pair	Lift	5ALi1	1	11	1	render-cross-checked
+isu-2786-2026-06-02	10	18	Lifts / Group 5A	Pair	Lift	5ALi2	2	11	1	render-cross-checked
+isu-2786-2026-06-02	10	19	Lifts / Group 5A	Pair	Lift	5ALi3	3	11	1	render-cross-checked
+isu-2786-2026-06-02	10	20	Lifts / Group 5A	Pair	Lift	5ALi4	4	11	1	render-cross-checked
+isu-2786-2026-06-02	10	21	Lifts / Group 5R	Pair	Lift	5RLiB	B	11	1	render-cross-checked
+isu-2786-2026-06-02	10	22	Lifts / Group 5R	Pair	Lift	5RLi1	1	11	1	render-cross-checked
+isu-2786-2026-06-02	10	23	Lifts / Group 5R	Pair	Lift	5RLi2	2	11	1	render-cross-checked
+isu-2786-2026-06-02	10	24	Lifts / Group 5R	Pair	Lift	5RLi3	3	11	1	render-cross-checked
+isu-2786-2026-06-02	10	25	Lifts / Group 5R	Pair	Lift	5RLi4	4	11	1	render-cross-checked
+isu-2786-2026-06-02	10	26	Twist Lifts	Pair	TwistLift	1TwB	B	11	1	render-cross-checked
+isu-2786-2026-06-02	10	27	Twist Lifts	Pair	TwistLift	1Tw1	1	11	1	render-cross-checked
+isu-2786-2026-06-02	10	28	Twist Lifts	Pair	TwistLift	1Tw2	2	11	1	render-cross-checked
+isu-2786-2026-06-02	10	29	Twist Lifts	Pair	TwistLift	1Tw3	3	11	1	render-cross-checked
+isu-2786-2026-06-02	10	30	Twist Lifts	Pair	TwistLift	1Tw4	4	11	1	render-cross-checked
+isu-2786-2026-06-02	10	31	Twist Lifts	Pair	TwistLift	1TwB<<	B	11	1,legend	render-cross-checked
+isu-2786-2026-06-02	10	32	Twist Lifts	Pair	TwistLift	1Tw1<<	1	11	1,legend	render-cross-checked
+isu-2786-2026-06-02	10	33	Twist Lifts	Pair	TwistLift	1Tw2<<	2	11	1,legend	render-cross-checked
+isu-2786-2026-06-02	10	34	Twist Lifts	Pair	TwistLift	1Tw3<<	3	11	1,legend	render-cross-checked
+isu-2786-2026-06-02	10	35	Twist Lifts	Pair	TwistLift	1Tw4<<	4	11	1,legend	render-cross-checked
+isu-2786-2026-06-02	10	36	Twist Lifts	Pair	TwistLift	2TwB	B	11	1	render-cross-checked
+isu-2786-2026-06-02	10	37	Twist Lifts	Pair	TwistLift	2Tw1	1	11	1	render-cross-checked
+isu-2786-2026-06-02	10	38	Twist Lifts	Pair	TwistLift	2Tw2	2	11	1	render-cross-checked
+isu-2786-2026-06-02	10	39	Twist Lifts	Pair	TwistLift	2Tw3	3	11	1	render-cross-checked
+isu-2786-2026-06-02	10	40	Twist Lifts	Pair	TwistLift	2Tw4	4	11	1	render-cross-checked
+isu-2786-2026-06-02	10	41	Twist Lifts	Pair	TwistLift	2TwB<<	B	11	1,legend	render-cross-checked
+isu-2786-2026-06-02	10	42	Twist Lifts	Pair	TwistLift	2Tw1<<	1	11	1,legend	render-cross-checked
+isu-2786-2026-06-02	10	43	Twist Lifts	Pair	TwistLift	2Tw2<<	2	11	1,legend	render-cross-checked
+isu-2786-2026-06-02	10	44	Twist Lifts	Pair	TwistLift	2Tw3<<	3	11	1,legend	render-cross-checked
+isu-2786-2026-06-02	10	45	Twist Lifts	Pair	TwistLift	2Tw4<<	4	11	1,legend	render-cross-checked
+isu-2786-2026-06-02	11	1	Twist Lifts	Pair	TwistLift	3TwB	B	11	1	render-cross-checked
+isu-2786-2026-06-02	11	2	Twist Lifts	Pair	TwistLift	3Tw1	1	11	1	render-cross-checked
+isu-2786-2026-06-02	11	3	Twist Lifts	Pair	TwistLift	3Tw2	2	11	1	render-cross-checked
+isu-2786-2026-06-02	11	4	Twist Lifts	Pair	TwistLift	3Tw3	3	11	1	render-cross-checked
+isu-2786-2026-06-02	11	5	Twist Lifts	Pair	TwistLift	3Tw4	4	11	1	render-cross-checked
+isu-2786-2026-06-02	11	6	Twist Lifts	Pair	TwistLift	3TwB<<	B	11	1,legend	render-cross-checked
+isu-2786-2026-06-02	11	7	Twist Lifts	Pair	TwistLift	3Tw1<<	1	11	1,legend	render-cross-checked
+isu-2786-2026-06-02	11	8	Twist Lifts	Pair	TwistLift	3Tw2<<	2	11	1,legend	render-cross-checked
+isu-2786-2026-06-02	11	9	Twist Lifts	Pair	TwistLift	3Tw3<<	3	11	1,legend	render-cross-checked
+isu-2786-2026-06-02	11	10	Twist Lifts	Pair	TwistLift	3Tw4<<	4	11	1,legend	render-cross-checked
+isu-2786-2026-06-02	11	11	Twist Lifts	Pair	TwistLift	4TwB	B	11	1	render-cross-checked
+isu-2786-2026-06-02	11	12	Twist Lifts	Pair	TwistLift	4Tw1	1	11	1	render-cross-checked
+isu-2786-2026-06-02	11	13	Twist Lifts	Pair	TwistLift	4Tw2	2	11	1	render-cross-checked
+isu-2786-2026-06-02	11	14	Twist Lifts	Pair	TwistLift	4Tw3	3	11	1	render-cross-checked
+isu-2786-2026-06-02	11	15	Twist Lifts	Pair	TwistLift	4Tw4	4	11	1	render-cross-checked
+isu-2786-2026-06-02	11	16	Twist Lifts	Pair	TwistLift	4TwB<<	B	11	1,legend	render-cross-checked
+isu-2786-2026-06-02	11	17	Twist Lifts	Pair	TwistLift	4Tw1<<	1	11	1,legend	render-cross-checked
+isu-2786-2026-06-02	11	18	Twist Lifts	Pair	TwistLift	4Tw2<<	2	11	1,legend	render-cross-checked
+isu-2786-2026-06-02	11	19	Twist Lifts	Pair	TwistLift	4Tw3<<	3	11	1,legend	render-cross-checked
+isu-2786-2026-06-02	11	20	Twist Lifts	Pair	TwistLift	4Tw4<<	4	11	1,legend	render-cross-checked
+isu-2786-2026-06-02	11	21	Throw Jumps	Pair	ThrowJump	1TTh	-	11	1	render-cross-checked
+isu-2786-2026-06-02	11	22	Throw Jumps	Pair	ThrowJump	1STh	-	11	1	render-cross-checked
+isu-2786-2026-06-02	11	23	Throw Jumps	Pair	ThrowJump	1LoTh	-	11	1	render-cross-checked
+isu-2786-2026-06-02	11	24	Throw Jumps	Pair	ThrowJump	1FTh	-	11	1	render-cross-checked
+isu-2786-2026-06-02	11	25	Throw Jumps	Pair	ThrowJump	1LzTh	-	11	1	render-cross-checked
+isu-2786-2026-06-02	11	26	Throw Jumps	Pair	ThrowJump	1TThq	-	11	1,legend	render-cross-checked
+isu-2786-2026-06-02	11	27	Throw Jumps	Pair	ThrowJump	1SThq	-	11	1,legend	render-cross-checked
+isu-2786-2026-06-02	11	28	Throw Jumps	Pair	ThrowJump	1LoThq	-	11	1,legend	render-cross-checked
+isu-2786-2026-06-02	11	29	Throw Jumps	Pair	ThrowJump	1FThq	-	11	1,legend	render-cross-checked
+isu-2786-2026-06-02	11	30	Throw Jumps	Pair	ThrowJump	1LzThq	-	11	1,legend	render-cross-checked
+isu-2786-2026-06-02	11	31	Throw Jumps	Pair	ThrowJump	1TTh<	-	11	1,3,legend	render-cross-checked
+isu-2786-2026-06-02	11	32	Throw Jumps	Pair	ThrowJump	1STh<	-	11	1,3,legend	render-cross-checked
+isu-2786-2026-06-02	11	33	Throw Jumps	Pair	ThrowJump	1LoTh<	-	11	1,3,legend	render-cross-checked
+isu-2786-2026-06-02	11	34	Throw Jumps	Pair	ThrowJump	1FTh<	-	11	1,3,legend	render-cross-checked
+isu-2786-2026-06-02	11	35	Throw Jumps	Pair	ThrowJump	1LzTh<	-	11	1,3,legend	render-cross-checked
+isu-2786-2026-06-02	11	36	Throw Jumps	Pair	ThrowJump	1TTh<<	-	11	1,legend	render-cross-checked
+isu-2786-2026-06-02	11	37	Throw Jumps	Pair	ThrowJump	1STh<<	-	11	1,legend	render-cross-checked
+isu-2786-2026-06-02	11	38	Throw Jumps	Pair	ThrowJump	1LoTh<<	-	11	1,legend	render-cross-checked
+isu-2786-2026-06-02	11	39	Throw Jumps	Pair	ThrowJump	1FTh<<	-	11	1,legend	render-cross-checked
+isu-2786-2026-06-02	11	40	Throw Jumps	Pair	ThrowJump	1LzTh<<	-	11	1,legend	render-cross-checked
+isu-2786-2026-06-02	11	41	Throw Jumps	Pair	ThrowJump	1ATh	-	11	1	render-cross-checked
+isu-2786-2026-06-02	11	42	Throw Jumps	Pair	ThrowJump	2TTh	-	11	1	render-cross-checked
+isu-2786-2026-06-02	11	43	Throw Jumps	Pair	ThrowJump	2STh	-	11	1	render-cross-checked
+isu-2786-2026-06-02	11	44	Throw Jumps	Pair	ThrowJump	2LoTh	-	11	1	render-cross-checked
+isu-2786-2026-06-02	11	45	Throw Jumps	Pair	ThrowJump	2FTh	-	11	1	render-cross-checked
+isu-2786-2026-06-02	11	46	Throw Jumps	Pair	ThrowJump	2LzTh	-	11	1	render-cross-checked
+isu-2786-2026-06-02	11	47	Throw Jumps	Pair	ThrowJump	1AThq	-	11	1,legend	render-cross-checked
+isu-2786-2026-06-02	11	48	Throw Jumps	Pair	ThrowJump	2TThq	-	11	1,legend	render-cross-checked
+isu-2786-2026-06-02	11	49	Throw Jumps	Pair	ThrowJump	2SThq	-	11	1,legend	render-cross-checked
+isu-2786-2026-06-02	11	50	Throw Jumps	Pair	ThrowJump	2LoThq	-	11	1,legend	render-cross-checked
+isu-2786-2026-06-02	11	51	Throw Jumps	Pair	ThrowJump	2FThq	-	11	1,legend	render-cross-checked
+isu-2786-2026-06-02	11	52	Throw Jumps	Pair	ThrowJump	2LzThq	-	11	1,legend	render-cross-checked
+isu-2786-2026-06-02	12	1	Throw Jumps	Pair	ThrowJump	1ATh<	-	11	1,3,legend	render-cross-checked
+isu-2786-2026-06-02	12	2	Throw Jumps	Pair	ThrowJump	2TTh<	-	11	1,3,legend	render-cross-checked
+isu-2786-2026-06-02	12	3	Throw Jumps	Pair	ThrowJump	2STh<	-	11	1,3,legend	render-cross-checked
+isu-2786-2026-06-02	12	4	Throw Jumps	Pair	ThrowJump	2LoTh<	-	11	1,3,legend	render-cross-checked
+isu-2786-2026-06-02	12	5	Throw Jumps	Pair	ThrowJump	2FTh<	-	11	1,3,legend	render-cross-checked
+isu-2786-2026-06-02	12	6	Throw Jumps	Pair	ThrowJump	2LzTh<	-	11	1,3,legend	render-cross-checked
+isu-2786-2026-06-02	12	7	Throw Jumps	Pair	ThrowJump	1ATh<<	-	11	1,legend	render-cross-checked
+isu-2786-2026-06-02	12	8	Throw Jumps	Pair	ThrowJump	2TTh<<	-	11	1,legend	render-cross-checked
+isu-2786-2026-06-02	12	9	Throw Jumps	Pair	ThrowJump	2STh<<	-	11	1,legend	render-cross-checked
+isu-2786-2026-06-02	12	10	Throw Jumps	Pair	ThrowJump	2LoTh<<	-	11	1,legend	render-cross-checked
+isu-2786-2026-06-02	12	11	Throw Jumps	Pair	ThrowJump	2FTh<<	-	11	1,legend	render-cross-checked
+isu-2786-2026-06-02	12	12	Throw Jumps	Pair	ThrowJump	2LzTh<<	-	11	1,legend	render-cross-checked
+isu-2786-2026-06-02	12	13	Throw Jumps	Pair	ThrowJump	2ATh	-	11	1	render-cross-checked
+isu-2786-2026-06-02	12	14	Throw Jumps	Pair	ThrowJump	3TTh	-	11	1	render-cross-checked
+isu-2786-2026-06-02	12	15	Throw Jumps	Pair	ThrowJump	3STh	-	11	1	render-cross-checked
+isu-2786-2026-06-02	12	16	Throw Jumps	Pair	ThrowJump	3LoTh	-	11	1	render-cross-checked
+isu-2786-2026-06-02	12	17	Throw Jumps	Pair	ThrowJump	3FTh	-	11	1	render-cross-checked
+isu-2786-2026-06-02	12	18	Throw Jumps	Pair	ThrowJump	3LzTh	-	11	1	render-cross-checked
+isu-2786-2026-06-02	12	19	Throw Jumps	Pair	ThrowJump	2AThq	-	11	1,legend	render-cross-checked
+isu-2786-2026-06-02	12	20	Throw Jumps	Pair	ThrowJump	3TThq	-	11	1,legend	render-cross-checked
+isu-2786-2026-06-02	12	21	Throw Jumps	Pair	ThrowJump	3SThq	-	11	1,legend	render-cross-checked
+isu-2786-2026-06-02	12	22	Throw Jumps	Pair	ThrowJump	3LoThq	-	11	1,legend	render-cross-checked
+isu-2786-2026-06-02	12	23	Throw Jumps	Pair	ThrowJump	3FThq	-	11	1,legend	render-cross-checked
+isu-2786-2026-06-02	12	24	Throw Jumps	Pair	ThrowJump	3LzThq	-	11	1,legend	render-cross-checked
+isu-2786-2026-06-02	12	25	Throw Jumps	Pair	ThrowJump	2ATh<	-	11	1,3,legend	render-cross-checked
+isu-2786-2026-06-02	12	26	Throw Jumps	Pair	ThrowJump	3TTh<	-	11	1,3,legend	render-cross-checked
+isu-2786-2026-06-02	12	27	Throw Jumps	Pair	ThrowJump	3STh<	-	11	1,3,legend	render-cross-checked
+isu-2786-2026-06-02	12	28	Throw Jumps	Pair	ThrowJump	3LoTh<	-	11	1,3,legend	render-cross-checked
+isu-2786-2026-06-02	12	29	Throw Jumps	Pair	ThrowJump	3FTh<	-	11	1,3,legend	render-cross-checked
+isu-2786-2026-06-02	12	30	Throw Jumps	Pair	ThrowJump	3LzTh<	-	11	1,3,legend	render-cross-checked
+isu-2786-2026-06-02	12	31	Throw Jumps	Pair	ThrowJump	2ATh<<	-	11	1,legend	render-cross-checked
+isu-2786-2026-06-02	12	32	Throw Jumps	Pair	ThrowJump	3TTh<<	-	11	1,legend	render-cross-checked
+isu-2786-2026-06-02	12	33	Throw Jumps	Pair	ThrowJump	3STh<<	-	11	1,legend	render-cross-checked
+isu-2786-2026-06-02	12	34	Throw Jumps	Pair	ThrowJump	3LoTh<<	-	11	1,legend	render-cross-checked
+isu-2786-2026-06-02	12	35	Throw Jumps	Pair	ThrowJump	3FTh<<	-	11	1,legend	render-cross-checked
+isu-2786-2026-06-02	12	36	Throw Jumps	Pair	ThrowJump	3LzTh<<	-	11	1,legend	render-cross-checked
+isu-2786-2026-06-02	12	37	Throw Jumps	Pair	ThrowJump	3ATh	-	11	1	render-cross-checked
+isu-2786-2026-06-02	12	38	Throw Jumps	Pair	ThrowJump	4TTh	-	11	1	render-cross-checked
+isu-2786-2026-06-02	12	39	Throw Jumps	Pair	ThrowJump	4STh	-	11	1	render-cross-checked
+isu-2786-2026-06-02	12	40	Throw Jumps	Pair	ThrowJump	4LoTh	-	11	1	render-cross-checked
+isu-2786-2026-06-02	12	41	Throw Jumps	Pair	ThrowJump	4FTh	-	11	1	render-cross-checked
+isu-2786-2026-06-02	12	42	Throw Jumps	Pair	ThrowJump	4LzTh	-	11	1	render-cross-checked
+isu-2786-2026-06-02	12	43	Throw Jumps	Pair	ThrowJump	3AThq	-	11	1,legend	render-cross-checked
+isu-2786-2026-06-02	12	44	Throw Jumps	Pair	ThrowJump	4TThq	-	11	1,legend	render-cross-checked
+isu-2786-2026-06-02	12	45	Throw Jumps	Pair	ThrowJump	4SThq	-	11	1,legend	render-cross-checked
+isu-2786-2026-06-02	12	46	Throw Jumps	Pair	ThrowJump	4LoThq	-	11	1,legend	render-cross-checked
+isu-2786-2026-06-02	12	47	Throw Jumps	Pair	ThrowJump	4FThq	-	11	1,legend	render-cross-checked
+isu-2786-2026-06-02	12	48	Throw Jumps	Pair	ThrowJump	4LzThq	-	11	1,legend	render-cross-checked
+isu-2786-2026-06-02	12	49	Throw Jumps	Pair	ThrowJump	3ATh<	-	11	1,3,legend	render-cross-checked
+isu-2786-2026-06-02	12	50	Throw Jumps	Pair	ThrowJump	4TTh<	-	11	1,3,legend	render-cross-checked
+isu-2786-2026-06-02	12	51	Throw Jumps	Pair	ThrowJump	4STh<	-	11	1,3,legend	render-cross-checked
+isu-2786-2026-06-02	12	52	Throw Jumps	Pair	ThrowJump	4LoTh<	-	11	1,3,legend	render-cross-checked
+isu-2786-2026-06-02	12	53	Throw Jumps	Pair	ThrowJump	4FTh<	-	11	1,3,legend	render-cross-checked
+isu-2786-2026-06-02	12	54	Throw Jumps	Pair	ThrowJump	4LzTh<	-	11	1,3,legend	render-cross-checked
+isu-2786-2026-06-02	13	1	Throw Jumps	Pair	ThrowJump	3ATh<<	-	11	1,legend	render-cross-checked
+isu-2786-2026-06-02	13	2	Throw Jumps	Pair	ThrowJump	4TTh<<	-	11	1,legend	render-cross-checked
+isu-2786-2026-06-02	13	3	Throw Jumps	Pair	ThrowJump	4STh<<	-	11	1,legend	render-cross-checked
+isu-2786-2026-06-02	13	4	Throw Jumps	Pair	ThrowJump	4LoTh<<	-	11	1,legend	render-cross-checked
+isu-2786-2026-06-02	13	5	Throw Jumps	Pair	ThrowJump	4FTh<<	-	11	1,legend	render-cross-checked
+isu-2786-2026-06-02	13	6	Throw Jumps	Pair	ThrowJump	4LzTh<<	-	11	1,legend	render-cross-checked
+isu-2786-2026-06-02	13	7	Death Spirals	Pair	DeathSpiral	BiDsB	B	11	1	render-cross-checked
+isu-2786-2026-06-02	13	8	Death Spirals	Pair	DeathSpiral	BiDs1	1	11	1	render-cross-checked
+isu-2786-2026-06-02	13	9	Death Spirals	Pair	DeathSpiral	BiDs2	2	11	1	render-cross-checked
+isu-2786-2026-06-02	13	10	Death Spirals	Pair	DeathSpiral	BiDs3	3	11	1	render-cross-checked
+isu-2786-2026-06-02	13	11	Death Spirals	Pair	DeathSpiral	BiDs4	4	11	1	render-cross-checked
+isu-2786-2026-06-02	13	12	Death Spirals	Pair	DeathSpiral	FiDsB	B	11	1	render-cross-checked
+isu-2786-2026-06-02	13	13	Death Spirals	Pair	DeathSpiral	FiDs1	1	11	1	render-cross-checked
+isu-2786-2026-06-02	13	14	Death Spirals	Pair	DeathSpiral	FiDs2	2	11	1	render-cross-checked
+isu-2786-2026-06-02	13	15	Death Spirals	Pair	DeathSpiral	FiDs3	3	11	1	render-cross-checked
+isu-2786-2026-06-02	13	16	Death Spirals	Pair	DeathSpiral	FiDs4	4	11	1	render-cross-checked
+isu-2786-2026-06-02	13	17	Death Spirals	Pair	DeathSpiral	BoDsB	B	11	1	render-cross-checked
+isu-2786-2026-06-02	13	18	Death Spirals	Pair	DeathSpiral	BoDs1	1	11	1	render-cross-checked
+isu-2786-2026-06-02	13	19	Death Spirals	Pair	DeathSpiral	BoDs2	2	11	1	render-cross-checked
+isu-2786-2026-06-02	13	20	Death Spirals	Pair	DeathSpiral	BoDs3	3	11	1	render-cross-checked
+isu-2786-2026-06-02	13	21	Death Spirals	Pair	DeathSpiral	BoDs4	4	11	1	render-cross-checked
+isu-2786-2026-06-02	13	22	Death Spirals	Pair	DeathSpiral	FoDsB	B	11	1	render-cross-checked
+isu-2786-2026-06-02	13	23	Death Spirals	Pair	DeathSpiral	FoDs1	1	11	1	render-cross-checked
+isu-2786-2026-06-02	13	24	Death Spirals	Pair	DeathSpiral	FoDs2	2	11	1	render-cross-checked
+isu-2786-2026-06-02	13	25	Death Spirals	Pair	DeathSpiral	FoDs3	3	11	1	render-cross-checked
+isu-2786-2026-06-02	13	26	Death Spirals	Pair	DeathSpiral	FoDs4	4	11	1	render-cross-checked
+isu-2786-2026-06-02	13	27	Advanced Novice Death Spirals eligible for bonus (b)	Pair	DeathSpiral	BiDs2b	2	11	1,legend	render-cross-checked
+isu-2786-2026-06-02	13	28	Advanced Novice Death Spirals eligible for bonus (b)	Pair	DeathSpiral	BiDs3b	3	11	1,legend	render-cross-checked
+isu-2786-2026-06-02	13	29	Advanced Novice Death Spirals eligible for bonus (b)	Pair	DeathSpiral	FiDs2b	2	11	1,legend	render-cross-checked
+isu-2786-2026-06-02	13	30	Advanced Novice Death Spirals eligible for bonus (b)	Pair	DeathSpiral	FiDs3b	3	11	1,legend	render-cross-checked
+isu-2786-2026-06-02	13	31	Advanced Novice Death Spirals eligible for bonus (b)	Pair	DeathSpiral	BoDs2b	2	11	1,legend	render-cross-checked
+isu-2786-2026-06-02	13	32	Advanced Novice Death Spirals eligible for bonus (b)	Pair	DeathSpiral	BoDs3b	3	11	1,legend	render-cross-checked
+isu-2786-2026-06-02	13	33	Advanced Novice Death Spirals eligible for bonus (b)	Pair	DeathSpiral	FoDs2b	2	11	1,legend	render-cross-checked
+isu-2786-2026-06-02	13	34	Advanced Novice Death Spirals eligible for bonus (b)	Pair	DeathSpiral	FoDs3b	3	11	1,legend	render-cross-checked
+isu-2786-2026-06-02	13	35	Pivot Figure	Pair	PivotFigure	PiF1	-	11	1	render-cross-checked
+isu-2786-2026-06-02	13	36	Pair Spins	Pair	PairSpin	PSpB	B	11	1	render-cross-checked
+isu-2786-2026-06-02	13	37	Pair Spins	Pair	PairSpin	PSp1	1	11	1	render-cross-checked
+isu-2786-2026-06-02	13	38	Pair Spins	Pair	PairSpin	PSp2	2	11	1	render-cross-checked
+isu-2786-2026-06-02	13	39	Pair Spins	Pair	PairSpin	PSp3	3	11	1	render-cross-checked
+isu-2786-2026-06-02	13	40	Pair Spins	Pair	PairSpin	PSp4	4	11	1	render-cross-checked
+isu-2786-2026-06-02	14	1	Pair Spin Combination	Pair	PairSpinCombination	PCoSpB	B	11	1	render-cross-checked
+isu-2786-2026-06-02	14	2	Pair Spin Combination	Pair	PairSpinCombination	PCoSp1	1	11	1	render-cross-checked
+isu-2786-2026-06-02	14	3	Pair Spin Combination	Pair	PairSpinCombination	PCoSp2	2	11	1	render-cross-checked
+isu-2786-2026-06-02	14	4	Pair Spin Combination	Pair	PairSpinCombination	PCoSp3	3	11	1	render-cross-checked
+isu-2786-2026-06-02	14	5	Pair Spin Combination	Pair	PairSpinCombination	PCoSp4	4	11	1	render-cross-checked
+isu-2786-2026-06-02	14	6	Pair Spin Combination	Pair	PairSpinCombination	PCoSpBV	B	11	1,3,legend	render-cross-checked
+isu-2786-2026-06-02	14	7	Pair Spin Combination	Pair	PairSpinCombination	PCoSp1V	1	11	1,3,legend	render-cross-checked
+isu-2786-2026-06-02	14	8	Pair Spin Combination	Pair	PairSpinCombination	PCoSp2V	2	11	1,3,legend	render-cross-checked
+isu-2786-2026-06-02	14	9	Pair Spin Combination	Pair	PairSpinCombination	PCoSp3V	3	11	1,3,legend	render-cross-checked
+isu-2786-2026-06-02	14	10	Pair Spin Combination	Pair	PairSpinCombination	PCoSp4V	4	11	1,3,legend	render-cross-checked
+isu-2786-2026-06-02	14	11	Choreographic Step Sequence	SingleAndPair	ChoreographicSequence	ChSq1	-	11	2	render-cross-checked
+isu-2786-2026-06-02	14	12	Choreographic Spin	SingleAndPair	ChoreographicSpin	ChSp1	-	11	2	render-cross-checked
+isu-2786-2026-06-02	14	13	Choreographic Pair Spin	Pair	ChoreographicPairSpin	ChPSp1	-	11	2	render-cross-checked
+isu-2786-2026-06-02	14	14	Choreographic Pair Lift	Pair	ChoreographicPairLift	ChPLi1	-	11	2	render-cross-checked
