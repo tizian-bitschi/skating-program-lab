@@ -1,4 +1,4 @@
-//! Exhaustive reference for the fixed three-slot Bronze jump domain.
+//! Exhaustive reference for the bounded Bronze jump domain.
 use crate::{
     lookup_base_value, validate_program, AdultCategory, BaseValue, BaseValueError,
     BaseValueOutcome, ComponentCode, Coverage, FindingKind, JumpElement, JumpKind, ListedJump,
@@ -9,18 +9,13 @@ use crate::{
 /// Fixed assumptions for this exhaustive model.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ReferenceDomain {
-    pub slot_start_seconds: [u16; 3],
-    pub duration_seconds: u16,
-    pub uninterrupted_timing_assumed: bool,
-    pub no_event_exception_assumed: bool,
     pub clean_recognition_assumed: bool,
     pub exclude_lutz: bool,
 }
 
-/// Slot occupancy corresponds to the result's domain times.
+/// A distinct ordered program and its unfactored base value.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ReferenceCandidate {
-    pub slots: [bool; 3],
     pub program: Program,
     pub base_hundredths: u16,
     pub coverage: Coverage,
@@ -57,10 +52,6 @@ const BRONZE_TABLE: ScoringTableId = ScoringTableId::Isu2786June2_2026;
 
 fn bronze_domain(exclude_lutz: bool) -> ReferenceDomain {
     ReferenceDomain {
-        slot_start_seconds: [10, 20, 30],
-        duration_seconds: 100,
-        uninterrupted_timing_assumed: true,
-        no_event_exception_assumed: true,
         clean_recognition_assumed: true,
         exclude_lutz,
     }
@@ -107,7 +98,6 @@ pub fn enumerate_bronze_reference(exclude_lutz: bool) -> Result<ReferenceResult,
         }
         program.sources = sources;
         let candidate = ReferenceCandidate {
-            slots,
             program,
             base_hundredths: total,
             coverage: validation.coverage,
@@ -122,7 +112,14 @@ pub fn enumerate_bronze_reference(exclude_lutz: bool) -> Result<ReferenceResult,
                 candidates.clear();
                 candidates.push(candidate);
             }
-            Some(previous) if total == previous => candidates.push(candidate),
+            Some(previous)
+                if total == previous
+                    && !candidates
+                        .iter()
+                        .any(|c| c.program.elements == candidate.program.elements) =>
+            {
+                candidates.push(candidate)
+            }
             _ => {}
         }
     }

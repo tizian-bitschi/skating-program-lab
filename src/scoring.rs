@@ -380,7 +380,18 @@ fn element_score(
     } else if timing.duration_seconds > required + 10 {
         return Err(ProgramScoreError::TimingUnknown);
     }
-    // A single recorded x is only meaningful for a jump; timing determines credit.
+    unfactored_element_score(ruleset, table, element)
+}
+
+fn unfactored_element_score(
+    ruleset: crate::RulesetId,
+    table: ScoringTableId,
+    element: &ProgramElement,
+) -> Result<ElementScore, ProgramScoreError> {
+    if element.recognition.ruleset != ruleset {
+        return Err(ProgramScoreError::RulesetMismatch);
+    }
+    // A recorded x does not determine eligibility; each caller supplies its own evidence.
     let annotations = if is_jump(element) == Some(true)
         && element.annotations == [ScoringAnnotation::SecondHalfCredit]
     {
@@ -396,6 +407,21 @@ fn element_score(
         element.fall,
     )
     .map_err(ProgramScoreError::Element)
+}
+
+fn sum_element_scores(results: &[Result<ProgramElementScore, ProgramScoreError>]) -> Option<i64> {
+    results
+        .iter()
+        .map(|result| match result {
+            Ok(score) => Ok(i64::from(score.score_hundredths)),
+            Err(ProgramScoreError::Element(
+                ElementScoreError::Ignored | ElementScoreError::NoValue,
+            )) => Ok(0),
+            Err(error) => Err(error),
+        })
+        .sum::<Result<i64, _>>()
+        .ok()
+        .filter(|_| !results.is_empty())
 }
 
 fn second_half_selection(
@@ -475,6 +501,79 @@ fn apply_credit(score: ElementScore, second_half: bool) -> ProgramElementScore {
     }
 }
 
+/// Timestamp-free single-judge what-if calculation. A boundary is an assumption, not timing evidence.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PlanningScore {
+    pub second_half_boundary: Option<usize>,
+    pub elements: Vec<Result<ProgramElementScore, ProgramScoreError>>,
+    /// A hypothetical sum, never an official TES.
+    pub hypothetical_hundredths: Option<i64>,
+}
+
+/// The boundary is the index of the first element assumed to be in the second half.
+pub fn score_planning_scenario(
+    ruleset: crate::RulesetId,
+    table: ScoringTableId,
+    elements: &[ProgramElement],
+    second_half_boundary: Option<usize>,
+) -> Result<PlanningScore, ProgramScoreError> {
+    if second_half_boundary.is_some_and(|boundary| boundary > elements.len()) {
+        return Err(ProgramScoreError::InvalidInput);
+    }
+    let preliminary: Vec<_> = elements
+        .iter()
+        .map(|element| unfactored_element_score(ruleset, table, element))
+        .collect();
+    let mut certain_later = 0usize;
+    let mut possible_later = 0usize;
+    let mut credit = vec![Ok(false); elements.len()];
+    if let Some(boundary) = second_half_boundary {
+        for i in (boundary..elements.len()).rev() {
+            let element = &elements[i];
+            let score = &preliminary[i];
+            if matches!(
+                score,
+                Err(ProgramScoreError::Element(ElementScoreError::Ignored))
+            ) {
+                continue;
+            }
+            if score.is_ok() && is_jump(element) == Some(true) {
+                credit[i] = if certain_later >= 3 {
+                    Ok(false)
+                } else if possible_later < 3 {
+                    Ok(true)
+                } else {
+                    Err(ProgramScoreError::TimingUnknown)
+                };
+                certain_later += 1;
+                possible_later += 1;
+            } else if score.is_err() && is_jump(element) != Some(false) {
+                // A no-value or unresolved element can affect selection unless known to be a non-jump.
+                let known_nonjump = element.recognition.details.as_ref().is_some_and(|details| {
+                    details
+                        .components()
+                        .iter()
+                        .all(|c| !c.as_str().starts_with(char::is_numeric))
+                });
+                if !known_nonjump || element.recognition.outcome == RecognitionOutcome::Unknown {
+                    possible_later += 1;
+                }
+            }
+        }
+    }
+    let results: Vec<_> = preliminary
+        .into_iter()
+        .zip(credit)
+        .map(|(score, second_half)| Ok(apply_credit(score?, second_half?)))
+        .collect();
+    let hypothetical_hundredths = sum_element_scores(&results);
+    Ok(PlanningScore {
+        second_half_boundary,
+        elements: results,
+        hypothetical_hundredths,
+    })
+}
+
 /// Calculate a partial-coverage scenario, not an official panel or segment score.
 /// Elements must be in program order; callers supply all recognized elements and falls.
 pub fn score_program(
@@ -515,23 +614,11 @@ pub fn score_program(
             Ok(apply_credit(score, second_half))
         })
         .collect();
-    let tes_hundredths = results
-        .iter()
-        .map(|r| match r {
-            Ok(score) => Ok(i64::from(score.score_hundredths)),
-            Err(ProgramScoreError::Element(
-                ElementScoreError::Ignored | ElementScoreError::NoValue,
-            )) => Ok(0),
-            Err(error) => Err(error),
+    let tes_hundredths = sum_element_scores(&results).filter(|_| {
+        timing.is_some_and(|t| {
+            t.ordinary_timing_confirmed && t.duration_seconds > required.saturating_sub(40)
         })
-        .sum::<Result<i64, _>>()
-        .ok()
-        .filter(|_| !elements.is_empty())
-        .filter(|_| {
-            timing.is_some_and(|t| {
-                t.ordinary_timing_confirmed && t.duration_seconds > required.saturating_sub(40)
-            })
-        });
+    });
     ProgramScore {
         elements: results,
         tes_hundredths,

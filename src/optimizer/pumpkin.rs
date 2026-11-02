@@ -27,8 +27,8 @@ use std::{
 #[derive(Debug, Clone)]
 pub struct OptimizerRequest {
     pub exclude_lutz: bool,
-    /// Whether clean 1Lz is a candidate in each of the three ordered slots.
-    pub enabled_slots: [bool; 3],
+    /// Maximum number of elements in the bounded domain (at most three).
+    pub max_elements: usize,
     pub ruleset: RulesetId,
     pub scoring_table: ScoringTableId,
     pub enumerate_equal_optima: bool,
@@ -63,7 +63,7 @@ pub enum TerminationReason {
 #[derive(Debug, Clone)]
 pub struct OptimizerResult {
     pub domain: ReferenceDomain,
-    pub enabled_slots: [bool; 3],
+    pub max_elements: usize,
     pub ruleset: RulesetId,
     pub scoring_table: ScoringTableId,
     /// The sum of unfactored supported jump base values, in hundredths.
@@ -96,7 +96,7 @@ fn optimize_bronze_inner(
     stop_after_incumbent: bool,
     stop_during_enumeration: bool,
 ) -> Result<OptimizerResult, ReferenceError> {
-    if request.max_solutions == 0 {
+    if request.max_solutions == 0 || request.max_elements > 3 {
         return Err(ReferenceError::InvalidLimit);
     }
     let reference_domain = bronze_domain(request.exclude_lutz);
@@ -133,10 +133,7 @@ fn optimize_bronze_inner(
         }
         if mask == 0
             || (request.exclude_lutz && mask != 0)
-            || slots
-                .iter()
-                .zip(request.enabled_slots)
-                .any(|(&occupied, enabled)| occupied && !enabled)
+            || slots.iter().filter(|&&occupied| occupied).count() > request.max_elements
             || !validation.findings.is_empty()
         {
             let clause = x
@@ -231,8 +228,12 @@ fn optimize_bronze_inner(
                 match iter.next_solution() {
                     IteratedSolution::Solution(s, ..) => {
                         let slots = x.map(|v| s.get_integer_value(v) == 1);
-                        if !candidates.iter().any(|c| c.slots == slots) {
-                            candidates.push(checked_candidate(slots, unit)?);
+                        let candidate = checked_candidate(slots, unit)?;
+                        if !candidates
+                            .iter()
+                            .any(|c| c.program.elements == candidate.program.elements)
+                        {
+                            candidates.push(candidate);
                         }
                         if candidates.len() >= request.max_solutions {
                             break;
@@ -249,12 +250,11 @@ fn optimize_bronze_inner(
                     }
                 }
             }
-            candidates.sort_by_key(|c| c.slots);
         }
     }
     Ok(OptimizerResult {
         domain: reference_domain,
-        enabled_slots: request.enabled_slots,
+        max_elements: request.max_elements,
         ruleset,
         scoring_table: table,
         objective: OptimizerObjective::MaximizeUnfactoredBaseValueHundredths,
@@ -291,7 +291,6 @@ fn checked_candidate(slots: [bool; 3], unit: u16) -> Result<ReferenceCandidate, 
         return Err(ReferenceError::InconsistentSolverResult);
     }
     Ok(ReferenceCandidate {
-        slots,
         program,
         base_hundredths: total,
         coverage: validation.coverage,
@@ -316,7 +315,7 @@ mod tests {
     fn interrupted_after_incumbent_is_not_proven() {
         let request = OptimizerRequest {
             exclude_lutz: false,
-            enabled_slots: [true; 3],
+            max_elements: 3,
             ruleset: BRONZE_RULESET,
             scoring_table: BRONZE_TABLE,
             enumerate_equal_optima: true,
@@ -339,7 +338,7 @@ mod tests {
     fn interrupted_enumeration_keeps_optimality_but_not_completeness() {
         let request = OptimizerRequest {
             exclude_lutz: false,
-            enabled_slots: [true; 3],
+            max_elements: 3,
             ruleset: BRONZE_RULESET,
             scoring_table: BRONZE_TABLE,
             enumerate_equal_optima: true,
@@ -360,7 +359,7 @@ mod tests {
     fn unsupported_ruleset_has_a_distinct_error() {
         let request = OptimizerRequest {
             exclude_lutz: false,
-            enabled_slots: [true; 3],
+            max_elements: 3,
             ruleset: RulesetId::TestOther,
             scoring_table: BRONZE_TABLE,
             enumerate_equal_optima: true,
