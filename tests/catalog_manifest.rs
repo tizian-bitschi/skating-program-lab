@@ -2,9 +2,14 @@ use skating_program_lab::{CatalogSource, ScoringTableId, ISU_2786_JUNE_2_2026_SH
 use std::collections::{BTreeMap, BTreeSet};
 
 const MANIFEST: &str = include_str!("fixtures/isu-2786-2026-06-02-manifest.tsv");
+const SOURCE_CODES: &str = include_str!("fixtures/isu-2786-2026-06-02-source-codes.txt");
 
 #[test]
 fn source_inventory_accounts_for_every_printed_value_row() {
+    check_manifest(MANIFEST);
+}
+
+fn check_manifest(manifest: &str) {
     // Counted against rendered pages, including graphic-only 3A labels on p. 4.
     let page_counts = [55, 52, 54, 54, 50, 55, 55, 45, 45, 52, 54, 40, 14];
     let family_counts = BTreeMap::from([
@@ -26,10 +31,31 @@ fn source_inventory_accounts_for_every_printed_value_row() {
     let mut seen = BTreeSet::new();
     let mut pages = [0; 13];
     let mut families = BTreeMap::new();
-    for line in MANIFEST.lines().skip(1) {
+    let expected: Vec<_> = SOURCE_CODES
+        .lines()
+        .filter(|line| !line.starts_with('#'))
+        .flat_map(|line| {
+            let group: Vec<_> = line.split('|').collect();
+            assert_eq!(group.len(), 4);
+            group[3]
+                .split_whitespace()
+                .map(|code| (group[0], group[1], group[2], code))
+                .collect::<Vec<_>>()
+        })
+        .collect();
+    let lines: Vec<_> = manifest.lines().skip(1).collect();
+    assert_eq!(expected.len(), 625);
+    assert_eq!(lines.len(), expected.len());
+    for (line, (expected_page, family, discipline, code)) in lines.into_iter().zip(expected) {
         let cells: Vec<_> = line.split('\t').collect();
         assert_eq!(cells.len(), 11, "{line}");
         assert_eq!(cells[0], "isu-2786-2026-06-02");
+        assert_eq!(cells[1], expected_page, "{line}");
+        assert_eq!(cells[4], discipline, "{line}");
+        assert_eq!(cells[5], family, "{line}");
+        assert_eq!(cells[6], code, "{line}");
+        assert_eq!(cells[7], expected_level(code, family), "{line}");
+        assert_eq!(cells[9], expected_notes(code, family), "{line}");
         let page: usize = cells[1].parse().unwrap();
         assert!((2..=14).contains(&page));
         pages[page - 2] += 1;
@@ -48,6 +74,88 @@ fn source_inventory_accounts_for_every_printed_value_row() {
     assert_eq!(seen.len(), 625);
     for code in ["Eu", "3A", "3Ab", "3Aq", "3Aqb", "5Lz!<<", "PiF1", "ChPLi1"] {
         assert!(seen.contains(code), "missing easily omitted row {code}");
+    }
+}
+
+fn expected_level<'a>(code: &'a str, family: &str) -> &'a str {
+    match family {
+        "Spin"
+        | "StepSequence"
+        | "Lift"
+        | "TwistLift"
+        | "DeathSpiral"
+        | "PairSpin"
+        | "PairSpinCombination" => {
+            let unmarked = code.trim_end_matches(['V', 'b', '<']);
+            &unmarked[unmarked.len() - 1..]
+        }
+        _ => "-",
+    }
+}
+
+fn expected_notes(code: &str, family: &str) -> String {
+    // Marker parsing uses family boundaries: the q in StSq is not a call.
+    let markers = match family {
+        "Jump" if code != "Eu" => {
+            let jump = code.trim_start_matches(|c: char| c.is_ascii_digit());
+            ["Lo", "Lz", "T", "S", "F", "A"]
+                .into_iter()
+                .find_map(|name| jump.strip_prefix(name))
+                .unwrap()
+        }
+        "ThrowJump" => code.split_once("Th").unwrap().1,
+        "TwistLift" if code.ends_with("<<") => "<<",
+        "Spin" | "PairSpinCombination" if code.ends_with('V') => "V",
+        "DeathSpiral" if code.ends_with('b') => "b",
+        _ => "",
+    };
+    let mut notes = vec![if family.starts_with("Choreographic") {
+        "2"
+    } else {
+        "1"
+    }];
+    // Remark 3 lists <, e and V, while << is separately defined in the legend.
+    if markers.contains('e')
+        || markers.contains('V')
+        || (markers.contains('<') && !markers.contains("<<"))
+    {
+        notes.push("3");
+    }
+    if family == "Jump" {
+        notes.extend(["4", "5"]);
+        if code.starts_with('5') {
+            notes.push("6");
+        }
+    }
+    if !markers.is_empty() {
+        notes.push("legend");
+    }
+    notes.join(",")
+}
+
+#[test]
+fn inventory_validation_rejects_source_and_metadata_corruption() {
+    for (before, after) in [
+        ("\tStSq4\t", "\tStSq5\t"),
+        ("\t1,legend\t", "\tINVALID_NOTE\t"),
+        ("\tStSq4\t4\t", "\tStSq4\t3\t"),
+        ("\tSingleAndPair\tStepSequence\t", "\tPair\tStepSequence\t"),
+        ("\tStepSequence\tStSq4\t", "\tSpin\tStSq4\t"),
+        (
+            "\t1T<<\t-\t11\t1,4,5,legend\t",
+            "\t1T<<\t-\t11\t1,3,4,5,legend\t",
+        ),
+        ("\tStSq4\t4\t11\t1\t", "\tStSq4\t4\t11\t1,legend\t"),
+    ] {
+        assert!(
+            MANIFEST.contains(before),
+            "mutation must change the fixture"
+        );
+        let mutated = MANIFEST.replacen(before, after, 1);
+        assert!(
+            std::panic::catch_unwind(|| check_manifest(&mutated)).is_err(),
+            "{after}"
+        );
     }
 }
 

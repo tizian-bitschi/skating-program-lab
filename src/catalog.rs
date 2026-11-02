@@ -64,17 +64,10 @@ pub struct CatalogSource {
 impl CatalogSource {
     /// Reuse the existing exact-edition document resolver.
     pub fn reference(self, notation: &str) -> SourceReference {
-        let (document, version) = match self.table {
-            ScoringTableId::Isu2786June2_2026 => ("ISU Communication 2786", "2026-06-02"),
-        };
-        SourceReference {
-            document: document.into(),
-            version: version.into(),
-            location: format!(
-                "p. {}, {}, value row {}, code {}",
-                self.page, self.section, self.row, notation
-            ),
-        }
+        self.table.source_reference(format!(
+            "p. {}, {}, value row {}, code {}",
+            self.page, self.section, self.row, notation
+        ))
     }
 }
 

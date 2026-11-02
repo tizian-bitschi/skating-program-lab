@@ -30,5 +30,9 @@ published value-row identifiers, numeric-column layout, notes and factors.
 conversion. `tests/catalog_manifest.rs` checks the separate source inventory.
 No production catalog data or lookup is available in this slice; population and
 scorer migration follow in B, Pair data and final parity audit in C. Existing
-scoring and recognition support is unchanged. The inventory was visually checked
+scoring and recognition support is unchanged. Catalog and scoring share the
+private table-source resolver. The inventory test compares every published code
+with a separately maintained reference and rejects corrupted code, level,
+discipline, family and note assignments. Downgrade-only rows reference the legend
+rather than remark 3. The inventory was visually checked
 by the implementation author; independent review is pending.

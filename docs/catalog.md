@@ -17,6 +17,14 @@ count and applicable p. 14 note references. `render-cross-checked` records the
 implementation author's check against rendered source pages; it does not claim
 independent review approval. The external PR review must check this inventory.
 
+`tests/fixtures/isu-2786-2026-06-02-source-codes.txt` is a separately maintained,
+compact reference transcribed from the printed code columns, grouped by page,
+family and discipline. It is not generated from the manifest or production
+catalog. Tests compare all 625 codes and their order/placement, then check level
+and note consistency using family-aware marker boundaries. Mutation tests prove
+that replacing `StSq4` with `StSq5`, corrupting a note, or changing level, family
+or discipline fails even when totals remain unchanged.
+
 | Printed page | Value rows | Sections |
 | --- | ---: | --- |
 | 1 | 0 | Cover and edition |
@@ -62,6 +70,13 @@ annotations, not implemented eligibility, recognition or scoring rules:
   edge, and `V` reduced spin value. Published bonus rows retain their printed BV;
   no bonus amount is inferred or added.
 
+Remark 3 is attached only to the explicitly named single `<`, `e` or `V` markers.
+A downgrade-only `<<` row references the legend, not remark 3. A combined
+`e<<` row still references remark 3 because of its `e`. This records the source's
+wording without inferring scoring behavior. Markers are parsed after the element
+name; the `q` inside `StSq`/`ChSq1` is not a quarter call. These unmarked sequence
+codes carry no legend reference.
+
 Section 2 on p. 14 separately publishes Senior/Junior program component factors:
 Men SP 1.67 / FS 3.33; Women and Pairs SP 1.33 / FS 2.67. These are documented
 source metadata, not SOV rows or a PCS implementation.
@@ -75,9 +90,12 @@ lookup, then migrates existing scorer rows without extending engine behavior.
 C adds Pair data and completes the independent fixture/completeness audit. Issue
 #45 stays open until C is reviewed, checked and merged.
 
-At A, there are no production catalog rows and no lookup API yet. The existing
-scorer remains unchanged. The manifest test checks unique identifiers, per-page
-and per-family counts, row ordinals, edition and column counts. Later parity tests
+At A, there are no production catalog rows and no lookup API yet. Scoring values
+and behavior remain unchanged; catalog and scorer now use one private source
+resolver on `ScoringTableId` for document/edition identity. The manifest test
+checks every code against the separate source reference, metadata consistency,
+unique identifiers, per-page and per-family counts, row ordinals, edition and
+column counts. Later parity tests
 compare production data with this separate manifest. Manifest updates require a
 fresh source review; never regenerate expected coverage from production rows.
 
