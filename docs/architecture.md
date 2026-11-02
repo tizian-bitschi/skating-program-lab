@@ -13,6 +13,7 @@ The core is intended for native and eventual WebAssembly use. Correctness and tr
 | `src/lib.rs` | Public re-exports, ruleset and table identities, source references. |
 | `src/plan.rs` | Ordered `Program` and intended elements; incomplete plans are representable. |
 | `src/execution.rs` | Observations and supplied panel recognition, calls and notation. |
+| `src/spin_validation.rs` | Additive indexed spin evidence, explicit source-bound spin policies and partial family coverage. |
 | `src/validation.rs` | `validate_program` returns findings and partial coverage for a plan. |
 | `src/catalog.rs`, `src/catalog/` | Immutable versioned SOV data and exact-code lookup; source-backed presence does not establish engine support. |
 | `src/scoring.rs`, `src/scoring/execution_evidence.rs` | Base values and scores from recognition and supplied facts; TES and deductions stay separate. |
