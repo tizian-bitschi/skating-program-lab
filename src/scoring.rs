@@ -380,7 +380,18 @@ fn element_score(
     } else if timing.duration_seconds > required + 10 {
         return Err(ProgramScoreError::TimingUnknown);
     }
-    // A single recorded x is only meaningful for a jump; timing determines credit.
+    unfactored_element_score(ruleset, table, element)
+}
+
+fn unfactored_element_score(
+    ruleset: crate::RulesetId,
+    table: ScoringTableId,
+    element: &ProgramElement,
+) -> Result<ElementScore, ProgramScoreError> {
+    if element.recognition.ruleset != ruleset {
+        return Err(ProgramScoreError::RulesetMismatch);
+    }
+    // A recorded x does not determine eligibility; each caller supplies its own evidence.
     let annotations = if is_jump(element) == Some(true)
         && element.annotations == [ScoringAnnotation::SecondHalfCredit]
     {
@@ -396,6 +407,21 @@ fn element_score(
         element.fall,
     )
     .map_err(ProgramScoreError::Element)
+}
+
+fn sum_element_scores(results: &[Result<ProgramElementScore, ProgramScoreError>]) -> Option<i64> {
+    results
+        .iter()
+        .map(|result| match result {
+            Ok(score) => Ok(i64::from(score.score_hundredths)),
+            Err(ProgramScoreError::Element(
+                ElementScoreError::Ignored | ElementScoreError::NoValue,
+            )) => Ok(0),
+            Err(error) => Err(error),
+        })
+        .sum::<Result<i64, _>>()
+        .ok()
+        .filter(|_| !results.is_empty())
 }
 
 fn second_half_selection(
@@ -496,58 +522,51 @@ pub fn score_planning_scenario(
     }
     let preliminary: Vec<_> = elements
         .iter()
-        .map(|element| {
-            if element.recognition.ruleset != ruleset {
-                return Err(ProgramScoreError::RulesetMismatch);
-            }
-            score_element(
-                table,
-                &element.recognition,
-                &element.annotations,
-                element.goe,
-                element.fall,
-            )
-            .map_err(ProgramScoreError::Element)
-        })
+        .map(|element| unfactored_element_score(ruleset, table, element))
         .collect();
-    // Unknown elements can change the last-three selection, so never assume their type.
-    let selection_known = preliminary.iter().all(Result::is_ok)
-        && elements.iter().all(|element| is_jump(element).is_some());
-    let selected: Vec<_> = second_half_boundary
-        .map(|boundary| {
-            let jumps: Vec<_> = elements
-                .iter()
-                .enumerate()
-                .skip(boundary)
-                .filter_map(|(i, element)| (is_jump(element) == Some(true)).then_some(i))
-                .collect();
-            jumps[jumps.len().saturating_sub(3)..].to_vec()
-        })
-        .unwrap_or_default();
+    let mut certain_later = 0usize;
+    let mut possible_later = 0usize;
+    let mut credit = vec![Ok(false); elements.len()];
+    if let Some(boundary) = second_half_boundary {
+        for i in (boundary..elements.len()).rev() {
+            let element = &elements[i];
+            let score = &preliminary[i];
+            if matches!(
+                score,
+                Err(ProgramScoreError::Element(ElementScoreError::Ignored))
+            ) {
+                continue;
+            }
+            if score.is_ok() && is_jump(element) == Some(true) {
+                credit[i] = if certain_later >= 3 {
+                    Ok(false)
+                } else if possible_later < 3 {
+                    Ok(true)
+                } else {
+                    Err(ProgramScoreError::TimingUnknown)
+                };
+                certain_later += 1;
+                possible_later += 1;
+            } else if score.is_err() && is_jump(element) != Some(false) {
+                // A no-value or unresolved element can affect selection unless known to be a non-jump.
+                let known_nonjump = element.recognition.details.as_ref().is_some_and(|details| {
+                    details
+                        .components()
+                        .iter()
+                        .all(|c| !c.as_str().starts_with(char::is_numeric))
+                });
+                if !known_nonjump || element.recognition.outcome == RecognitionOutcome::Unknown {
+                    possible_later += 1;
+                }
+            }
+        }
+    }
     let results: Vec<_> = preliminary
         .into_iter()
-        .enumerate()
-        .map(|(i, result)| {
-            let score = result?;
-            if second_half_boundary.is_some()
-                && !selection_known
-                && is_jump(&elements[i]) == Some(true)
-            {
-                return Err(ProgramScoreError::TimingUnknown);
-            }
-            Ok(apply_credit(score, selected.contains(&i)))
-        })
+        .zip(credit)
+        .map(|(score, second_half)| Ok(apply_credit(score?, second_half?)))
         .collect();
-    let hypothetical_hundredths = results
-        .iter()
-        .map(|result| {
-            result
-                .as_ref()
-                .map(|score| i64::from(score.score_hundredths))
-        })
-        .sum::<Result<i64, _>>()
-        .ok()
-        .filter(|_| !elements.is_empty());
+    let hypothetical_hundredths = sum_element_scores(&results);
     Ok(PlanningScore {
         second_half_boundary,
         elements: results,
@@ -595,23 +614,11 @@ pub fn score_program(
             Ok(apply_credit(score, second_half))
         })
         .collect();
-    let tes_hundredths = results
-        .iter()
-        .map(|r| match r {
-            Ok(score) => Ok(i64::from(score.score_hundredths)),
-            Err(ProgramScoreError::Element(
-                ElementScoreError::Ignored | ElementScoreError::NoValue,
-            )) => Ok(0),
-            Err(error) => Err(error),
+    let tes_hundredths = sum_element_scores(&results).filter(|_| {
+        timing.is_some_and(|t| {
+            t.ordinary_timing_confirmed && t.duration_seconds > required.saturating_sub(40)
         })
-        .sum::<Result<i64, _>>()
-        .ok()
-        .filter(|_| !elements.is_empty())
-        .filter(|_| {
-            timing.is_some_and(|t| {
-                t.ordinary_timing_confirmed && t.duration_seconds > required.saturating_sub(40)
-            })
-        });
+    });
     ProgramScore {
         elements: results,
         tes_hundredths,

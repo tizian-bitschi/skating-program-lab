@@ -383,6 +383,91 @@ fn planning_boundary_is_optional_and_never_timing_evidence() {
 }
 
 #[test]
+fn planning_preserves_zero_outcomes_and_annotation_semantics() {
+    let mut ignored = program_element("1Lz", None, 0, false, None);
+    ignored.recognition.outcome = RecognitionOutcome::Ignored;
+    let mut no_value = ignored.clone();
+    no_value.recognition.outcome = RecognitionOutcome::NoValue;
+    let mut jump = program_element("1Lz", None, 0, false, None);
+    jump.annotations.push(ScoringAnnotation::SecondHalfCredit);
+    let elements = vec![ignored, no_value, jump];
+    let plain =
+        score_planning_scenario(RulesetId::IsuAdult2026_27July16, TABLE, &elements, None).unwrap();
+    assert_eq!(plain.hypothetical_hundredths, Some(60));
+    assert_eq!(
+        plain.elements[0],
+        Err(ProgramScoreError::Element(ElementScoreError::Ignored))
+    );
+    assert_eq!(
+        plain.elements[1],
+        Err(ProgramScoreError::Element(ElementScoreError::NoValue))
+    );
+    let assumed =
+        score_planning_scenario(RulesetId::IsuAdult2026_27July16, TABLE, &elements, Some(2))
+            .unwrap();
+    assert_eq!(assumed.hypothetical_hundredths, Some(66));
+    let mut timed = elements[2].clone();
+    timed.start_ms = Some(50_000);
+    let actual = score_program(
+        RulesetId::IsuAdult2026_27July16,
+        AdultCategory::Bronze,
+        TABLE,
+        &[timed],
+        Some(0),
+        ordinary(100),
+    );
+    assert_eq!(actual.tes_hundredths, Some(66));
+}
+
+#[test]
+fn planning_boundary_and_uncertain_selection_are_local_to_affected_jumps() {
+    let jump = program_element("1Lz", None, 0, false, None);
+    let jumps = vec![jump.clone(); 5];
+    let all =
+        score_planning_scenario(RulesetId::IsuAdult2026_27July16, TABLE, &jumps, Some(0)).unwrap();
+    assert_eq!(
+        all.elements
+            .iter()
+            .map(|s| s.as_ref().unwrap().second_half)
+            .collect::<Vec<_>>(),
+        vec![false, false, true, true, true]
+    );
+    let none = score_planning_scenario(
+        RulesetId::IsuAdult2026_27July16,
+        TABLE,
+        &jumps,
+        Some(jumps.len()),
+    )
+    .unwrap();
+    assert!(none
+        .elements
+        .iter()
+        .all(|s| !s.as_ref().unwrap().second_half));
+    let mut unknown = jump.clone();
+    unknown.recognition.outcome = RecognitionOutcome::Unknown;
+    let before = score_planning_scenario(
+        RulesetId::IsuAdult2026_27July16,
+        TABLE,
+        &[unknown.clone(), jump.clone()],
+        Some(1),
+    )
+    .unwrap();
+    assert!(before.elements[1].as_ref().unwrap().second_half);
+    assert_eq!(before.hypothetical_hundredths, None);
+    let after = score_planning_scenario(
+        RulesetId::IsuAdult2026_27July16,
+        TABLE,
+        &[jump.clone(), unknown, jump.clone(), jump],
+        Some(0),
+    )
+    .unwrap();
+    assert_eq!(after.elements[0], Err(ProgramScoreError::TimingUnknown));
+    assert!(after.elements[2].as_ref().unwrap().second_half);
+    assert!(after.elements[3].as_ref().unwrap().second_half);
+    assert_eq!(after.hypothetical_hundredths, None);
+}
+
+#[test]
 fn program_totals_keep_deductions_separate() {
     // Adult announcement pp. 6, 10, 11 and Communication 2786 pp. 2, 8.
     let elements = vec![
