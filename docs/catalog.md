@@ -97,8 +97,8 @@ returned APPROVE for commit `58b5a21`.
 B embeds 402 shared rows: 215 jumps (including Euler), 180 spins, five step
 sequences and two choreographic rows. `catalog_row(table, exact_code)` returns an
 immutable static row or `None`, with no parsing, category filtering or fallback.
-The complete 625-row source manifest is retained; 223 Pair-specific rows remain
-pending C and return `None` at this intermediate stage.
+The complete 625-row source manifest is retained. C adds the 223 Pair-specific
+rows; all 625 published rows are now available through the same lookup.
 
 The old hard-coded `jump_row` values and CSSp1/ChSp1 arrays are removed. The scorer
 reads the existing single/double subset and these two spin rows from the shared
@@ -114,14 +114,66 @@ An internal cardinality/uniqueness test rejects extra or duplicate production
 codes. Page/row boundaries independently validate every manifest section name;
 this exposed and corrected the CSp and FCSp section labels on p. 6 (15 rows,
 without changing any values). Eight corruption cases cover the manifest checker.
-The remaining Pair data and numerical fixtures are completed in C.
 
 Manifest updates require source review; never regenerate expected coverage from
 production rows. Printed numerical values are transcribed directly, including
 rounded V rows, rather than recomputed using percentage arithmetic.
 
-Pair data availability will not imply Pair recognition/scoring/validation support.
+## Complete dataset and numerical audit (C)
+
+B was merged as [PR #51](https://github.com/tizian-bitschi/skating-program-lab/pull/51)
+after [independent GPT-6 review](https://chatgpt.com/c/6ae8bcd6-1e10-83ed-964f-20065978704b)
+returned APPROVE for commit `12741ab`.
+
+C adds 45 lifts, 40 twists, 92 throws, 28 death spirals, one pivot figure, five
+pair spins, ten pair spin combinations, one choreographic pair spin and one
+choreographic pair lift. These 223 rows complete all 625 exact codes in the
+source manifest. Pair rows remain data only: the recognition constructor does not
+accept their codes and no Pair scorer, validator or optimizer is introduced.
+
+`tests/fixtures/isu-2786-2026-06-02-source-values.tsv` records every one of the
+6,875 printed numerical cells in source-column order: -5..-1, BASE, +1..+5.
+It comes from a separate Poppler 22.02.0 extraction, not the PyMuPDF production
+transcription, production Rust arrays or their generator input. Code/page/row
+placement comes from the independently reviewed code inventory; the four
+graphic-only 3A labels are explicit exceptions, never inferred from a BV.
+
+The audit compares every production BASE/GOE cell and precise row placement with
+this fixture and verifies that its code set equals the full manifest. It checks
+document, edition and source hash. Six corruption cases exercise changed values,
+missing GOE cells, duplicate codes, wrong editions and wrong hashes. A private
+cardinality/uniqueness check detects extra or duplicate production rows. The 42
+separately hand-read fixtures cover all 14 families, multiple levels, technical
+calls, bonus and reduced-value cases, and the entire GOE range. The existing
+single/double jump fixtures and source references are unchanged.
+
+Reproduce the full source audit using Python's standard library and Poppler
+(`pdftotext` on PATH), outside the runtime library:
+
+```sh
+python tools/verify_sov_source.py /path/to/2786-SinglesPairs-SOV-Update-260602.pdf
+python -B tools/test_verify_sov_source.py
+cargo test --test catalog --test catalog_manifest
+```
+
+The verifier rejects any PDF with a different SHA-256 before extraction. It checks
+all page counts and extracted code labels, and compares the resulting source
+fixture byte-for-byte. An explicit `--write` refreshes the fixture from the pinned
+source only; changing an immutable edition's data still requires source review.
+The Python regression test proves that an incorrect source edition cannot reach
+the extractor or a fallback. No PDF, Python or Poppler is needed by consumers or
+by normal offline Rust tests.
+
+No unresolved extraction mismatch remains. Both extraction paths read the same
+underlying PDF text layer, so agreement alone is not proof of correct rendering.
+All 14 pages were rendered and visually inspected; the separate code inventory
+and hand-read numerical fixtures cross-check that layer. Independent external
+review of this final data/audit slice is required before closure. No independent
+human cell-by-cell approval is claimed.
+
 Category filtering does not belong in the catalog. Unknown table strings retain
-`UnknownVersion`; exact-code lookup will return `None` for absent notation.
-Future editions require their own identity and fixtures and must preserve this
-edition's values.
+`UnknownVersion`; exact-code lookup returns `None` for absent notation, including
+unpublished combinations and variants. A known row does not establish engine
+support, eligibility or correct execution. Footnotes and PCS factors above remain
+data-only. Future editions require their own identity and fixtures and must
+preserve this edition's values; the private initializer is specific to June 2.
