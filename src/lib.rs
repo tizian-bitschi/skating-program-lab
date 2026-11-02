@@ -117,5 +117,8 @@ pub use validation::*;
 mod scoring;
 pub use scoring::*;
 
+mod catalog;
+pub use catalog::*;
+
 mod optimizer;
 pub use optimizer::*;
