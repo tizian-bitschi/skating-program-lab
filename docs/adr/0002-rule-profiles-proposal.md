@@ -154,3 +154,20 @@ profile programs at the public boundary. No synthetic result exposes an Adult
 category. Numerical scoring uses the explicitly selected AdultScoringV1
 mechanism and recognition compatibility binding; it does not validate category
 eligibility. Unimplemented mechanisms block profile selection conservatively.
+
+## Review corrections
+
+Registration rejects contradictory required jump/family/count policies before
+selection. Its source inventory must include the selected SOV document and exact
+edition in addition to every binding and explicit scoring citation. Catalog rows
+still carry their own precise provenance, separate from eligibility rules.
+
+Jump-rule citation overrides remain supported. Scoring binding overrides return
+`ProfileErrorKind::Unsupported` at registration: the current scorer has separate
+explicit duration, time-deduction and fall-deduction citations, so a single
+replacement cannot silently redirect them. Define a new versioned scoring policy
+with those explicit citations instead. No scoring override is accepted and
+ignored. Source inventories and optimizer provenance have distinct granularity:
+optimizer results deduplicate exact references in stable order, retaining
+separate SOV row locations. One `ProfileRule` enum and its canonical rule list
+serve registration, Adult binding construction and validation.

@@ -68,3 +68,10 @@ and level policies block selection as unsupported. Numerical scoring retains
 partial scope and does not establish category eligibility. The solver retains
 its finite jump domain and maximum five slots. No real Junior, Senior or national
 profile has been added. See the [ADR](adr/0002-rule-profiles-proposal.md).
+
+Review regression tests additionally reject contradictory Axel/sequence/family
+requirements, missing or mismatched SOV source editions and unsupported scoring
+binding overrides. Optimizer sources contain each exact citation once, in stable
+order; distinct SOV row locations remain distinct. ProfileRule is shared by
+registry and validator. Scoring binding overrides are explicitly unsupported;
+new versioned scoring policies use explicit policy citations.

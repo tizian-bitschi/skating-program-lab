@@ -1,4 +1,5 @@
 //! Partial, source-backed validation of intended programs.
+use crate::ProfileRule as Rule;
 use crate::{
     AdultCategory, JumpElement, JumpKind, JumpPart, ListedJump, PlannedElement, Program, RulesetId,
     Season, SourceReference,
@@ -51,56 +52,30 @@ pub(crate) fn category_source(category: AdultCategory) -> SourceReference {
 pub(crate) fn adult_bindings(
     category: AdultCategory,
     category_source: &SourceReference,
+    scoring_source: &SourceReference,
 ) -> Vec<crate::RuleBinding> {
-    [
-        Rule::Input,
-        Rule::Eligibility,
-        Rule::Count,
-        Rule::CompoundCount,
-        Rule::Structure,
-        Rule::Euler,
-        Rule::Repetition,
-        Rule::Axel,
-        Rule::Transition,
-    ]
-    .into_iter()
-    .map(|rule| crate::RuleBinding {
-        rule: rule.key(),
-        id: rule.id(category),
-        mechanism: crate::RuleMechanism::JumpPlanV1,
-        source: rule.source(category_source),
-    })
-    .collect()
-}
-#[derive(Clone, Copy)]
-enum Rule {
-    Input,
-    Eligibility,
-    Count,
-    CompoundCount,
-    Structure,
-    Euler,
-    Repetition,
-    Axel,
-    Transition,
+    Rule::ALL
+        .into_iter()
+        .map(|rule| crate::RuleBinding {
+            rule,
+            id: rule.id(category),
+            mechanism: if rule == Rule::Scoring {
+                crate::RuleMechanism::AdultScoringV1
+            } else {
+                crate::RuleMechanism::JumpPlanV1
+            },
+            source: if rule == Rule::Scoring {
+                scoring_source.clone()
+            } else {
+                rule.source(category_source)
+            },
+        })
+        .collect()
 }
 impl Rule {
-    fn key(self) -> crate::ProfileRule {
-        match self {
-            Self::Input => crate::ProfileRule::Input,
-            Self::Eligibility => crate::ProfileRule::Eligibility,
-            Self::Count => crate::ProfileRule::Count,
-            Self::CompoundCount => crate::ProfileRule::CompoundCount,
-            Self::Structure => crate::ProfileRule::Structure,
-            Self::Euler => crate::ProfileRule::Euler,
-            Self::Repetition => crate::ProfileRule::Repetition,
-            Self::Axel => crate::ProfileRule::Axel,
-            Self::Transition => crate::ProfileRule::Transition,
-        }
-    }
-
     fn id(self, category: AdultCategory) -> &'static str {
         match (self, category) {
+            (Self::Scoring, _) => "isu-adult-2026-27-scoring",
             (Self::Input, _) => "listed-jump-invalid-rotations",
             (Self::Eligibility, AdultCategory::Bronze) => ELIGIBILITY_RULE,
             (Self::Eligibility, AdultCategory::Silver) => {
@@ -192,11 +167,11 @@ impl<'a> Validator<'a> {
     ) {
         self.findings.push(Finding {
             kind,
-            rule_id: self.profile.binding(rule.key()).id,
+            rule_id: self.profile.binding(rule).id,
             element_index,
             component_index,
             explanation,
-            source: self.profile.binding(rule.key()).source.clone(),
+            source: self.profile.binding(rule).source.clone(),
         });
     }
     fn jump(&mut self, jump: &ListedJump, index: usize, component: Option<usize>) {

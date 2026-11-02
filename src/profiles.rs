@@ -44,6 +44,20 @@ pub enum ProfileRule {
     Transition,
     Scoring,
 }
+impl ProfileRule {
+    pub(crate) const ALL: [Self; 10] = [
+        Self::Input,
+        Self::Eligibility,
+        Self::Count,
+        Self::CompoundCount,
+        Self::Structure,
+        Self::Euler,
+        Self::Repetition,
+        Self::Axel,
+        Self::Transition,
+        Self::Scoring,
+    ];
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RuleBinding {
@@ -265,6 +279,16 @@ impl RuleProfile {
             .map(|b| self.binding(b.rule))
             .collect()
     }
+    #[cfg(feature = "optimizer")]
+    pub(crate) fn jump_sources(&self) -> Vec<SourceReference> {
+        let mut sources = Vec::new();
+        for binding in self.jump_bindings() {
+            if !sources.contains(&binding.source) {
+                sources.push(binding.source.clone());
+            }
+        }
+        sources
+    }
 }
 
 #[derive(Debug, Clone, Default)]
@@ -306,7 +330,7 @@ impl ProfileRegistry {
         ]
         .iter()
         .any(|s| s.trim().is_empty())
-            || profile.season.end_year != profile.season.start_year.saturating_add(1)
+            || Some(profile.season.end_year) != profile.season.start_year.checked_add(1)
             || profile.sources.is_empty()
             || profile.sources.iter().any(|s| !citation_valid(s))
         {
@@ -343,6 +367,94 @@ impl ProfileRegistry {
         {
             return Err(fail("invalid jump policy bounds or permissions"));
         }
+        let family_possible = |family: ProfileElementFamily| {
+            profile.families.allowed.contains(&family)
+                && policy.max_jumps > 0
+                && match family {
+                    ProfileElementFamily::SoloJump => true,
+                    ProfileElementFamily::Combination => {
+                        policy.max_combinations > 0 && policy.max_compounds > 0
+                    }
+                    ProfileElementFamily::JumpSequence => {
+                        policy.max_sequences > 0
+                            && policy.max_compounds > 0
+                            && policy.allowed.iter().any(|p| p.kind == JumpKind::Axel)
+                    }
+                    _ => false,
+                }
+        };
+        let required_jumps = profile
+            .families
+            .required
+            .iter()
+            .filter(|f| {
+                matches!(
+                    f,
+                    ProfileElementFamily::SoloJump
+                        | ProfileElementFamily::Combination
+                        | ProfileElementFamily::JumpSequence
+                )
+            })
+            .count();
+        let required_compounds = profile
+            .families
+            .required
+            .iter()
+            .filter(|f| {
+                matches!(
+                    f,
+                    ProfileElementFamily::Combination | ProfileElementFamily::JumpSequence
+                )
+            })
+            .count();
+        let available_occurrences = policy.allowed.iter().fold(0usize, |total, p| {
+            total.saturating_add(
+                usize::from(p.max_rotations - p.min_rotations + 1)
+                    .saturating_mul(policy.max_repetitions),
+            )
+        });
+        let required_occurrences = required_jumps + required_compounds;
+        if (policy.require_axel
+            && (!policy.allowed.iter().any(|p| p.kind == JumpKind::Axel)
+                || ![
+                    ProfileElementFamily::SoloJump,
+                    ProfileElementFamily::Combination,
+                    ProfileElementFamily::JumpSequence,
+                ]
+                .into_iter()
+                .any(family_possible)))
+            || profile.families.required.iter().any(|f| {
+                matches!(
+                    f,
+                    ProfileElementFamily::SoloJump
+                        | ProfileElementFamily::Combination
+                        | ProfileElementFamily::JumpSequence
+                ) && !family_possible(*f)
+            })
+            || required_jumps > policy.max_jumps
+            || required_compounds > policy.max_compounds
+            || required_occurrences.max(usize::from(policy.require_axel)) > available_occurrences
+            || [&profile.families.allowed, &profile.families.required]
+                .iter()
+                .any(|items| {
+                    items
+                        .iter()
+                        .enumerate()
+                        .any(|(i, f)| items[..i].contains(f))
+                })
+        {
+            return Err(fail(
+                "required jump policies conflict with permissions, families or count limits",
+            ));
+        }
+        let table_source = profile.scoring_table.source_reference(String::new());
+        if !profile
+            .sources
+            .iter()
+            .any(|s| s.document == table_source.document && s.version == table_source.version)
+        {
+            return Err(fail("selected SOV edition is missing from profile sources"));
+        }
         if profile.scoring.duration_seconds == 0
             || [
                 &profile.scoring.duration_source,
@@ -358,18 +470,7 @@ impl ProfileRegistry {
         {
             return Err(fail("invalid scoring or unsupported-policy metadata"));
         }
-        let required = [
-            ProfileRule::Input,
-            ProfileRule::Eligibility,
-            ProfileRule::Count,
-            ProfileRule::CompoundCount,
-            ProfileRule::Structure,
-            ProfileRule::Euler,
-            ProfileRule::Repetition,
-            ProfileRule::Axel,
-            ProfileRule::Transition,
-            ProfileRule::Scoring,
-        ];
+        let required = ProfileRule::ALL;
         if profile.bindings.len() != required.len()
             || required
                 .iter()
@@ -418,6 +519,9 @@ impl ProfileRegistry {
                     .any(|o| o.replaces == replacement.replacement.id)
             {
                 return Err(fail("ambiguous, cyclic or out-of-scope override"));
+            }
+            if replacement.replacement.rule == ProfileRule::Scoring {
+                return Err(profile.error(ProfileErrorKind::Unsupported, "scoring binding overrides are unsupported; define a new profile version with explicit scoring policy citations"));
             }
         }
         self.profiles.push(profile);
@@ -534,13 +638,7 @@ pub fn adult_profile(category: AdultCategory) -> RuleProfile {
     let duration_source = source(page.into());
     let time_source = source(format!("p. 6, time deductions; {page}, required duration"));
     let fall_source = source("p. 11, Bronze fall deductions".into());
-    let mut bindings = crate::validation::adult_bindings(category, &category_source);
-    bindings.push(RuleBinding {
-        rule: ProfileRule::Scoring,
-        id: "isu-adult-2026-27-scoring",
-        mechanism: RuleMechanism::AdultScoringV1,
-        source: duration_source.clone(),
-    });
+    let bindings = crate::validation::adult_bindings(category, &category_source, &duration_source);
     let mut sources = vec![
         category_source,
         duration_source.clone(),

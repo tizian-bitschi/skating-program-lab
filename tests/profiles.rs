@@ -282,6 +282,126 @@ fn incomplete_sources_invalid_bounds_and_duplicate_bindings_are_rejected() {
 }
 
 #[test]
+fn contradictory_requirements_are_invalid_before_selection() {
+    let mut variants = vec![];
+    let mut axel = synthetic();
+    axel.jumps.require_axel = true;
+    variants.push(axel);
+    let mut sequence = synthetic();
+    sequence
+        .families
+        .required
+        .push(ProfileElementFamily::JumpSequence);
+    sequence.jumps.max_sequences = 0;
+    variants.push(sequence);
+    let mut combination = synthetic();
+    combination
+        .families
+        .required
+        .push(ProfileElementFamily::Combination);
+    combination.jumps.max_combinations = 0;
+    variants.push(combination);
+    let mut no_slot = synthetic();
+    no_slot
+        .families
+        .required
+        .push(ProfileElementFamily::SoloJump);
+    no_slot.jumps.max_jumps = 0;
+    variants.push(no_slot);
+    let mut no_family = adult_profile(AdultCategory::Masters);
+    no_family.families.allowed = vec![ProfileElementFamily::StepSequence];
+    variants.push(no_family);
+    let mut required_slots = synthetic();
+    required_slots.families.required = vec![
+        ProfileElementFamily::SoloJump,
+        ProfileElementFamily::Combination,
+    ];
+    variants.push(required_slots);
+    let mut sequence_without_axel = synthetic();
+    sequence_without_axel.jumps.max_sequences = 1;
+    sequence_without_axel
+        .families
+        .required
+        .push(ProfileElementFamily::JumpSequence);
+    variants.push(sequence_without_axel);
+    let mut too_few_occurrences = synthetic();
+    too_few_occurrences.jumps.max_jumps = 2;
+    too_few_occurrences.jumps.max_repetitions = 1;
+    too_few_occurrences
+        .families
+        .required
+        .push(ProfileElementFamily::Combination);
+    variants.push(too_few_occurrences);
+    for profile in variants {
+        let mut registry = ProfileRegistry::default();
+        let error = registry.register(profile.clone()).unwrap_err();
+        assert_eq!(error.profile, profile.id);
+        assert_eq!(error.kind, ProfileErrorKind::Invalid);
+        assert!(error.reason.contains("conflict"));
+        assert_eq!(
+            registry.get(&profile.id).unwrap_err().kind,
+            ProfileErrorKind::Unknown
+        );
+    }
+}
+
+#[test]
+fn selected_sov_edition_requires_its_exact_source_in_the_profile_inventory() {
+    let mut missing = synthetic();
+    missing
+        .sources
+        .retain(|s| s.document != "ISU Communication 2786");
+    let mut wrong_edition = synthetic();
+    wrong_edition
+        .sources
+        .iter_mut()
+        .find(|s| s.document == "ISU Communication 2786")
+        .unwrap()
+        .version = "2026-05-05".into();
+    for profile in [missing, wrong_edition] {
+        let error = ProfileRegistry::default().register(profile).unwrap_err();
+        assert_eq!(error.kind, ProfileErrorKind::Invalid);
+        assert!(error.reason.contains("SOV edition"));
+    }
+}
+
+#[test]
+fn scoring_binding_override_is_explicitly_rejected_instead_of_ignored() {
+    let mut profile = synthetic();
+    let mut replacement = profile
+        .bindings
+        .iter()
+        .find(|b| b.rule == ProfileRule::Scoring)
+        .unwrap()
+        .clone();
+    let replaces = replacement.id;
+    replacement.id = "synthetic-scoring-v1";
+    replacement.source = profile.sources.last().unwrap().clone();
+    profile.overrides.push(RuleOverride {
+        replaces,
+        replacement,
+        event_scope: profile.event_scope.clone(),
+        justification: "synthetic scoring replacement".into(),
+    });
+    let mut registry = ProfileRegistry::adult();
+    let error = registry.register(profile.clone()).unwrap_err();
+    assert_eq!(error.profile, profile.id);
+    assert_eq!(error.kind, ProfileErrorKind::Unsupported);
+    assert!(error.reason.contains("scoring binding overrides"));
+    let error = score_profile_program(
+        &registry,
+        &profile.id,
+        TABLE,
+        &[recognized()],
+        Some(0),
+        None,
+        None,
+    )
+    .unwrap_err();
+    assert_eq!(error.kind, ProfileErrorKind::Unknown);
+}
+
+#[test]
 fn unsupported_mechanisms_and_pair_scope_never_evaluate_as_allowed() {
     let mut variants = vec![];
     let mut pair = synthetic();
@@ -498,6 +618,35 @@ fn synthetic_profile_uses_existing_solver_and_preserves_identity_and_bounds() {
     };
     let adult = optimize_profile_jumps(&registry, &adult_request).unwrap();
     assert_eq!(adult.candidates[0].base_hundredths, 220); // Two 1A, 1.10 each.
+    assert_eq!(adult.sources.len(), 4); // Announcement, transition Sports Rule, two distinct SOV rows.
+    assert_eq!(
+        adult.sources[0].location,
+        "p. 10, Silver Free Skating, jumps"
+    );
+    assert_eq!(
+        adult.sources[1].location,
+        "p. 65, Rule 610, jump combinations"
+    );
+    assert_eq!(adult.sources[2].document, "ISU Communication 2786");
+    assert!(adult
+        .sources
+        .iter()
+        .enumerate()
+        .all(|(i, s)| !adult.sources[..i].contains(s)));
+    assert_eq!(
+        adult.sources,
+        optimize_profile_jumps(&registry, &adult_request)
+            .unwrap()
+            .sources
+    );
+    let excluded = ProfileJumpOptimizerRequest {
+        excluded_kinds: vec![JumpKind::ToeLoop],
+        ..request.clone()
+    };
+    assert_eq!(
+        optimize_profile_jumps(&registry, &excluded).unwrap().status,
+        OptimizerStatus::InfeasibleProven
+    );
     let mut unsupported = custom;
     unsupported.id.version = "unsupported".into();
     unsupported.bindings[0].mechanism = RuleMechanism::Unsupported("future".into());

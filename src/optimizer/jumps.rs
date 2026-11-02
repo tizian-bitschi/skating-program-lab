@@ -151,11 +151,7 @@ fn checked_profile_candidate(
         category: request.category,
         ruleset: request.ruleset,
         scoring_table: request.scoring_table,
-        sources: profile
-            .jump_bindings()
-            .iter()
-            .map(|b| b.source.clone())
-            .collect(),
+        sources: profile.jump_sources(),
         elements: elements.iter().cloned().map(PlannedElement::Jump).collect(),
     };
     let validation = crate::validation::validate_elements(&program.elements, profile);
@@ -239,6 +235,27 @@ pub struct ProfileJumpOptimizerRequest {
     pub time_limit: Option<Duration>,
 }
 
+impl ProfileJumpOptimizerRequest {
+    fn search_controls(&self, profile: &crate::RuleProfile) -> JumpOptimizerRequest {
+        // The internal legacy carrier supplies domain controls only; policy comes from profile.
+        JumpOptimizerRequest {
+            category: AdultCategory::Bronze,
+            ruleset: profile.scoring.recognition_ruleset,
+            scoring_table: self.scoring_table,
+            allowed_jumps: self.allowed_jumps.clone(),
+            combinations: self.combinations.clone(),
+            exclusions: self.exclusions.clone(),
+            excluded_kinds: self.excluded_kinds.clone(),
+            max_elements: self.max_elements,
+            require_nonempty: self.require_nonempty,
+            max_search_nodes: self.max_search_nodes,
+            enumerate_equal_optima: self.enumerate_equal_optima,
+            max_solutions: self.max_solutions,
+            time_limit: self.time_limit,
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ProfileJumpCandidate {
     pub program: crate::ProfileProgram,
@@ -279,22 +296,7 @@ pub fn optimize_profile_jumps(
     let profile = registry
         .resolve(&request.profile, request.scoring_table)
         .map_err(ProfileJumpOptimizerError::Selection)?;
-    // The internal legacy carrier supplies domain controls only; policy comes from profile.
-    let controls = JumpOptimizerRequest {
-        category: AdultCategory::Bronze,
-        ruleset: profile.scoring.recognition_ruleset,
-        scoring_table: request.scoring_table,
-        allowed_jumps: request.allowed_jumps.clone(),
-        combinations: request.combinations.clone(),
-        exclusions: request.exclusions.clone(),
-        excluded_kinds: request.excluded_kinds.clone(),
-        max_elements: request.max_elements,
-        require_nonempty: request.require_nonempty,
-        max_search_nodes: request.max_search_nodes,
-        enumerate_equal_optima: request.enumerate_equal_optima,
-        max_solutions: request.max_solutions,
-        time_limit: request.time_limit,
-    };
+    let controls = request.search_controls(profile);
     let result = model::optimize_profile(&controls, profile).map_err(|reason| {
         ProfileJumpOptimizerError::Search {
             profile: profile.id.clone(),

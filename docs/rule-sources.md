@@ -51,3 +51,8 @@ Create a new profile version for policy or source changes and keep prior entries
 Select SOV editions separately; category eligibility does not alter catalog
 values. Synthetic test provenance never establishes an official class. The
 current Adult definitions reuse the editions and limitations documented above.
+
+The profile source inventory must contain the exact selected SOV document edition
+and every rule/policy citation. Scoring binding overrides are currently rejected
+as unsupported rather than ignored; use an explicitly cited new scoring-policy
+version. Jump-rule citation overrides remain scoped to the named event.

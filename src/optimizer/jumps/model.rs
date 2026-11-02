@@ -183,11 +183,7 @@ fn optimize_profile_inner(
         })
         .transpose()?;
     let universe = universe(request, profile)?;
-    let mut sources: Vec<_> = profile
-        .jump_bindings()
-        .iter()
-        .map(|b| b.source.clone())
-        .collect();
+    let mut sources: Vec<_> = profile.jump_sources();
     let mut values = vec![0i32];
     for element in &universe {
         let score = value(element, request)?;
