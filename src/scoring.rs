@@ -36,6 +36,7 @@ struct TableRow {
     document: &'static str,
     version: &'static str,
     section: &'static str,
+    goe_reference: Option<String>,
 }
 
 impl TableRow {
@@ -226,6 +227,43 @@ fn table_row(
         .as_ref()
         .ok_or(BaseValueError::UnknownDetails)?;
     let notation = details.notation().ok_or(BaseValueError::UnknownCalls)?;
+    if details.components().len() == 2 {
+        let components = details.components();
+        let second = components[1].as_str();
+        if !matches!(second, "1T" | "2T" | "1Lo" | "2Lo") || details.level().is_some() {
+            return Err(BaseValueError::Unsupported);
+        }
+        let calls = details.calls().ok_or(BaseValueError::UnknownCalls)?;
+        if calls
+            .iter()
+            .any(|entry| !matches!(entry.target, crate::CallTarget::Component(_)))
+        {
+            return Err(BaseValueError::Unsupported);
+        }
+        let mut parts = notation.split('+');
+        let first = parts.next().ok_or(BaseValueError::Unsupported)?;
+        let second = parts.next().ok_or(BaseValueError::Unsupported)?;
+        if parts.next().is_some() {
+            return Err(BaseValueError::Unsupported);
+        }
+        let (first_bv, _, first_goe) = jump_row(first).ok_or(BaseValueError::Unsupported)?;
+        let (second_bv, _, second_goe) = jump_row(second).ok_or(BaseValueError::Unsupported)?;
+        let (reference, goe) = if first_bv >= second_bv {
+            (first, first_goe)
+        } else {
+            (second, second_goe)
+        };
+        return Ok(TableRow {
+            hundredths: first_bv + second_bv,
+            goe: Some(goe),
+            table,
+            notation: notation.clone(),
+            document: "ISU Communication 2786",
+            version: "2026-06-02",
+            section: "pp. 2–4, Jumps; p. 14, combination reference",
+            goe_reference: Some(reference.to_owned()),
+        });
+    }
     if details.components().len() != 1 {
         return Err(BaseValueError::Unsupported);
     }
@@ -259,6 +297,7 @@ fn table_row(
         document,
         version,
         section,
+        goe_reference: None,
     })
 }
 
@@ -370,7 +409,10 @@ pub fn score_element(
     } else {
         format!("GOE column {goe:+}")
     };
-    let goe_source = row.source(&column);
+    let mut goe_source = row.source(&column);
+    if let Some(reference) = &row.goe_reference {
+        goe_source.location = format!("p. 14, combination reference; {column}, row {reference}");
+    }
     let base = row.base();
     let consistency_source = SourceReference {
         document: "ISU Communication 2788".into(),
