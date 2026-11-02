@@ -3,6 +3,452 @@ use skating_program_lab::*;
 const TABLE: ScoringTableId = ScoringTableId::Isu2786June2_2026;
 
 #[test]
+fn deleted_component_changes_bv_and_reference_but_keeps_its_execution_calls() {
+    // TPH p. 29 deletes only non-counting components; Q&A 3 Q2–3 keeps all calls.
+    let r = jump_unit(
+        &["1Lz", "2Lo"],
+        vec![RecordedCall {
+            target: CallTarget::Component(1),
+            call: PanelCall::NotCounted,
+        }],
+    );
+    let score = score_element(TABLE, &r, &[], 5, Some(false)).unwrap();
+    assert_eq!(
+        (
+            score.base.hundredths,
+            score.goe_hundredths,
+            score.score_hundredths
+        ),
+        (60, 30, 90)
+    );
+    assert!(score.goe_source.location.contains("code 1Lz"));
+    assert!(score
+        .base
+        .source
+        .location
+        .contains("excluded by supplied *"));
+    let r = jump_unit(
+        &["2S", "2Lo"],
+        vec![
+            RecordedCall {
+                target: CallTarget::Component(0),
+                call: PanelCall::Quarter,
+            },
+            RecordedCall {
+                target: CallTarget::Component(1),
+                call: PanelCall::Quarter,
+            },
+            RecordedCall {
+                target: CallTarget::Component(1),
+                call: PanelCall::NotCounted,
+            },
+        ],
+    );
+    let score = score_element(TABLE, &r, &[], -1, Some(false)).unwrap();
+    assert_eq!(
+        (
+            score.base.hundredths,
+            score.goe_hundredths,
+            score.score_hundredths
+        ),
+        (130, -13, 117)
+    );
+    assert_eq!(
+        score_element(TABLE, &r, &[], 0, Some(false)),
+        Err(ElementScoreError::UnsupportedMarks)
+    );
+    assert!(score.base.notation.contains("2Loq*"));
+}
+
+#[test]
+fn supplied_contextual_repetition_retains_one_jump_with_original_goe() {
+    // TPH p. 33: excess sequence/combination retains the first jump with +REP.
+    let r = jump_unit(
+        &["1Lz", "1A"],
+        vec![
+            RecordedCall {
+                target: CallTarget::Component(1),
+                call: PanelCall::NotCounted,
+            },
+            RecordedCall {
+                target: CallTarget::BetweenComponents(2),
+                call: PanelCall::Sequence,
+            },
+            RecordedCall {
+                target: CallTarget::Element,
+                call: PanelCall::Repetition,
+            },
+        ],
+    );
+    let score = score_element(TABLE, &r, &[], 1, Some(false)).unwrap();
+    assert_eq!(
+        (
+            score.base.hundredths,
+            score.goe_hundredths,
+            score.score_hundredths
+        ),
+        (48, 6, 54)
+    );
+    assert!(score.goe_source.location.contains("code 1Lz"));
+    assert!(score
+        .base
+        .source
+        .location
+        .contains("excluded by supplied *"));
+    let r = jump_unit(
+        &["2Lz", "2Lo"],
+        vec![
+            RecordedCall {
+                target: CallTarget::Component(0),
+                call: PanelCall::UnderRotated,
+            },
+            RecordedCall {
+                target: CallTarget::Component(1),
+                call: PanelCall::NotCounted,
+            },
+            RecordedCall {
+                target: CallTarget::Element,
+                call: PanelCall::Repetition,
+            },
+        ],
+    );
+    let score = score_element(TABLE, &r, &[], -1, Some(false)).unwrap();
+    assert_eq!((score.base.hundredths, score.goe_hundredths), (134, -17));
+}
+
+#[test]
+fn interrupted_unit_bv_is_known_but_execution_context_is_not_fabricated() {
+    for r in [
+        jump_unit(
+            &["2S", "2T", "2A"],
+            vec![
+                RecordedCall {
+                    target: CallTarget::BetweenComponents(1),
+                    call: PanelCall::Sequence,
+                },
+                RecordedCall {
+                    target: CallTarget::Component(1),
+                    call: PanelCall::UnderRotated,
+                },
+                RecordedCall {
+                    target: CallTarget::Component(1),
+                    call: PanelCall::NotCounted,
+                },
+                RecordedCall {
+                    target: CallTarget::Component(2),
+                    call: PanelCall::Quarter,
+                },
+                RecordedCall {
+                    target: CallTarget::Component(2),
+                    call: PanelCall::NotCounted,
+                },
+            ],
+        ),
+        jump_unit(
+            &["2S", "2T"],
+            vec![
+                RecordedCall {
+                    target: CallTarget::BetweenComponents(1),
+                    call: PanelCall::Combination,
+                },
+                RecordedCall {
+                    target: CallTarget::Component(1),
+                    call: PanelCall::NotCounted,
+                },
+            ],
+        ),
+    ] {
+        assert!(matches!(
+            lookup_base_value(TABLE, &r, &[]),
+            Ok(BaseValueOutcome::Value(BaseValue {
+                hundredths: 130,
+                ..
+            }))
+        ));
+        // The marker does not say which execution error interrupted the unit.
+        assert_eq!(
+            score_element(TABLE, &r, &[], -5, Some(false)),
+            Err(ElementScoreError::UnsupportedMarks)
+        );
+        assert_eq!(
+            score_element(TABLE, &r, &[], -3, Some(true)),
+            Err(ElementScoreError::UnsupportedMarks)
+        );
+    }
+}
+
+#[test]
+fn all_deleted_components_are_no_value_rather_than_recognized_zero() {
+    let r = jump_unit(
+        &["1Lz", "1T"],
+        vec![
+            RecordedCall {
+                target: CallTarget::Component(0),
+                call: PanelCall::NotCounted,
+            },
+            RecordedCall {
+                target: CallTarget::Component(1),
+                call: PanelCall::NotCounted,
+            },
+        ],
+    );
+    assert_eq!(
+        lookup_base_value(TABLE, &r, &[]),
+        Ok(BaseValueOutcome::NoValue)
+    );
+    assert_eq!(
+        score_element(TABLE, &r, &[], 0, Some(false)),
+        Err(ElementScoreError::NoValue)
+    );
+}
+
+fn jump_unit(codes: &[&str], calls: Vec<RecordedCall>) -> PanelRecognition {
+    let mut r = recognition(codes[0], None, Some(vec![]));
+    r.details = Some(
+        RecognitionDetails::new(
+            codes
+                .iter()
+                .map(|code| ComponentCode::try_from(*code).unwrap())
+                .collect(),
+            None,
+            Some(calls),
+        )
+        .unwrap(),
+    );
+    r
+}
+
+#[test]
+fn supplied_euler_and_sequence_units_use_full_source_values_and_one_goe() {
+    // TPH pp. 28–29: Eu is unlisted/zero and sequences retain full jump values.
+    // 2786 pp. 2–3: named component rows; p. 14 remark 4: one reference GOE.
+    for (codes, sequence, base, adjustment) in [
+        (vec!["1Lz", "Eu", "1S"], false, 100, 6),
+        (vec!["1Lz", "Eu", "1F", "2T"], false, 240, 13),
+        (vec!["1Lz", "1A"], true, 170, 11),
+        (vec!["1Lz", "1A", "2A"], true, 500, 33),
+        (vec!["1Lz", "1A", "2T"], true, 300, 13),
+        (vec!["1Lz", "Eu", "1F", "1A"], true, 220, 11),
+    ] {
+        let calls = if sequence {
+            vec![RecordedCall {
+                target: CallTarget::BetweenComponents(codes.len()),
+                call: PanelCall::Sequence,
+            }]
+        } else {
+            vec![]
+        };
+        let r = jump_unit(&codes, calls);
+        let score = score_element(TABLE, &r, &[], 1, Some(false)).unwrap();
+        assert_eq!(
+            (
+                score.base.hundredths,
+                score.goe_hundredths,
+                score.score_hundredths
+            ),
+            (base, adjustment, base as i16 + adjustment)
+        );
+        for code in codes {
+            assert!(score.base.source.location.contains(&format!("code {code}")));
+        }
+        assert_eq!(score.base.table, TABLE);
+        assert!(score.goe_source.location.contains(if sequence {
+            "sequence reference"
+        } else {
+            "combination reference"
+        }));
+    }
+}
+
+#[test]
+fn euler_component_calls_and_sequence_q_keep_their_numeric_rules() {
+    let r = jump_unit(
+        &["1Lz", "Eu", "1F"],
+        vec![
+            RecordedCall {
+                target: CallTarget::Component(0),
+                call: PanelCall::WrongEdge,
+            },
+            RecordedCall {
+                target: CallTarget::Component(0),
+                call: PanelCall::UnderRotated,
+            },
+        ],
+    );
+    let score = score_element(TABLE, &r, &[], -2, Some(false)).unwrap();
+    assert_eq!(
+        (
+            score.base.hundredths,
+            score.goe_hundredths,
+            score.score_hundredths
+        ),
+        (86, -10, 76)
+    );
+    assert!(score.goe_source.location.contains("code 1F"));
+    assert!(score.base.source.location.contains("value row 1, code Eu"));
+    assert_eq!(
+        score_element(TABLE, &r, &[], -1, Some(false)),
+        Err(ElementScoreError::UnsupportedMarks)
+    );
+    let r = jump_unit(
+        &["1Lz", "1A"],
+        vec![
+            RecordedCall {
+                target: CallTarget::Component(0),
+                call: PanelCall::Quarter,
+            },
+            RecordedCall {
+                target: CallTarget::BetweenComponents(1),
+                call: PanelCall::Sequence,
+            },
+        ],
+    );
+    let score = score_element(TABLE, &r, &[], 1, Some(false)).unwrap();
+    assert_eq!((score.base.hundredths, score.goe_hundredths), (170, 11));
+    assert_eq!(
+        score.consistency_source.document,
+        "ISU Handbook for Referees and Judges"
+    );
+    assert_eq!(
+        score_element(TABLE, &r, &[], 2, Some(false)),
+        Err(ElementScoreError::UnsupportedMarks)
+    );
+}
+
+#[test]
+fn missing_or_unsupported_unit_structure_does_not_get_a_default_score() {
+    for codes in [
+        vec!["1Lz", "1A"],
+        vec!["Eu", "1S"],
+        vec!["1Lz", "Eu"],
+        vec!["1Lz", "Eu", "Eu", "1S"],
+        vec!["1Lz", "Eu", "1T"],
+        vec!["1Lz", "1T", "1T", "1Lo"],
+    ] {
+        assert_eq!(
+            lookup_base_value(TABLE, &jump_unit(&codes, vec![]), &[]),
+            Err(BaseValueError::Unsupported)
+        );
+    }
+    for (codes, calls) in [
+        (
+            vec!["1Lz", "1T"],
+            vec![RecordedCall {
+                target: CallTarget::BetweenComponents(2),
+                call: PanelCall::Sequence,
+            }],
+        ),
+        (
+            vec!["1Lz", "1T", "1A"],
+            vec![RecordedCall {
+                target: CallTarget::BetweenComponents(1),
+                call: PanelCall::Sequence,
+            }],
+        ),
+        (
+            vec!["1Lz", "1A"],
+            vec![
+                RecordedCall {
+                    target: CallTarget::BetweenComponents(1),
+                    call: PanelCall::Sequence,
+                },
+                RecordedCall {
+                    target: CallTarget::BetweenComponents(2),
+                    call: PanelCall::Sequence,
+                },
+            ],
+        ),
+        (
+            vec!["1Lz", "Eu", "1S"],
+            vec![RecordedCall {
+                target: CallTarget::Component(1),
+                call: PanelCall::Quarter,
+            }],
+        ),
+        (
+            vec!["1Lz", "1T"],
+            vec![RecordedCall {
+                target: CallTarget::BetweenComponents(1),
+                call: PanelCall::Combination,
+            }],
+        ),
+        (
+            vec!["1Lz", "1T"],
+            vec![RecordedCall {
+                target: CallTarget::Component(1),
+                call: PanelCall::WrongEdge,
+            }],
+        ),
+        (
+            vec!["1Lz", "1T"],
+            vec![RecordedCall {
+                target: CallTarget::Element,
+                call: PanelCall::Repetition,
+            }],
+        ),
+    ] {
+        assert_eq!(
+            lookup_base_value(TABLE, &jump_unit(&codes, calls), &[]),
+            Err(BaseValueError::Unsupported)
+        );
+    }
+}
+
+#[test]
+fn euler_zero_and_sequence_second_half_remain_distinct_from_no_value() {
+    let zero = jump_unit(
+        &["1Lz", "Eu", "1S"],
+        vec![
+            RecordedCall {
+                target: CallTarget::Component(0),
+                call: PanelCall::Downgraded,
+            },
+            RecordedCall {
+                target: CallTarget::Component(2),
+                call: PanelCall::Downgraded,
+            },
+        ],
+    );
+    assert!(matches!(
+        lookup_base_value(TABLE, &zero, &[]),
+        Ok(BaseValueOutcome::Value(BaseValue { hundredths: 0, .. }))
+    ));
+    assert_eq!(
+        score_element(TABLE, &zero, &[], -5, Some(false))
+            .unwrap()
+            .score_hundredths,
+        0
+    );
+    let r = jump_unit(
+        &["1Lz", "1A"],
+        vec![RecordedCall {
+            target: CallTarget::BetweenComponents(2),
+            call: PanelCall::Sequence,
+        }],
+    );
+    let element = ProgramElement {
+        recognition: r,
+        annotations: vec![],
+        goe: 1,
+        fall: Some(false),
+        start_ms: Some(90_000),
+    };
+    let timed = score_program(
+        RulesetId::IsuAdult2026_27July16,
+        AdultCategory::Masters,
+        TABLE,
+        std::slice::from_ref(&element),
+        Some(0),
+        ordinary(180),
+    );
+    assert_eq!(timed.tes_hundredths, Some(198)); // 170*1.1=187, plus unfactored GOE 11.
+    let planned =
+        score_planning_scenario(RulesetId::IsuAdult2026_27July16, TABLE, &[element], Some(0))
+            .unwrap();
+    assert_eq!(planned.hypothetical_hundredths, Some(198));
+}
+
+#[test]
 fn single_q_starts_at_three_for_solo_combination_and_repetition() {
     let solo = recognition("2Lo", None, Some(vec![PanelCall::Quarter]));
     let mut combo = solo.clone();
