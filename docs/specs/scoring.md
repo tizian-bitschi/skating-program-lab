@@ -48,3 +48,7 @@ Scoring source references resolve their known document and version to official I
 ## Implemented subset
 
 See [implementation status](../implementation-status.md#scoring) for supported rows and limitations.
+
+## Timestamp-free planning scenarios
+
+`score_planning_scenario` calculates a hypothetical single-judge sum without skating times. With no boundary it uses unfactored values and categorizes no element as second half. An optional index marks the first element assumed to be in the second half; the resulting credit is conditional on that assumption. The index is not evidence of an actual start time, event applicability or an official TES. Unknown elements can leave the conditional selection incomplete. `score_program` remains the separate time-dependent path and requires timing and applicable rule evidence for exact claims; duration remains available for deductions.

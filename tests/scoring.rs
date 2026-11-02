@@ -345,6 +345,44 @@ fn ordinary(seconds: u32) -> Option<ProgramTiming> {
 }
 
 #[test]
+fn planning_boundary_is_optional_and_never_timing_evidence() {
+    let elements = vec![
+        program_element("1Lz", None, 0, false, None),
+        program_element("1Lz", None, 0, false, None),
+    ];
+    let plain =
+        score_planning_scenario(RulesetId::IsuAdult2026_27July16, TABLE, &elements, None).unwrap();
+    assert_eq!(plain.hypothetical_hundredths, Some(120));
+    assert!(plain
+        .elements
+        .iter()
+        .all(|result| !result.as_ref().unwrap().second_half));
+    let assumed =
+        score_planning_scenario(RulesetId::IsuAdult2026_27July16, TABLE, &elements, Some(1))
+            .unwrap();
+    assert_eq!(assumed.second_half_boundary, Some(1));
+    assert_eq!(assumed.hypothetical_hundredths, Some(126));
+    assert!(!assumed.elements[0].as_ref().unwrap().second_half);
+    assert!(assumed.elements[1].as_ref().unwrap().second_half);
+    assert_eq!(
+        score_program(
+            RulesetId::IsuAdult2026_27July16,
+            AdultCategory::Bronze,
+            TABLE,
+            &elements,
+            Some(0),
+            None
+        )
+        .tes_hundredths,
+        None
+    );
+    assert_eq!(
+        score_planning_scenario(RulesetId::IsuAdult2026_27July16, TABLE, &elements, Some(3)),
+        Err(ProgramScoreError::InvalidInput)
+    );
+}
+
+#[test]
 fn program_totals_keep_deductions_separate() {
     // Adult announcement pp. 6, 10, 11 and Communication 2786 pp. 2, 8.
     let elements = vec![
