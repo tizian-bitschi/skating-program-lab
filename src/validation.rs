@@ -42,7 +42,7 @@ pub struct ValidationResult {
 pub(crate) fn bronze_jump_source() -> SourceReference {
     category_source(AdultCategory::Bronze)
 }
-fn category_source(category: AdultCategory) -> SourceReference {
+pub(crate) fn category_source(category: AdultCategory) -> SourceReference {
     let location = match category {
         AdultCategory::Bronze => "p. 11, Bronze Free Skating, jumps",
         AdultCategory::Silver => "p. 10, Silver Free Skating, jumps",
@@ -54,6 +54,29 @@ fn category_source(category: AdultCategory) -> SourceReference {
         version: "2026-07-16".into(),
         location: location.into(),
     }
+}
+
+#[cfg(feature = "optimizer")]
+pub(crate) fn jump_rule_ids(category: AdultCategory) -> Vec<&'static str> {
+    [
+        Rule::Eligibility,
+        Rule::Count,
+        Rule::CompoundCount,
+        Rule::Structure,
+        Rule::Euler,
+        Rule::Repetition,
+        Rule::Axel,
+        Rule::Transition,
+    ]
+    .into_iter()
+    .filter(|rule| !matches!(rule, Rule::Axel) || category == AdultCategory::Masters)
+    .map(|rule| rule.id(category))
+    .collect()
+}
+
+#[cfg(feature = "optimizer")]
+pub(crate) fn jump_rule_sources(category: AdultCategory) -> Vec<SourceReference> {
+    vec![category_source(category), Rule::Transition.source(category)]
 }
 #[derive(Clone, Copy)]
 enum Rule {
