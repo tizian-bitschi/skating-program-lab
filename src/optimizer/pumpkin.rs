@@ -1,3 +1,4 @@
+use super::solver_common::{self, Deadline, EnumerationEnd};
 use super::*;
 use crate::validation::{
     bronze_jump_source, COMBINATION_COUNT_RULE, COUNT_RULE, ELIGIBILITY_RULE, EULER_RULE,
@@ -8,11 +9,7 @@ use pumpkin_solver::{
     core::{
         optimisation::{linear_sat_unsat::LinearSatUnsat, OptimisationDirection},
         predicate,
-        results::{
-            solution_iterator::IteratedSolution, OptimisationResult, ProblemSolution,
-            SolutionReference,
-        },
-        termination::TerminationCondition,
+        results::{OptimisationResult, ProblemSolution, SolutionReference},
         variables::TransformableVariable,
         DefaultBrancher,
     },
@@ -77,13 +74,6 @@ pub struct OptimizerResult {
     pub max_solutions: usize,
     pub time_limit: Option<Duration>,
     pub candidates: Vec<ReferenceCandidate>,
-}
-
-struct Deadline(Option<Instant>);
-impl TerminationCondition for Deadline {
-    fn should_stop(&mut self) -> bool {
-        self.0.is_some_and(|deadline| Instant::now() >= deadline)
-    }
 }
 
 /// Search only the documented reference domain. Unknown validation or BV aborts the request.
@@ -180,13 +170,12 @@ fn optimize_bronze_inner(
         LinearSatUnsat::new(OptimisationDirection::Maximise, objective, callback),
     );
     let mut candidates = Vec::new();
-    let (status, solution) = match outcome {
-        OptimisationResult::Optimal(s) => (OptimizerStatus::OptimalProven, Some(s)),
-        OptimisationResult::Satisfiable(s) | OptimisationResult::Stopped(s, _) => {
-            (OptimizerStatus::FeasibleUnproven, Some(s))
-        }
-        OptimisationResult::Unsatisfiable => (OptimizerStatus::InfeasibleProven, None),
-        OptimisationResult::Unknown => (OptimizerStatus::Incomplete, None),
+    let status = solver_common::status(&outcome);
+    let solution = match outcome {
+        OptimisationResult::Optimal(s)
+        | OptimisationResult::Satisfiable(s)
+        | OptimisationResult::Stopped(s, _) => Some(s),
+        OptimisationResult::Unsatisfiable | OptimisationResult::Unknown => None,
     };
     let mut reason = match status {
         OptimizerStatus::InfeasibleProven => TerminationReason::Infeasible,
@@ -217,37 +206,29 @@ fn optimize_bronze_inner(
             solver
                 .add_constraint(pumpkin_solver::equals(vec![objective], optimum, tag))
                 .post();
-            let mut brancher = solver.default_brancher();
-            let mut resolver = ResolutionResolver::default();
             if stop_during_enumeration {
                 termination.0 = Some(Instant::now());
             }
-            let mut iter =
-                solver.get_solution_iterator(&mut brancher, &mut termination, &mut resolver);
-            loop {
-                match iter.next_solution() {
-                    IteratedSolution::Solution(s, ..) => {
-                        let slots = x.map(|v| s.get_integer_value(v) == 1);
-                        let candidate = checked_candidate(slots, unit)?;
-                        if !candidates
-                            .iter()
-                            .any(|c| c.program.elements == candidate.program.elements)
-                        {
-                            candidates.push(candidate);
-                        }
-                        if candidates.len() >= request.max_solutions {
-                            break;
-                        }
-                    }
-                    IteratedSolution::Finished => {
-                        complete = true;
-                        reason = TerminationReason::EnumerationExhausted;
-                        break;
-                    }
-                    IteratedSolution::Unsatisfiable | IteratedSolution::Unknown => {
-                        reason = TerminationReason::EnumerationInterrupted;
-                        break;
-                    }
+            let mut examined = 0;
+            match solver_common::enumerate(
+                &mut solver,
+                &mut termination,
+                request.max_solutions,
+                usize::MAX,
+                &mut examined,
+                &mut candidates,
+                |s| {
+                    let slots = x.map(|v| s.get_integer_value(v) == 1);
+                    checked_candidate(slots, unit).map(Some)
+                },
+            )? {
+                EnumerationEnd::Exhausted => {
+                    complete = true;
+                    reason = TerminationReason::EnumerationExhausted;
+                }
+                EnumerationEnd::SolutionLimit => reason = TerminationReason::SolutionLimit,
+                EnumerationEnd::Interrupted | EnumerationEnd::SearchLimit => {
+                    reason = TerminationReason::EnumerationInterrupted
                 }
             }
         }

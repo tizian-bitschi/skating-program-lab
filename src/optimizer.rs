@@ -61,6 +61,12 @@ fn bronze_domain(exclude_lutz: bool) -> ReferenceDomain {
 mod pumpkin;
 #[cfg(feature = "optimizer")]
 pub use pumpkin::*;
+#[cfg(feature = "optimizer")]
+mod jumps;
+#[cfg(feature = "optimizer")]
+mod solver_common;
+#[cfg(feature = "optimizer")]
+pub use jumps::*;
 
 /// Enumerate every slot assignment. Exclusion removes 1Lz from every slot.
 /// Lookup errors abort the search rather than producing an incomplete optimum.

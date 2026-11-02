@@ -18,4 +18,6 @@ Jump transitions are distinct from listed jumps. Regular spins distinguish flyin
 
 ## Optimization
 
-The reference and Pumpkin solver cover only the finite Bronze 1Lz domain in the [optimization specification](specs/optimization.md). The solver is enabled by default; `--no-default-features` omits Pumpkin. `src/optimizer.rs`, `src/optimizer/pumpkin.rs` and `tests/optimizer.rs` cover this domain, element-count bounds and result limits. These do not establish complete eligibility, a global maximum or WebAssembly compatibility.
+The original reference and Bronze solver cover the finite 1Lz domain in the [optimization specification](specs/optimization.md). The separate category-aware `optimize_jumps` API searches explicit bounded jump-only domains in all four Adult categories. It supports clean singles and doubles and explicitly listed clean two-jump combinations ending in a toe loop or loop, subject to the shared validator and table. It does not optimize sequences, Euler, other transitions, calls, or full programs. Search interruption and incomplete tie enumeration remain distinct from proofs. The unfactored table-BV objective assumes clean recognition and does not resolve program-wide scoring consequences; see [category-aware optimization](specs/optimization.md#category-aware-jump-optimizer).
+
+Pumpkin is enabled by default; `--no-default-features` omits both solver APIs. These optimizers do not establish complete eligibility, a global maximum or WebAssembly compatibility.
