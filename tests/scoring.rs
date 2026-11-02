@@ -2,6 +2,209 @@ use skating_program_lab::*;
 
 const TABLE: ScoringTableId = ScoringTableId::Isu2786June2_2026;
 
+#[test]
+fn single_non_jump_scores_match_independent_source_extraction() {
+    let inventory: std::collections::BTreeMap<_, _> =
+        include_str!("fixtures/isu-2786-2026-06-02-manifest.tsv")
+            .lines()
+            .skip(1)
+            .map(|line| line.split('\t').collect::<Vec<_>>())
+            .filter(|fields| fields[4] == "SingleAndPair" && fields[5] != "Jump")
+            .map(|fields| (fields[6], fields))
+            .collect();
+    assert_eq!(inventory.len(), 187);
+    let mut count = 0;
+    // Independent PDF extraction maintained in #45, not production catalog values.
+    for line in include_str!("fixtures/isu-2786-2026-06-02-source-values.tsv").lines() {
+        let fields: Vec<_> = line.split('\t').collect();
+        if fields.len() != 15 {
+            continue;
+        }
+        let notation = fields[3];
+        let Some(metadata) = inventory.get(notation) else {
+            continue;
+        };
+        let reduced = notation.ends_with('V');
+        let unmarked = notation.strip_suffix('V').unwrap_or(notation);
+        let (code, level) = if matches!(unmarked, "ChSp1" | "ChSq1") {
+            (unmarked, None)
+        } else {
+            let Some(last) = unmarked.chars().last() else {
+                continue;
+            };
+            let level = match last {
+                'B' => Level::Basic,
+                '1' => Level::One,
+                '2' => Level::Two,
+                '3' => Level::Three,
+                '4' => Level::Four,
+                _ => continue,
+            };
+            (&unmarked[..unmarked.len() - 1], Some(level))
+        };
+        if !(code.ends_with("Sp") || code == "StSq" || matches!(code, "ChSp1" | "ChSq1")) {
+            continue;
+        }
+        assert!(
+            ComponentCode::try_from(code).is_ok(),
+            "missing Single code {code}"
+        );
+        let calls = if reduced {
+            vec![PanelCall::ReducedSpinValue]
+        } else {
+            vec![]
+        };
+        let r = recognition(code, level, Some(calls));
+        let base: u16 = fields[9].parse().unwrap();
+        for goe in -5i8..=5 {
+            let expected = if goe == 0 {
+                0
+            } else {
+                fields[(goe + 9) as usize].parse::<i16>().unwrap()
+            };
+            let score = score_element(TABLE, &r, &[], goe, Some(false)).unwrap();
+            assert_eq!(score.base.notation, notation);
+            assert_eq!(
+                (
+                    score.base.hundredths,
+                    score.goe_hundredths,
+                    score.score_hundredths
+                ),
+                (base, expected, base as i16 + expected),
+                "{notation} {goe}"
+            );
+            assert!(score
+                .base
+                .source
+                .location
+                .contains(&format!("p. {},", fields[1])));
+            assert_eq!(score.base.table, TABLE);
+            assert_eq!(score.base.source.version, "2026-06-02");
+            if !matches!(notation, "CSSp1" | "ChSp1") {
+                assert!(score.base.source.location.contains(metadata[3]));
+                assert!(score
+                    .base
+                    .source
+                    .location
+                    .contains(&format!("value row {}, code {notation}", metadata[2])));
+                assert!(score.goe_source.location.contains(metadata[3]));
+            }
+            assert_eq!(
+                score_element(TABLE, &r, &[], goe, Some(true)).is_ok(),
+                goe <= -3
+            );
+        }
+        assert_eq!(
+            score_element(TABLE, &r, &[], 0, None),
+            Err(ElementScoreError::UnknownFall)
+        );
+        count += 1;
+    }
+    assert_eq!(count, inventory.len());
+}
+
+#[test]
+fn change_foot_layback_variants_have_explicit_source_fixtures() {
+    // Communication 2786 p. 7, value rows 31, 36, 45 and 50.
+    for (code, level, reduced, base, adjustment) in [
+        ("CLSp", Level::Basic, false, 200, 20),
+        ("CLSp", Level::Basic, true, 150, 15),
+        ("FCLSp", Level::Four, false, 380, 38),
+        ("FCLSp", Level::Four, true, 285, 29),
+    ] {
+        let r = recognition(
+            code,
+            Some(level),
+            Some(if reduced {
+                vec![PanelCall::ReducedSpinValue]
+            } else {
+                vec![]
+            }),
+        );
+        let score = score_element(TABLE, &r, &[], 1, Some(false)).unwrap();
+        assert_eq!(
+            (score.base.hundredths, score.goe_hundredths),
+            (base, adjustment)
+        );
+    }
+}
+
+#[test]
+fn non_jump_marks_and_missing_levels_do_not_fabricate_values() {
+    for code in ["CSSp", "StSq"] {
+        assert_eq!(
+            lookup_base_value(TABLE, &recognition(code, None, Some(vec![])), &[]),
+            Err(BaseValueError::UnknownDetails)
+        );
+        for call in [
+            PanelCall::Quarter,
+            PanelCall::UnderRotated,
+            PanelCall::Downgraded,
+            PanelCall::WrongEdge,
+            PanelCall::UnclearEdge,
+            PanelCall::NotCounted,
+        ] {
+            assert_eq!(
+                lookup_base_value(
+                    TABLE,
+                    &recognition(code, Some(Level::One), Some(vec![call])),
+                    &[]
+                ),
+                Err(BaseValueError::Unsupported)
+            );
+        }
+    }
+    for code in ["USp", "StSq", "ChSq1", "ChSp1"] {
+        let level = if code.starts_with("Ch") {
+            None
+        } else {
+            Some(Level::Basic)
+        };
+        assert_eq!(
+            lookup_base_value(
+                TABLE,
+                &recognition(code, level, Some(vec![PanelCall::ReducedSpinValue])),
+                &[]
+            ),
+            Err(BaseValueError::Unsupported)
+        );
+    }
+}
+
+#[test]
+fn expanded_families_integrate_without_second_half_spin_credit() {
+    let elements = [
+        program_element("USp", Some(Level::Basic), 1, false, Some(20_000)),
+        program_element("StSq", Some(Level::Four), -3, true, Some(55_000)),
+        program_element("ChSq1", None, 2, false, Some(65_000)),
+        program_element("ChSp1", None, -3, true, Some(75_000)),
+    ];
+    // 120+12 + 410-123 + 350+100 + 350-150 = 1069. Inside Bronze falls: no deduction.
+    let timed = score_program(
+        RulesetId::IsuAdult2026_27July16,
+        AdultCategory::Bronze,
+        TABLE,
+        &elements,
+        Some(0),
+        ordinary(100),
+    );
+    assert_eq!(timed.tes_hundredths, Some(1069));
+    assert_eq!(timed.fall_deduction.unwrap().hundredths, 0);
+    assert_eq!(timed.time_deduction.unwrap().hundredths, 0);
+    assert!(timed
+        .elements
+        .iter()
+        .all(|element| !element.as_ref().unwrap().second_half));
+    let planning =
+        score_planning_scenario(RulesetId::IsuAdult2026_27July16, TABLE, &elements, Some(0))
+            .unwrap();
+    assert_eq!(planning.hypothetical_hundredths, Some(1069));
+    assert!(planning
+        .elements
+        .iter()
+        .all(|element| !element.as_ref().unwrap().second_half));
+}
+
 fn recognition(
     code: &str,
     level: Option<Level>,
@@ -735,7 +938,7 @@ fn annotations_and_unresolved_nonjumps_are_isolated() {
         .is_err());
     let mut jump = program_element("1Lz", None, 1, false, Some(50_000));
     jump.annotations.push(ScoringAnnotation::SecondHalfCredit);
-    let unsupported = program_element("CSSp", Some(Level::Two), 0, false, None);
+    let unsupported = program_element("CSSp", None, 0, false, None);
     let result = score_program(
         rules,
         AdultCategory::Bronze,

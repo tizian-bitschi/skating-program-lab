@@ -1,7 +1,7 @@
 //! Source-backed, unfactored base values for a deliberately limited catalog.
 use crate::{
-    Level, PanelCall, PanelRecognition, RecognitionOutcome, ScoringAnnotation, ScoringTableId,
-    SourceReference,
+    CatalogDiscipline, CatalogFamily, PanelCall, PanelRecognition, RecognitionOutcome,
+    ScoringAnnotation, ScoringTableId, SourceReference,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -34,11 +34,17 @@ struct TableRow {
     table: ScoringTableId,
     notation: String,
     section: &'static str,
+    catalog_source: Option<crate::CatalogSource>,
     goe_reference: Option<String>,
 }
 
 impl TableRow {
     fn source(&self, column: &str) -> SourceReference {
+        if let Some(source) = self.catalog_source {
+            let mut reference = source.reference(&self.notation);
+            reference.location.push_str(&format!(", {column}"));
+            return reference;
+        }
         self.table
             .source_reference(format!("{}, {column}, row {}", self.section, self.notation))
     }
@@ -114,38 +120,58 @@ fn table_row(
             table,
             notation: notation.clone(),
             section: "pp. 2–4, Jumps; p. 14, combination reference",
+            catalog_source: None,
             goe_reference: Some(reference.to_owned()),
         });
     }
     if details.components().len() != 1 {
         return Err(BaseValueError::Unsupported);
     }
-    let (hundredths, section, goe) = match table {
-        ScoringTableId::Isu2786June2_2026 => match (notation.as_str(), details.level()) {
-            ("CSSp1", Some(Level::One)) | ("ChSp1", None) => {
-                let row =
-                    crate::catalog_row(table, &notation).ok_or(BaseValueError::Unsupported)?;
-                let section = if notation == "CSSp1" {
-                    "p. 8, Spins"
-                } else {
-                    "p. 14, Choreographic Elements"
-                };
-                (row.base_hundredths, section, Some(row.goe_hundredths))
-            }
-            (name, None) => {
-                let (base, section, goe) =
-                    jump_row(table, name).ok_or(BaseValueError::Unsupported)?;
-                (base, section, Some(goe))
-            }
-            _ => return Err(BaseValueError::Unsupported),
-        },
+    let component = details.components()[0].as_str();
+    if details.level().is_none() && (component.ends_with("Sp") || component == "StSq") {
+        return Err(BaseValueError::UnknownDetails);
+    }
+    let catalog = crate::catalog_row(table, &notation).ok_or(BaseValueError::Unsupported)?;
+    if catalog.discipline != CatalogDiscipline::SingleAndPair || catalog.level != details.level() {
+        return Err(BaseValueError::Unsupported);
+    }
+    let (hundredths, section, goe) = match catalog.family {
+        CatalogFamily::Jump if details.level().is_none() => {
+            let (base, section, goe) =
+                jump_row(table, &notation).ok_or(BaseValueError::Unsupported)?;
+            (base, section, Some(goe))
+        }
+        CatalogFamily::Spin
+        | CatalogFamily::StepSequence
+        | CatalogFamily::ChoreographicSpin
+        | CatalogFamily::ChoreographicSequence => {
+            // Preserve source strings only for the previously supported public outputs.
+            let section = match notation.as_str() {
+                "CSSp1" => "p. 8, Spins",
+                "ChSp1" => "p. 14, Choreographic Elements",
+                _ => "",
+            };
+            (
+                catalog.base_hundredths,
+                section,
+                Some(catalog.goe_hundredths),
+            )
+        }
+        _ => return Err(BaseValueError::Unsupported),
     };
     Ok(TableRow {
         hundredths,
         goe,
         table,
-        notation,
         section,
+        catalog_source: if catalog.family == CatalogFamily::Jump
+            || matches!(notation.as_str(), "CSSp1" | "ChSp1")
+        {
+            None
+        } else {
+            Some(catalog.source)
+        },
+        notation,
         goe_reference: None,
     })
 }
@@ -235,6 +261,7 @@ pub fn score_element(
     let (max_grade, fall_max, downgraded) = match calls {
         [] => (5, -3, false),
         [entry] => match entry.call {
+            PanelCall::ReducedSpinValue => (5, -3, false),
             PanelCall::Quarter | PanelCall::UnderRotated => (3, -5, false),
             PanelCall::UnclearEdge => (4, -4, false),
             PanelCall::WrongEdge => (0, -5, false),

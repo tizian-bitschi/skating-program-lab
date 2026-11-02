@@ -112,11 +112,7 @@ fn exact_lookup_rejects_absent_codes_and_editions_without_fallback() {
 
 #[test]
 fn known_catalog_rows_do_not_expand_recognition_or_scoring_support() {
-    for (code, level, notation) in [
-        ("3A", None, "3A"),
-        ("CSSp", Some(Level::Two), "CSSp2"),
-        ("StSq", Some(Level::One), "StSq1"),
-    ] {
+    for (code, level, notation) in [("3A", None, "3A"), ("3T", None, "3T")] {
         assert!(catalog_row(TABLE, notation).is_some());
         let recognition = PanelRecognition {
             ruleset: RulesetId::IsuAdult2026_27July16,
