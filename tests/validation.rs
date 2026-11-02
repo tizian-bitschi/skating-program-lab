@@ -67,7 +67,7 @@ fn missing_fields_and_multiple_combination_findings_are_preserved() {
             .iter()
             .filter(|f| f.kind == FindingKind::Unknown && f.rule_id.ends_with("jump-eligibility"))
             .count(),
-        4
+        3
     );
     assert_eq!(
         result
@@ -533,4 +533,96 @@ fn compound_limits_repetitions_and_uncertainty() {
         .iter()
         .any(|f| f.kind == FindingKind::Unknown
             && f.explanation.contains("verified combination subset")));
+}
+
+#[test]
+fn explicit_transitions_are_unknown_with_sports_rule_source_in_all_categories() {
+    for category in [
+        AdultCategory::Bronze,
+        AdultCategory::Silver,
+        AdultCategory::Gold,
+        AdultCategory::Masters,
+    ] {
+        let result = validate_program(&program(
+            category,
+            vec![PlannedElement::Jump(JumpElement::Combination(vec![
+                JumpPart::Jump(jump(Some(JumpKind::Lutz), Some(1))),
+                JumpPart::OtherTransition("three-turn".into()),
+                JumpPart::Jump(jump(Some(JumpKind::ToeLoop), Some(1))),
+            ]))],
+        ));
+        let finding = result
+            .findings
+            .iter()
+            .find(|f| f.rule_id == "isu-sports-2026-jump-transition")
+            .unwrap();
+        assert_eq!(finding.kind, FindingKind::Unknown);
+        assert_eq!(finding.component_index, Some(1));
+        assert_eq!(finding.source.version, "2026-06-12");
+        assert!(finding.source.location.contains("Rule 610"));
+    }
+}
+
+#[test]
+fn masters_axel_requirement_distinguishes_missing_type_from_rotation() {
+    for (kind, rotations, expected) in [
+        (Some(JumpKind::ToeLoop), None, FindingKind::Violation),
+        (None, Some(1), FindingKind::Unknown),
+        (Some(JumpKind::Axel), None, FindingKind::Unknown),
+    ] {
+        let result = validate_program(&program(
+            AdultCategory::Masters,
+            vec![solo(kind, rotations)],
+        ));
+        assert_eq!(
+            result
+                .findings
+                .iter()
+                .find(|f| f.rule_id.ends_with("axel-required"))
+                .unwrap()
+                .kind,
+            expected
+        );
+    }
+}
+
+#[test]
+fn missing_and_invalid_rotations_and_unspecified_element_limits_are_distinct() {
+    for category in [
+        AdultCategory::Bronze,
+        AdultCategory::Silver,
+        AdultCategory::Gold,
+        AdultCategory::Masters,
+    ] {
+        for (rotations, expected) in [
+            (None, FindingKind::Unknown),
+            (Some(0), FindingKind::Violation),
+        ] {
+            let result = validate_program(&program(
+                category,
+                vec![solo(Some(JumpKind::ToeLoop), rotations)],
+            ));
+            let rule = if rotations.is_none() {
+                "jump-eligibility"
+            } else {
+                "invalid-rotations"
+            };
+            assert!(result
+                .findings
+                .iter()
+                .any(|f| f.rule_id.ends_with(rule) && f.kind == expected));
+        }
+        let limit = if matches!(category, AdultCategory::Bronze | AdultCategory::Silver) {
+            4
+        } else {
+            5
+        };
+        let mut elements = vec![solo(Some(JumpKind::ToeLoop), Some(1)); limit];
+        elements.push(PlannedElement::Unspecified);
+        let result = validate_program(&program(category, elements));
+        assert!(result
+            .findings
+            .iter()
+            .any(|f| f.rule_id.ends_with("jump-element-count") && f.kind == FindingKind::Unknown));
+    }
 }

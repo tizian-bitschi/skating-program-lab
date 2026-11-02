@@ -1153,3 +1153,53 @@ fn recognized_pair_sums_base_and_uses_one_reference_goe() {
         Err(ElementScoreError::BaseValue(BaseValueError::Unsupported))
     );
 }
+
+#[test]
+fn second_component_can_set_combination_goe_reference() {
+    let mut combo = recognition("1T", None, Some(vec![]));
+    combo.details = Some(
+        RecognitionDetails::new(
+            vec![
+                ComponentCode::try_from("1T").unwrap(),
+                ComponentCode::try_from("2Lo").unwrap(),
+            ],
+            None,
+            Some(vec![]),
+        )
+        .unwrap(),
+    );
+    let result = score_element(TABLE, &combo, &[], 2, Some(false)).unwrap();
+    assert_eq!(
+        (
+            result.base.hundredths,
+            result.goe_hundredths,
+            result.score_hundredths
+        ),
+        (210, 34, 244)
+    );
+    assert!(result.goe_source.location.contains("2Lo"));
+    combo.details = Some(
+        RecognitionDetails::new(
+            vec![
+                ComponentCode::try_from("1T").unwrap(),
+                ComponentCode::try_from("2Lo").unwrap(),
+            ],
+            None,
+            Some(vec![RecordedCall {
+                target: CallTarget::Component(1),
+                call: PanelCall::UnderRotated,
+            }]),
+        )
+        .unwrap(),
+    );
+    let result = score_element(TABLE, &combo, &[], 2, Some(false)).unwrap();
+    assert_eq!(
+        (
+            result.base.hundredths,
+            result.goe_hundredths,
+            result.score_hundredths
+        ),
+        (176, 27, 203)
+    );
+    assert!(result.goe_source.location.contains("2Lo<"));
+}

@@ -10,7 +10,7 @@ Jump transitions are distinct from listed jumps. Regular spins distinguish flyin
 
 ## Validation
 
-`src/validation.rs` checks jump eligibility, element count, combinations, sequences, Euler and listed-jump repetitions for Bronze, Silver, Gold and Masters. Masters requires an Axel-type jump. Transitions outside the documented direct subset, direct sequence steps, and Euler footwork or panel consequences remain unknown; other seasons are unsupported. Findings carry a rule identifier, explanation, location and source. Coverage is always partial; an empty list does not establish compliance. Spin and sequence recognition and program-wide scoring consequences are not validated. `tests/validation.rs` covers selected boundaries and unknowns.
+`src/validation.rs` checks jump eligibility, element count, combinations, sequences, Euler and listed-jump repetitions for Bronze, Silver, Gold and Masters. Masters requires an Axel-type jump. Transitions outside the documented direct subset, direct sequence steps, and Euler footwork or panel consequences remain unknown; other seasons are unsupported. Findings carry a rule identifier, explanation, location and source. A missing rotation is unknown; an explicitly zero rotation is invalid input reported as a violation. Coverage is always partial; an empty list does not establish compliance. Spin and sequence recognition and program-wide scoring consequences are not validated. `tests/validation.rs` covers selected boundaries and unknowns.
 
 ## Scoring
 
