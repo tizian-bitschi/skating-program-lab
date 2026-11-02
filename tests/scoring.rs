@@ -973,30 +973,31 @@ fn no_value_before_half_or_known_nonjump_does_not_block_bonus() {
 fn clean_jump_columns_match_june_table() {
     // Communication 2786, 2 June 2026, pp. 2–3: BASE and each GOE column.
     let fixtures = [
-        ("1T", 40, [20, 16, 12, 8, 4]),
-        ("1S", 40, [20, 16, 12, 8, 4]),
-        ("1Lo", 50, [25, 20, 15, 10, 5]),
-        ("1F", 50, [25, 20, 15, 10, 5]),
-        ("1Lz", 60, [30, 24, 18, 12, 6]),
-        ("1A", 110, [55, 44, 33, 22, 11]),
-        ("2T", 130, [65, 52, 39, 26, 13]),
-        ("2S", 130, [65, 52, 39, 26, 13]),
-        ("2Lo", 170, [85, 68, 51, 34, 17]),
-        ("2F", 180, [90, 72, 54, 36, 18]),
-        ("2Lz", 210, [105, 84, 63, 42, 21]),
-        ("2A", 330, [165, 132, 99, 66, 33]),
+        ("1T", 40, [-20, -16, -12, -8, -4, 0, 4, 8, 12, 16, 20]),
+        ("1S", 40, [-20, -16, -12, -8, -4, 0, 4, 8, 12, 16, 20]),
+        ("1Lo", 50, [-25, -20, -15, -10, -5, 0, 5, 10, 15, 20, 25]),
+        ("1F", 50, [-25, -20, -15, -10, -5, 0, 5, 10, 15, 20, 25]),
+        ("1Lz", 60, [-30, -24, -18, -12, -6, 0, 6, 12, 18, 24, 30]),
+        ("1A", 110, [-55, -44, -33, -22, -11, 0, 11, 22, 33, 44, 55]),
+        ("2T", 130, [-65, -52, -39, -26, -13, 0, 13, 26, 39, 52, 65]),
+        ("2S", 130, [-65, -52, -39, -26, -13, 0, 13, 26, 39, 52, 65]),
+        ("2Lo", 170, [-85, -68, -51, -34, -17, 0, 17, 34, 51, 68, 85]),
+        ("2F", 180, [-90, -72, -54, -36, -18, 0, 18, 36, 54, 72, 90]),
+        (
+            "2Lz",
+            210,
+            [-105, -84, -63, -42, -21, 0, 21, 42, 63, 84, 105],
+        ),
+        (
+            "2A",
+            330,
+            [-165, -132, -99, -66, -33, 0, 33, 66, 99, 132, 165],
+        ),
     ];
-    for (code, base, negatives) in fixtures {
+    for (code, base, expected_values) in fixtures {
         let r = recognition(code, None, Some(vec![]));
-        for grade in -5i8..=5 {
+        for (grade, expected) in (-5i8..=5).zip(expected_values) {
             let score = score_element(TABLE, &r, &[], grade, Some(false)).unwrap();
-            let expected = if grade < 0 {
-                -negatives[(grade + 5) as usize]
-            } else if grade > 0 {
-                negatives[(5 - grade) as usize]
-            } else {
-                0
-            };
             assert_eq!(
                 (score.base.hundredths, score.goe_hundredths),
                 (base, expected),
@@ -1061,6 +1062,30 @@ fn jump_value_does_not_depend_on_adult_category() {
                 score.unfactored.goe_hundredths
             ),
             (170, 17)
+        );
+    }
+}
+
+#[test]
+fn call_and_fall_limits_are_enforced() {
+    use PanelCall::*;
+    for (call, maximum, fall_maximum) in [
+        (Quarter, 3, -5),
+        (UnderRotated, 3, -5),
+        (Downgraded, -1, -5),
+        (UnclearEdge, 4, -4),
+        (WrongEdge, 0, -5),
+    ] {
+        let r = recognition("2F", None, Some(vec![call]));
+        assert!(score_element(TABLE, &r, &[], maximum, Some(false)).is_ok());
+        assert_eq!(
+            score_element(TABLE, &r, &[], maximum + 1, Some(false)),
+            Err(ElementScoreError::UnsupportedMarks)
+        );
+        assert!(score_element(TABLE, &r, &[], fall_maximum, Some(true)).is_ok());
+        assert_eq!(
+            score_element(TABLE, &r, &[], fall_maximum + 1, Some(true)),
+            Err(ElementScoreError::InconsistentFall)
         );
     }
 }

@@ -1,6 +1,7 @@
 //! Source-backed, unfactored base values for a deliberately limited catalog.
 use crate::{
-    Level, PanelRecognition, RecognitionOutcome, ScoringAnnotation, ScoringTableId, SourceReference,
+    Level, PanelCall, PanelRecognition, RecognitionOutcome, ScoringAnnotation, ScoringTableId,
+    SourceReference,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -230,10 +231,6 @@ fn table_row(
     }
     let (hundredths, section, goe) = match table {
         ScoringTableId::Isu2786June2_2026 => match (notation.as_str(), details.level()) {
-            (name, None) if jump_row(name).is_some() => {
-                let (base, section, goe) = jump_row(name).expect("matched jump row");
-                (base, section, Some(goe))
-            }
             ("CSSp1", Some(Level::One)) => (
                 230,
                 "p. 8, Spins",
@@ -244,6 +241,10 @@ fn table_row(
                 "p. 14, Choreographic Elements",
                 Some([-250, -200, -150, -100, -50, 0, 50, 100, 150, 200, 250]),
             ),
+            (name, None) => {
+                let (base, section, goe) = jump_row(name).ok_or(BaseValueError::Unsupported)?;
+                (base, section, Some(goe))
+            }
             _ => return Err(BaseValueError::Unsupported),
         },
     };
@@ -261,23 +262,39 @@ fn table_row(
     })
 }
 
+enum ResolvedRow {
+    Value(TableRow),
+    Ignored,
+    NoValue,
+}
+
+fn resolve_row(
+    table: ScoringTableId,
+    recognition: &PanelRecognition,
+    annotations: &[ScoringAnnotation],
+) -> Result<ResolvedRow, BaseValueError> {
+    if !annotations.is_empty() {
+        return Err(BaseValueError::Unsupported);
+    }
+    match recognition.outcome {
+        RecognitionOutcome::Ignored => Ok(ResolvedRow::Ignored),
+        RecognitionOutcome::NoValue => Ok(ResolvedRow::NoValue),
+        RecognitionOutcome::Unknown => Err(BaseValueError::UnknownRecognition),
+        RecognitionOutcome::Recognized => Ok(ResolvedRow::Value(table_row(table, recognition)?)),
+    }
+}
+
 /// Look up a supplied panel outcome. This does not establish event eligibility.
 pub fn lookup_base_value(
     table: ScoringTableId,
     recognition: &PanelRecognition,
     annotations: &[ScoringAnnotation],
 ) -> Result<BaseValueOutcome, BaseValueError> {
-    if !annotations.is_empty() {
-        return Err(BaseValueError::Unsupported);
-    }
-    match recognition.outcome {
-        RecognitionOutcome::Ignored => Ok(BaseValueOutcome::Ignored),
-        RecognitionOutcome::NoValue => Ok(BaseValueOutcome::NoValue),
-        RecognitionOutcome::Unknown => Err(BaseValueError::UnknownRecognition),
-        RecognitionOutcome::Recognized => Ok(BaseValueOutcome::Value(
-            table_row(table, recognition)?.base(),
-        )),
-    }
+    Ok(match resolve_row(table, recognition, annotations)? {
+        ResolvedRow::Value(row) => BaseValueOutcome::Value(row.base()),
+        ResolvedRow::Ignored => BaseValueOutcome::Ignored,
+        ResolvedRow::NoValue => BaseValueOutcome::NoValue,
+    })
 }
 
 /// A single hypothetical judge's unfactored element score, in hundredths.
@@ -314,53 +331,36 @@ pub fn score_element(
     if !(-5..=5).contains(&goe) {
         return Err(ElementScoreError::InvalidGoe);
     }
-    match lookup_base_value(table, recognition, annotations)
-        .map_err(ElementScoreError::BaseValue)?
-    {
-        BaseValueOutcome::Ignored => return Err(ElementScoreError::Ignored),
-        BaseValueOutcome::NoValue => return Err(ElementScoreError::NoValue),
-        BaseValueOutcome::Value(_) => {}
-    }
-    let row = table_row(table, recognition).map_err(ElementScoreError::BaseValue)?;
+    let row =
+        match resolve_row(table, recognition, annotations).map_err(ElementScoreError::BaseValue)? {
+            ResolvedRow::Ignored => return Err(ElementScoreError::Ignored),
+            ResolvedRow::NoValue => return Err(ElementScoreError::NoValue),
+            ResolvedRow::Value(row) => row,
+        };
     let goe_values = row.goe.ok_or(ElementScoreError::UnsupportedMarks)?;
-    let details = recognition
+    let calls = recognition
         .details
         .as_ref()
-        .expect("table row requires details");
-    let marks = if row.section.ends_with("Jumps") {
-        row.notation
-            .strip_prefix(details.components()[0].as_str())
-            .unwrap_or("")
-    } else {
-        ""
-    };
-    if (marks.contains('e') || marks.contains('!')) && (marks.contains('<') || marks.contains('q'))
-    {
-        return Err(ElementScoreError::UnsupportedMarks);
-    }
+        .and_then(|details| details.calls())
+        .ok_or(ElementScoreError::BaseValue(BaseValueError::UnknownCalls))?;
     // Communication 2788 pp. 14, 16: reductions and maximum starting GOE.
-    let max_grade = match marks {
-        "q" | "<" => 3,
-        "!" => 4,
-        "e" => 0,
-        "<<" => -1,
-        _ => 5,
+    let (max_grade, fall_max, downgraded) = match calls {
+        [] => (5, -3, false),
+        [entry] => match entry.call {
+            PanelCall::Quarter | PanelCall::UnderRotated => (3, -5, false),
+            PanelCall::UnclearEdge => (4, -4, false),
+            PanelCall::WrongEdge => (0, -5, false),
+            PanelCall::Downgraded => (-1, -5, true),
+            _ => return Err(ElementScoreError::UnsupportedMarks),
+        },
+        _ => return Err(ElementScoreError::UnsupportedMarks),
     };
     if goe > max_grade {
         return Err(ElementScoreError::UnsupportedMarks);
     }
     match fall {
         None => return Err(ElementScoreError::UnknownFall),
-        Some(true)
-            if goe
-                > match marks {
-                    "" => -3,
-                    "!" => -4,
-                    _ => -5,
-                } =>
-        {
-            return Err(ElementScoreError::InconsistentFall);
-        }
+        Some(true) if goe > fall_max => return Err(ElementScoreError::InconsistentFall),
         _ => {}
     }
     let goe_hundredths = goe_values[(goe + 5) as usize];
@@ -375,7 +375,7 @@ pub fn score_element(
     let consistency_source = SourceReference {
         document: "ISU Communication 2788".into(),
         version: "2026-05-19".into(),
-        location: if row.notation.ends_with("<<") {
+        location: if downgraded {
             "pp. 14, 16, downgrade and fall reductions and maximum starting GOE"
         } else {
             "pp. 14, 16, call and fall reductions and maximum starting GOE"
