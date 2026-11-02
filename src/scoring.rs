@@ -55,6 +55,167 @@ impl TableRow {
     }
 }
 
+// ISU Communication 2786, updated 2026-06-02, pp. 2-4: BASE and GOE columns.
+fn jump_row(notation: &str) -> Option<(u16, &'static str, [i16; 11])> {
+    match notation {
+        "1T" | "1S" | "1Tq" | "1Sq" | "1Lo<" | "1F<" | "1Fe" | "1Feq" | "1F!<" => Some((
+            40,
+            "p. 2, Jumps",
+            [-20, -16, -12, -8, -4, 0, 4, 8, 12, 16, 20],
+        )),
+        "1Lo" | "1F" | "1Loq" | "1Fq" | "1F!" | "1F!q" => Some((
+            50,
+            "p. 2, Jumps",
+            [-25, -20, -15, -10, -5, 0, 5, 10, 15, 20, 25],
+        )),
+        "1Lz" | "1Lzq" | "1Lz!" | "1Lz!q" => Some((
+            60,
+            "p. 2, Jumps",
+            [-30, -24, -18, -12, -6, 0, 6, 12, 18, 24, 30],
+        )),
+        "1T<" | "1S<" => Some((
+            32,
+            "p. 2, Jumps",
+            [-16, -13, -10, -6, -3, 0, 3, 6, 10, 13, 16],
+        )),
+        "1Lz<" | "1Lze" | "1Lzeq" | "1Lz!<" => Some((
+            48,
+            "p. 2, Jumps",
+            [-24, -19, -14, -10, -5, 0, 5, 10, 14, 19, 24],
+        )),
+        "1T<<" | "1S<<" | "1Lo<<" | "1F<<" | "1Lz<<" | "1Fe<<" | "1Lze<<" | "1F!<<" | "1Lz!<<" => {
+            Some((0, "p. 2, Jumps", [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]))
+        }
+        "1Fe<" => Some((
+            30,
+            "p. 2, Jumps",
+            [-15, -12, -9, -6, -3, 0, 3, 6, 9, 12, 15],
+        )),
+        "1Lze<" => Some((
+            36,
+            "p. 2, Jumps",
+            [-18, -14, -11, -7, -4, 0, 4, 7, 11, 14, 18],
+        )),
+        "1A" | "1Aq" => Some((
+            110,
+            "p. 2, Jumps",
+            [-55, -44, -33, -22, -11, 0, 11, 22, 33, 44, 55],
+        )),
+        "2T" | "2S" | "2Tq" | "2Sq" => Some((
+            130,
+            "p. 2, Jumps",
+            [-65, -52, -39, -26, -13, 0, 13, 26, 39, 52, 65],
+        )),
+        "2Lo" | "2Loq" => Some((
+            170,
+            "p. 2, Jumps",
+            [-85, -68, -51, -34, -17, 0, 17, 34, 51, 68, 85],
+        )),
+        "2F" | "2Fq" => Some((
+            180,
+            "p. 2, Jumps",
+            [-90, -72, -54, -36, -18, 0, 18, 36, 54, 72, 90],
+        )),
+        "2Lz" | "2Lzq" => Some((
+            210,
+            "p. 2, Jumps",
+            [-105, -84, -63, -42, -21, 0, 21, 42, 63, 84, 105],
+        )),
+        "1A<" => Some((
+            88,
+            "p. 2, Jumps",
+            [-44, -35, -26, -18, -9, 0, 9, 18, 26, 35, 44],
+        )),
+        "2T<" | "2S<" => Some((
+            104,
+            "p. 2, Jumps",
+            [-52, -42, -31, -21, -10, 0, 10, 21, 31, 42, 52],
+        )),
+        "2Lo<" => Some((
+            136,
+            "p. 2, Jumps",
+            [-68, -54, -41, -27, -14, 0, 14, 27, 41, 54, 68],
+        )),
+        "2F<" => Some((
+            144,
+            "p. 2, Jumps",
+            [-72, -58, -43, -29, -14, 0, 14, 29, 43, 58, 72],
+        )),
+        "2Lz<" => Some((
+            168,
+            "p. 2, Jumps",
+            [-84, -67, -50, -34, -17, 0, 17, 34, 50, 67, 84],
+        )),
+        "1A<<" => Some((0, "p. 3, Jumps", [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])),
+        "2T<<" | "2S<<" | "2Fe<<" => Some((
+            40,
+            "p. 3, Jumps",
+            [-20, -16, -12, -8, -4, 0, 4, 8, 12, 16, 20],
+        )),
+        "2Lo<<" | "2F<<" | "2F!<<" => Some((
+            50,
+            "p. 3, Jumps",
+            [-25, -20, -15, -10, -5, 0, 5, 10, 15, 20, 25],
+        )),
+        "2Lz<<" | "2Lz!<<" => Some((
+            60,
+            "p. 3, Jumps",
+            [-30, -24, -18, -12, -6, 0, 6, 12, 18, 24, 30],
+        )),
+        "2Fe" | "2Feq" | "2F!<" => Some((
+            144,
+            "p. 3, Jumps",
+            [-72, -58, -43, -29, -14, 0, 14, 29, 43, 58, 72],
+        )),
+        "2Fe<" => Some((
+            108,
+            "p. 3, Jumps",
+            [-54, -43, -32, -22, -11, 0, 11, 22, 32, 43, 54],
+        )),
+        "2Lze" | "2Lzeq" | "2Lz!<" => Some((
+            168,
+            "p. 3, Jumps",
+            [-84, -67, -50, -34, -17, 0, 17, 34, 50, 67, 84],
+        )),
+        "2Lze<" => Some((
+            126,
+            "p. 3, Jumps",
+            [-63, -50, -38, -25, -13, 0, 13, 25, 38, 50, 63],
+        )),
+        "2Lze<<" => Some((
+            48,
+            "p. 3, Jumps",
+            [-24, -19, -14, -10, -5, 0, 5, 10, 14, 19, 24],
+        )),
+        "2F!" | "2F!q" => Some((
+            180,
+            "p. 3, Jumps",
+            [-90, -72, -54, -36, -18, 0, 18, 36, 54, 72, 90],
+        )),
+        "2Lz!" | "2Lz!q" => Some((
+            210,
+            "p. 3, Jumps",
+            [-105, -84, -63, -42, -21, 0, 21, 42, 63, 84, 105],
+        )),
+        "2A" | "2Aq" => Some((
+            330,
+            "p. 3, Jumps",
+            [-165, -132, -99, -66, -33, 0, 33, 66, 99, 132, 165],
+        )),
+        "2A<" => Some((
+            264,
+            "p. 3, Jumps",
+            [-132, -106, -79, -53, -26, 0, 26, 53, 79, 106, 132],
+        )),
+        "2A<<" => Some((
+            110,
+            "p. 4, Jumps",
+            [-55, -44, -33, -22, -11, 0, 11, 22, 33, 44, 55],
+        )),
+        _ => None,
+    }
+}
+
 fn table_row(
     table: ScoringTableId,
     recognition: &PanelRecognition,
@@ -69,16 +230,10 @@ fn table_row(
     }
     let (hundredths, section, goe) = match table {
         ScoringTableId::Isu2786June2_2026 => match (notation.as_str(), details.level()) {
-            ("1Lz", None) => (
-                60,
-                "p. 2, Jumps",
-                Some([-30, -24, -18, -12, -6, 0, 6, 12, 18, 24, 30]),
-            ),
-            ("1Lzq", None) | ("1Lz!", None) => (60, "p. 2, Jumps", None),
-            ("1Lz<", None) | ("1Lze", None) => (48, "p. 2, Jumps", None),
-            ("1Lz<<", None) => (0, "p. 2, Jumps", Some([0; 11])),
-            ("1Lze<", None) => (36, "p. 2, Jumps", None),
-            ("1A<<", None) => (0, "p. 3, Jumps", Some([0; 11])),
+            (name, None) if jump_row(name).is_some() => {
+                let (base, section, goe) = jump_row(name).expect("matched jump row");
+                (base, section, Some(goe))
+            }
             ("CSSp1", Some(Level::One)) => (
                 230,
                 "p. 8, Spins",
@@ -147,7 +302,7 @@ pub enum ElementScoreError {
     UnsupportedMarks,
 }
 
-/// Scores only individually reviewed unmarked elements, with an explicit fall observation.
+/// Scores supported single elements with an explicit fall observation.
 /// This does not validate event eligibility or other execution errors.
 pub fn score_element(
     table: ScoringTableId,
@@ -168,13 +323,42 @@ pub fn score_element(
     }
     let row = table_row(table, recognition).map_err(ElementScoreError::BaseValue)?;
     let goe_values = row.goe.ok_or(ElementScoreError::UnsupportedMarks)?;
-    // Communication 2788 pp. 14, 16: downgrade reduction and starting limit.
-    if row.notation.ends_with("<<") && goe > -1 {
+    let details = recognition
+        .details
+        .as_ref()
+        .expect("table row requires details");
+    let marks = if row.section.ends_with("Jumps") {
+        row.notation
+            .strip_prefix(details.components()[0].as_str())
+            .unwrap_or("")
+    } else {
+        ""
+    };
+    if (marks.contains('e') || marks.contains('!')) && (marks.contains('<') || marks.contains('q'))
+    {
+        return Err(ElementScoreError::UnsupportedMarks);
+    }
+    // Communication 2788 pp. 14, 16: reductions and maximum starting GOE.
+    let max_grade = match marks {
+        "q" | "<" => 3,
+        "!" => 4,
+        "e" => 0,
+        "<<" => -1,
+        _ => 5,
+    };
+    if goe > max_grade {
         return Err(ElementScoreError::UnsupportedMarks);
     }
     match fall {
         None => return Err(ElementScoreError::UnknownFall),
-        Some(true) if goe > if row.notation.ends_with("<<") { -5 } else { -3 } => {
+        Some(true)
+            if goe
+                > match marks {
+                    "" => -3,
+                    "!" => -4,
+                    _ => -5,
+                } =>
+        {
             return Err(ElementScoreError::InconsistentFall);
         }
         _ => {}
@@ -194,7 +378,7 @@ pub fn score_element(
         location: if row.notation.ends_with("<<") {
             "pp. 14, 16, downgrade and fall reductions and maximum starting GOE"
         } else {
-            "pp. 14, 16, fall reduction and maximum starting GOE"
+            "pp. 14, 16, call and fall reductions and maximum starting GOE"
         }
         .into(),
     };
