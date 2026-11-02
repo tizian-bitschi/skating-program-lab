@@ -512,3 +512,34 @@ fn unknown_execution_is_compatible_and_explicit_no_errors_resolves_unknown_fall(
         66
     );
 }
+
+#[test]
+fn execution_evidence_preserves_zero_no_value_ignored_and_unknown_outcomes() {
+    let zero = unit(&["1Lz"], vec![component(0, PanelCall::Downgraded)]);
+    let located_fall = evidence(vec![JumpExecutionError::Fall { component: 0 }]);
+    let score = score_element_with_execution(TABLE, &zero, &[], -5, None, &located_fall).unwrap();
+    assert_eq!(
+        (
+            score.base.hundredths,
+            score.goe_hundredths,
+            score.score_hundredths
+        ),
+        (0, 0, 0)
+    );
+    for (outcome, expected) in [
+        (RecognitionOutcome::NoValue, ElementScoreError::NoValue),
+        (RecognitionOutcome::Ignored, ElementScoreError::Ignored),
+        (
+            RecognitionOutcome::Unknown,
+            ElementScoreError::BaseValue(BaseValueError::UnknownRecognition),
+        ),
+    ] {
+        let mut r = zero.clone();
+        r.outcome = outcome;
+        r.details = None;
+        assert_eq!(
+            score_element_with_execution(TABLE, &r, &[], 0, None, &evidence(vec![])),
+            Err(expected)
+        );
+    }
+}
