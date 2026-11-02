@@ -3,6 +3,222 @@ use skating_program_lab::*;
 const TABLE: ScoringTableId = ScoringTableId::Isu2786June2_2026;
 
 #[test]
+fn supplied_starred_whole_element_is_no_value_not_recognized_zero() {
+    for (code, level) in [("1Lz", None), ("CSSp", Some(Level::Two)), ("ChSq1", None)] {
+        let r = recognition(code, level, Some(vec![PanelCall::NotCounted]));
+        assert_eq!(
+            lookup_base_value(TABLE, &r, &[]),
+            Ok(BaseValueOutcome::NoValue)
+        );
+        assert_eq!(
+            score_element(TABLE, &r, &[], 0, None),
+            Err(ElementScoreError::NoValue)
+        );
+        let element = ProgramElement {
+            recognition: r,
+            annotations: vec![],
+            goe: 0,
+            fall: Some(false),
+            start_ms: Some(20_000),
+        };
+        let timed = score_program(
+            RulesetId::IsuAdult2026_27July16,
+            AdultCategory::Bronze,
+            TABLE,
+            std::slice::from_ref(&element),
+            Some(0),
+            ordinary(100),
+        );
+        assert_eq!(timed.tes_hundredths, Some(0));
+        let planned =
+            score_planning_scenario(RulesetId::IsuAdult2026_27July16, TABLE, &[element], None)
+                .unwrap();
+        assert_eq!(planned.hypothetical_hundredths, Some(0));
+    }
+}
+
+#[test]
+fn supplied_repetition_reduces_only_base_and_preserves_call_goe_reference() {
+    use PanelCall::*;
+    // 2786 p. 14 remark 5: 80% BV rounded to two decimals, original GOE scale.
+    for (code, calls, goe, base, adjustment, credited_base) in [
+        ("1Lz", vec![], 1, 48, 6, 53),
+        ("2Lz", vec![UnderRotated], -1, 134, -17, 147),
+        ("1Lz", vec![WrongEdge], 0, 38, 0, 42),
+        ("2F", vec![UnclearEdge, UnderRotated], -1, 115, -14, 127),
+    ] {
+        let mut r = recognition(code, None, Some(calls));
+        let details = r.details.as_ref().unwrap();
+        let mut calls = details.calls().unwrap().to_vec();
+        calls.push(RecordedCall {
+            target: CallTarget::Element,
+            call: Repetition,
+        });
+        r.details = Some(
+            RecognitionDetails::new(details.components().to_vec(), None, Some(calls)).unwrap(),
+        );
+        let score = score_element(TABLE, &r, &[], goe, Some(false)).unwrap();
+        assert_eq!(
+            (
+                score.base.hundredths,
+                score.goe_hundredths,
+                score.score_hundredths
+            ),
+            (base, adjustment, base as i16 + adjustment)
+        );
+        assert!(score.base.source.location.contains("remark 5, 80% BASE"));
+        assert!(score.goe_source.location.contains("original reference"));
+        assert!(score.base.notation.ends_with("+REP"));
+        let element = ProgramElement {
+            recognition: r,
+            annotations: vec![],
+            goe,
+            fall: Some(false),
+            start_ms: Some(50_000),
+        };
+        let timed = score_program(
+            RulesetId::IsuAdult2026_27July16,
+            AdultCategory::Bronze,
+            TABLE,
+            std::slice::from_ref(&element),
+            Some(0),
+            ordinary(100),
+        );
+        let credited = timed.elements[0].as_ref().unwrap();
+        assert_eq!(credited.credited_base_hundredths, credited_base);
+        assert_eq!(credited.unfactored.goe_hundredths, adjustment);
+    }
+}
+
+#[test]
+fn three_jump_combination_sums_components_and_uses_only_one_reference_goe() {
+    let mut r = recognition("2F", None, Some(vec![]));
+    r.details = Some(
+        RecognitionDetails::new(
+            ["2F", "2T", "2Lo"]
+                .into_iter()
+                .map(|code| ComponentCode::try_from(code).unwrap())
+                .collect(),
+            None,
+            Some(vec![RecordedCall {
+                target: CallTarget::Component(0),
+                call: PanelCall::UnderRotated,
+            }]),
+        )
+        .unwrap(),
+    );
+    // 2786 pp. 2–4, p. 14 remark 4; Sports Rule 353.1(h)(i): 144+130+170, reference 2Lo.
+    let score = score_element(TABLE, &r, &[], 3, Some(false)).unwrap();
+    assert_eq!(
+        (
+            score.base.hundredths,
+            score.goe_hundredths,
+            score.score_hundredths
+        ),
+        (444, 51, 495)
+    );
+    assert!(score.goe_source.location.contains("row 2Lo"));
+}
+
+#[test]
+fn combined_edge_rotation_calls_follow_source_columns_and_cumulative_limits() {
+    use PanelCall::*;
+    // 2788 p. 14 adds reductions; p. 16 caps multiple errors at +2 before them.
+    // All minimum reductions: ! 1, e 2, q 2, < 2, << 3.
+    for (edge, rotation, maximum) in [
+        (UnclearEdge, Quarter, -1),
+        (UnclearEdge, UnderRotated, -1),
+        (UnclearEdge, Downgraded, -2),
+        (WrongEdge, Quarter, -2),
+        (WrongEdge, UnderRotated, -2),
+        (WrongEdge, Downgraded, -3),
+    ] {
+        for code in ["1F", "1Lz", "2F", "2Lz"] {
+            for calls in [vec![edge, rotation], vec![rotation, edge]] {
+                let r = recognition(code, None, Some(calls));
+                let notation = r.details.as_ref().unwrap().notation().unwrap();
+                let fields = include_str!("fixtures/isu-2786-2026-06-02-source-values.tsv")
+                    .lines()
+                    .map(|line| line.split('\t').collect::<Vec<_>>())
+                    .find(|fields| fields.get(3) == Some(&notation.as_str()))
+                    .unwrap();
+                let base: i16 = fields[9].parse().unwrap();
+                for goe in -5i8..=5 {
+                    let result = score_element(TABLE, &r, &[], goe, Some(false));
+                    if goe <= maximum {
+                        let score = result.unwrap();
+                        let adjustment: i16 = fields[(goe + 9) as usize].parse().unwrap();
+                        assert_eq!(
+                            (
+                                score.base.hundredths,
+                                score.goe_hundredths,
+                                score.score_hundredths
+                            ),
+                            (base as u16, adjustment, base + adjustment)
+                        );
+                    } else {
+                        assert_eq!(result, Err(ElementScoreError::UnsupportedMarks));
+                    }
+                }
+                assert!(score_element(TABLE, &r, &[], -5, Some(true)).is_ok());
+                assert_eq!(
+                    score_element(TABLE, &r, &[], maximum, Some(true)),
+                    Err(ElementScoreError::InconsistentFall)
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn multiple_component_calls_use_one_goe_and_special_multiple_q_reduction() {
+    use PanelCall::*;
+    for (first, second, call0, call1, maximum, base, adjustment) in [
+        // 2788 p. 14: multiple q is -3..-4 with starting cap +2, hence max -1.
+        ("2F", "2Lo", Quarter, Quarter, -1, 350, -18),
+        ("2Lz", "2Lo", UnderRotated, UnderRotated, -2, 304, -34),
+        ("2F", "2T", UnclearEdge, Quarter, -1, 310, -18),
+        ("2F", "2Lo", WrongEdge, UnderRotated, -2, 280, -29),
+    ] {
+        let mut r = recognition(first, None, Some(vec![]));
+        r.details = Some(
+            RecognitionDetails::new(
+                vec![
+                    ComponentCode::try_from(first).unwrap(),
+                    ComponentCode::try_from(second).unwrap(),
+                ],
+                None,
+                Some(vec![
+                    RecordedCall {
+                        target: CallTarget::Component(0),
+                        call: call0,
+                    },
+                    RecordedCall {
+                        target: CallTarget::Component(1),
+                        call: call1,
+                    },
+                ]),
+            )
+            .unwrap(),
+        );
+        let score = score_element(TABLE, &r, &[], maximum, Some(false)).unwrap();
+        assert_eq!(
+            (
+                score.base.hundredths,
+                score.goe_hundredths,
+                score.score_hundredths
+            ),
+            (base, adjustment, base as i16 + adjustment)
+        );
+        assert_eq!(
+            score_element(TABLE, &r, &[], maximum + 1, Some(false)),
+            Err(ElementScoreError::UnsupportedMarks)
+        );
+        assert!(score_element(TABLE, &r, &[], -5, Some(true)).is_ok());
+    }
+}
+
+#[test]
 fn single_non_jump_scores_match_independent_source_extraction() {
     let inventory: std::collections::BTreeMap<_, _> =
         include_str!("fixtures/isu-2786-2026-06-02-manifest.tsv")
@@ -142,7 +358,6 @@ fn non_jump_marks_and_missing_levels_do_not_fabricate_values() {
             PanelCall::Downgraded,
             PanelCall::WrongEdge,
             PanelCall::UnclearEdge,
-            PanelCall::NotCounted,
         ] {
             assert_eq!(
                 lookup_base_value(
@@ -319,7 +534,7 @@ fn unknown_and_unsupported_do_not_become_zero() {
             &recognition("1Lz", None, Some(vec![PanelCall::NotCounted])),
             &[]
         ),
-        Err(BaseValueError::Unsupported)
+        Ok(BaseValueOutcome::NoValue)
     );
     assert_eq!(
         lookup_base_value(
@@ -1241,8 +1456,10 @@ fn marked_rows_and_call_boundaries() {
     }
     let combined = recognition("1Lz", None, Some(vec![WrongEdge, UnderRotated]));
     assert_eq!(
-        score_element(TABLE, &combined, &[], -5, Some(false)),
-        Err(ElementScoreError::UnsupportedMarks)
+        score_element(TABLE, &combined, &[], -5, Some(false))
+            .unwrap()
+            .score_hundredths,
+        18
     );
 }
 

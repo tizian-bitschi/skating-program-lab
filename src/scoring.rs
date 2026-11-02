@@ -49,11 +49,20 @@ impl TableRow {
             .source_reference(format!("{}, {column}, row {}", self.section, self.notation))
     }
     fn base(&self) -> BaseValue {
+        let source = if self.notation.ends_with("+REP") {
+            self.table.source_reference(format!(
+                "{}; p. 14, remark 5, 80% BASE of row {} rounded to two decimals",
+                self.section,
+                self.goe_reference.as_deref().expect("repetition reference")
+            ))
+        } else {
+            self.source("BASE column")
+        };
         BaseValue {
             hundredths: self.hundredths,
             table: self.table,
             notation: self.notation.clone(),
-            source: self.source("BASE column"),
+            source,
         }
     }
 }
@@ -87,10 +96,48 @@ fn table_row(
         .as_ref()
         .ok_or(BaseValueError::UnknownDetails)?;
     let notation = details.notation().ok_or(BaseValueError::UnknownCalls)?;
-    if details.components().len() == 2 {
+    let calls = details.calls().ok_or(BaseValueError::UnknownCalls)?;
+    if calls
+        .iter()
+        .any(|entry| entry.call == PanelCall::Repetition)
+    {
+        // Supplied final +REP recognition, not an inference from program repetitions.
+        if details.components().len() != 1
+            || details.level().is_some()
+            || !details.components()[0]
+                .as_str()
+                .starts_with(char::is_numeric)
+        {
+            return Err(BaseValueError::Unsupported);
+        }
+        let mut original = recognition.clone();
+        original.details = Some(
+            crate::RecognitionDetails::new(
+                details.components().to_vec(),
+                None,
+                Some(
+                    calls
+                        .iter()
+                        .filter(|entry| entry.call != PanelCall::Repetition)
+                        .cloned()
+                        .collect(),
+                ),
+            )
+            .map_err(|_| BaseValueError::Unsupported)?,
+        );
+        let mut row = table_row(table, &original)?;
+        row.hundredths = ((u32::from(row.hundredths) * 8 + 5) / 10) as u16;
+        row.goe_reference = Some(row.notation);
+        row.notation = notation;
+        return Ok(row);
+    }
+    if (2..=3).contains(&details.components().len()) {
         let components = details.components();
-        let second = components[1].as_str();
-        if !matches!(second, "1T" | "2T" | "1Lo" | "2Lo") || details.level().is_some() {
+        if components[1..]
+            .iter()
+            .any(|code| !matches!(code.as_str(), "1T" | "2T" | "1Lo" | "2Lo"))
+            || details.level().is_some()
+        {
             return Err(BaseValueError::Unsupported);
         }
         let calls = details.calls().ok_or(BaseValueError::UnknownCalls)?;
@@ -100,22 +147,21 @@ fn table_row(
         {
             return Err(BaseValueError::Unsupported);
         }
-        let mut parts = notation.split('+');
-        let first = parts.next().ok_or(BaseValueError::Unsupported)?;
-        let second = parts.next().ok_or(BaseValueError::Unsupported)?;
-        if parts.next().is_some() {
-            return Err(BaseValueError::Unsupported);
+        let mut hundredths = 0;
+        let mut reference = "";
+        let mut reference_base = 0;
+        let mut goe = [0; 11];
+        for part in notation.split('+') {
+            let (base, _, values) = jump_row(table, part).ok_or(BaseValueError::Unsupported)?;
+            hundredths += base;
+            if reference.is_empty() || base > reference_base {
+                reference = part;
+                reference_base = base;
+                goe = values;
+            }
         }
-        let (first_bv, _, first_goe) = jump_row(table, first).ok_or(BaseValueError::Unsupported)?;
-        let (second_bv, _, second_goe) =
-            jump_row(table, second).ok_or(BaseValueError::Unsupported)?;
-        let (reference, goe) = if first_bv >= second_bv {
-            (first, first_goe)
-        } else {
-            (second, second_goe)
-        };
         return Ok(TableRow {
-            hundredths: first_bv + second_bv,
+            hundredths,
             goe: Some(goe),
             table,
             notation: notation.clone(),
@@ -194,7 +240,21 @@ fn resolve_row(
         RecognitionOutcome::Ignored => Ok(ResolvedRow::Ignored),
         RecognitionOutcome::NoValue => Ok(ResolvedRow::NoValue),
         RecognitionOutcome::Unknown => Err(BaseValueError::UnknownRecognition),
-        RecognitionOutcome::Recognized => Ok(ResolvedRow::Value(table_row(table, recognition)?)),
+        RecognitionOutcome::Recognized => {
+            // TPH Singles p. 2: an explicitly starred whole element has no value.
+            // Component deletion inside a combination needs separate reference-GOE rules.
+            let starred = recognition.details.as_ref().is_some_and(|details| {
+                details.components().len() == 1
+                    && details.calls().is_some_and(
+                        |calls| matches!(calls, [entry] if entry.call == PanelCall::NotCounted),
+                    )
+            });
+            if starred {
+                Ok(ResolvedRow::NoValue)
+            } else {
+                Ok(ResolvedRow::Value(table_row(table, recognition)?))
+            }
+        }
     }
 }
 
@@ -233,6 +293,50 @@ pub enum ElementScoreError {
     UnsupportedMarks,
 }
 
+// 2788 pp. 14, 16: add reductions and cap the starting grade for multiple errors.
+// Multiple q signs use their own -3..-4 row, not a separate -2 per q.
+fn goe_limits(calls: &[crate::RecordedCall]) -> Result<(i8, i8, bool), ElementScoreError> {
+    let mut reduction = 0;
+    let mut errors = 0;
+    let mut quarters = 0;
+    let mut capped = false;
+    let mut downgraded = false;
+    for entry in calls {
+        let minimum = match entry.call {
+            PanelCall::Quarter => {
+                quarters += 1;
+                0
+            }
+            PanelCall::UnderRotated => 2,
+            PanelCall::UnclearEdge => 1,
+            PanelCall::WrongEdge => {
+                capped = true;
+                2
+            }
+            PanelCall::Downgraded => {
+                capped = true;
+                downgraded = true;
+                3
+            }
+            PanelCall::ReducedSpinValue | PanelCall::Repetition => continue,
+            _ => return Err(ElementScoreError::UnsupportedMarks),
+        };
+        errors += 1;
+        reduction += minimum;
+    }
+    reduction += match quarters {
+        0 => 0,
+        1 => 2,
+        _ => 3,
+    };
+    let starting_max = if capped || errors > 1 { 2 } else { 5 };
+    Ok((
+        (starting_max - reduction).max(-5),
+        (2 - reduction - 5).max(-5),
+        downgraded,
+    ))
+}
+
 /// Scores supported single elements with an explicit fall observation.
 /// This does not validate event eligibility or other execution errors.
 pub fn score_element(
@@ -257,19 +361,7 @@ pub fn score_element(
         .as_ref()
         .and_then(|details| details.calls())
         .ok_or(ElementScoreError::BaseValue(BaseValueError::UnknownCalls))?;
-    // Communication 2788 pp. 14, 16: reductions and maximum starting GOE.
-    let (max_grade, fall_max, downgraded) = match calls {
-        [] => (5, -3, false),
-        [entry] => match entry.call {
-            PanelCall::ReducedSpinValue => (5, -3, false),
-            PanelCall::Quarter | PanelCall::UnderRotated => (3, -5, false),
-            PanelCall::UnclearEdge => (4, -4, false),
-            PanelCall::WrongEdge => (0, -5, false),
-            PanelCall::Downgraded => (-1, -5, true),
-            _ => return Err(ElementScoreError::UnsupportedMarks),
-        },
-        _ => return Err(ElementScoreError::UnsupportedMarks),
-    };
+    let (max_grade, fall_max, downgraded) = goe_limits(calls)?;
     if goe > max_grade {
         return Err(ElementScoreError::UnsupportedMarks);
     }
@@ -287,7 +379,14 @@ pub fn score_element(
     };
     let mut goe_source = row.source(&column);
     if let Some(reference) = &row.goe_reference {
-        goe_source.location = format!("p. 14, combination reference; {column}, row {reference}");
+        goe_source.location = if row.notation.ends_with("+REP") {
+            format!(
+                "{}; p. 14, remark 5, original reference; {column}, row {reference}",
+                row.section
+            )
+        } else {
+            format!("p. 14, combination reference; {column}, row {reference}")
+        };
     }
     let base = row.base();
     let consistency_source = SourceReference {
