@@ -1,16 +1,17 @@
 //! Immutable Scale of Values data, independent of recognition and scoring support.
 use crate::{Level, ScoringTableId, SourceReference};
 
+mod pair;
 mod shared;
 
 /// Exact published-code lookup in the selected immutable edition.
 /// Unknown notation returns `None`; this does not infer calls or engine support.
-/// Pair-specific rows are added in issue #45 slice C.
 pub fn catalog_row(table: ScoringTableId, notation: &str) -> Option<&'static CatalogRow> {
     match table {
-        ScoringTableId::Isu2786June2_2026 => {
-            shared::ROWS.iter().find(|row| row.notation == notation)
-        }
+        ScoringTableId::Isu2786June2_2026 => shared::ROWS
+            .iter()
+            .chain(pair::ROWS)
+            .find(|row| row.notation == notation),
     }
 }
 
@@ -152,10 +153,12 @@ mod tests {
 
     #[test]
     fn embedded_rows_have_no_extra_or_duplicate_codes() {
-        assert_eq!(shared::ROWS.len(), 402);
-        let codes: BTreeSet<_> = shared::ROWS.iter().map(|row| row.notation).collect();
-        assert_eq!(codes.len(), shared::ROWS.len());
-        for row in shared::ROWS {
+        assert_eq!((shared::ROWS.len(), pair::ROWS.len()), (402, 223));
+        let rows: Vec<_> = shared::ROWS.iter().chain(pair::ROWS).collect();
+        let codes: BTreeSet<_> = rows.iter().map(|row| row.notation).collect();
+        assert_eq!(codes.len(), 625);
+        assert_eq!(codes.len(), rows.len());
+        for row in rows {
             assert_eq!(row.source.table, ScoringTableId::Isu2786June2_2026);
             assert_eq!(row.goe_hundredths[5], 0);
         }

@@ -22,24 +22,31 @@ The original reference and Bronze solver cover the finite 1Lz domain in the [opt
 
 Pumpkin is enabled by default; `--no-default-features` omits both solver APIs. These optimizers do not establish complete eligibility, a global maximum or WebAssembly compatibility.
 
-## Versioned SOV catalog (issue #45, slices A/B)
+## Versioned SOV catalog (issue #45)
 
 The [catalog reference](catalog.md) records the June 2 source hash, all 625
-published value-row identifiers, numerical-column layout, notes and factors.
-Slice A was independently reviewed and merged in PR #50. Slice B embeds 402
-shared jump/spin/step/choreographic rows and exposes exact-version `catalog_row`
-lookup. Its source references identify printed page, value-row ordinal and code.
-The 223 Pair-specific rows remain pending C; absence is documented rather than
-filled from analogous rows.
+published value rows, numerical-column layout, notes and PCS factors. Slices A
+and B were independently reviewed and merged in PRs #50 and #51. Slice C adds
+all 223 Pair-specific rows and the complete numerical audit. Exact-version
+`catalog_row` lookup returns immutable data with discipline, family, level, notes,
+BASE, all GOE adjustments and printed page/value-row/code provenance. Unknown
+notation returns `None`; unknown editions keep `UnknownVersion` without fallback.
 
 The scorer reads its previous single/double jump and CSSp1/ChSp1 values from the
 catalog; duplicate hard-coded value arrays are removed. Recognition, scoring,
-validation and optimizer support do not expand. All original scoring fixtures
-remain unchanged. Catalog rows can therefore be known while scoring their
-behavior remains explicitly unsupported.
+validation and optimizer support do not expand. Pair rows are retrievable data
+only. A known catalog row can still have explicitly unsupported engine behavior.
 
 The independently reviewed source inventory is separate from production data.
-Tests compare all shared rows and their metadata, and verify 23 independently
-source-read numerical fixtures plus the existing twelve-jump fixtures. Full-code,
-section/level/family/discipline/note validation and eight corruption cases protect
-the inventory. Final Pair coverage and numerical/parity audit follow in C.
+Tests compare all 625 rows and their metadata, every one of the 6,875 printed
+numerical cells against a separate Poppler source extraction, and 42 separately
+hand-read all-GOE fixtures across every family. Existing twelve-jump fixtures and
+source references remain unchanged. Inventory/numerical mutation checks reject
+missing codes/columns, duplicates, incorrect metadata/values, and edition/hash
+mismatches. `tools/verify_sov_source.py` reproduces the source fixture from the
+exact pinned PDF; neither it nor a PDF parser is used at runtime.
+
+There are no unresolved extraction mismatches. The source audit and visual
+cross-check limits, including the lack of independent human cell-by-cell review,
+are explicit in the catalog reference. Notes and PCS factors are recorded data,
+not added scoring/eligibility rules or an implemented PCS calculation.
