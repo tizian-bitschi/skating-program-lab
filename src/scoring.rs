@@ -617,11 +617,10 @@ fn goe_limits(
     if let Some(extra) = execution {
         reduction += extra.minimum_reduction;
         errors += extra.errors;
-        capped |= extra.starting_cap == 2;
     }
     let fall_count = execution.map_or(1, |extra| i16::from(extra.fall_count));
     // Judges Handbook pp. 2, 6: any error excludes +5; a single q starts at most +3.
-    let starting_max = if capped || errors > 1 {
+    let mut starting_max = if capped || errors > 1 {
         2
     } else if quarters == 1 {
         3
@@ -630,11 +629,16 @@ fn goe_limits(
     } else {
         5
     };
+    if let Some(extra) = execution {
+        starting_max = starting_max.min(extra.starting_cap);
+    }
     GoeLimits {
         maximum: (starting_max - reduction).max(-5) as i8,
-        fall_maximum: (2 - reduction - 5 * fall_count).max(-5) as i8,
+        fall_maximum: (starting_max.min(2) - reduction - 5 * fall_count).max(-5) as i8,
         downgraded,
-        handbook_source: (errors == 1 && !capped)
+        handbook_source: (errors == 1
+            && !capped
+            && !execution.is_some_and(|extra| extra.errors > 0))
             || execution.is_some_and(|extra| extra.handbook_source),
     }
 }
@@ -661,17 +665,14 @@ pub fn score_element_with_execution(
     fall: Option<bool>,
     execution: &crate::ElementExecutionEvidence,
 ) -> Result<ElementScore, ElementScoreError> {
-    let adjustment = execution_evidence::validate(recognition, fall, execution)?;
-    let observed_fall = adjustment
-        .as_ref()
-        .map_or(fall, |extra| Some(extra.fall_count > 0));
+    let resolved = execution_evidence::resolve(recognition, fall, Some(execution))?;
     score_element_internal(
         table,
         recognition,
         annotations,
         goe,
-        observed_fall,
-        adjustment.as_ref(),
+        resolved.fall,
+        resolved.adjustment.as_ref(),
     )
 }
 
@@ -725,8 +726,10 @@ fn score_element_internal(
     let consistency_source = SourceReference {
         document: if limits.handbook_source { "ISU Handbook for Referees and Judges" } else { "ISU Communication 2788" }.into(),
         version: "2026-05-19".into(),
-        location: if limits.handbook_source {
+        location: if execution.is_some_and(|extra| extra.handbook_source) {
             "pp. 2, 5–6, execution errors, full revolutions, Euler and maximum starting GOE; Communication 2788 pp. 14, 16, call and fall reductions"
+        } else if limits.handbook_source {
+            "pp. 2, 6, maximum starting GOE for errors and q; Communication 2788 pp. 14, 16, call and fall reductions"
         } else if limits.downgraded {
             "pp. 14, 16, downgrade and fall reductions and maximum starting GOE"
         } else {
@@ -1092,15 +1095,19 @@ fn score_planning_internal(
         .iter()
         .enumerate()
         .map(|(index, element)| {
-            let adjustment = execution
-                .map_or(Ok(None), |values| {
-                    execution_evidence::validate(&element.recognition, element.fall, &values[index])
-                })
-                .map_err(ProgramScoreError::Element)?;
-            let observed_fall = adjustment
-                .as_ref()
-                .map_or(element.fall, |extra| Some(extra.fall_count > 0));
-            unfactored_element_score(ruleset, table, element, observed_fall, adjustment.as_ref())
+            let resolved = execution_evidence::resolve(
+                &element.recognition,
+                element.fall,
+                execution.map(|values| &values[index]),
+            )
+            .map_err(ProgramScoreError::Element)?;
+            unfactored_element_score(
+                ruleset,
+                table,
+                element,
+                resolved.fall,
+                resolved.adjustment.as_ref(),
+            )
         })
         .collect();
     let mut certain_later = 0usize;
@@ -1228,18 +1235,17 @@ fn score_program_internal(
             } else {
                 false
             };
-            let adjustment = execution.map_or(Ok(None), |values| {
-                execution_evidence::validate(&element.recognition, element.fall, &values[index])
-            });
-            if adjustment.is_err() {
+            let resolved = execution_evidence::resolve(
+                &element.recognition,
+                element.fall,
+                execution.map(|values| &values[index]),
+            );
+            if resolved.is_err() {
                 falls_confirmed = false;
             }
-            let adjustment = adjustment.map_err(ProgramScoreError::Element)?;
-            let observed_fall = adjustment
-                .as_ref()
-                .map_or(element.fall, |extra| Some(extra.fall_count > 0));
-            falls_confirmed &= observed_fall == Some(false)
-                || (observed_fall == Some(true)
+            let resolved = resolved.map_err(ProgramScoreError::Element)?;
+            falls_confirmed &= resolved.fall == Some(false)
+                || (resolved.fall == Some(true)
                     && element.recognition.outcome == RecognitionOutcome::Recognized);
             if invalid_timing {
                 return Err(ProgramScoreError::InvalidTiming);
@@ -1250,8 +1256,8 @@ fn score_program_internal(
                 element,
                 timing,
                 required,
-                observed_fall,
-                adjustment.as_ref(),
+                resolved.fall,
+                resolved.adjustment.as_ref(),
             )
         })
         .collect();

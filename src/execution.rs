@@ -31,6 +31,7 @@ pub enum JumpExecutionError {
         component: usize,
     },
     /// One full revolution is permitted structurally; more than one interrupts a unit.
+    /// Numeric GOE consequences are verified only for exactly one full revolution.
     FullRevolutionBetween {
         before_component: usize,
         full_revolutions: u8,

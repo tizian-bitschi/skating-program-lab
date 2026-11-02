@@ -3,6 +3,70 @@ use skating_program_lab::*;
 const TABLE: ScoringTableId = ScoringTableId::Isu2786June2_2026;
 const RULESET: RulesetId = RulesetId::IsuAdult2026_27July16;
 
+#[test]
+fn legacy_element_scores_match_frozen_pre_evidence_source_contracts() {
+    // Frozen from main a0f8d939 before this API: full structures, not new-vs-new comparisons.
+    for (call, notation, page, grade, base, adjustment, total) in [
+        (PanelCall::Quarter, "2Fq", 2, 1, 180, 18, 198),
+        (PanelCall::UnderRotated, "2F<", 2, 2, 144, 29, 173),
+        (PanelCall::UnclearEdge, "2F!", 3, 3, 180, 54, 234),
+    ] {
+        let table_source = |location| SourceReference {
+            document: "ISU Communication 2786".into(),
+            version: "2026-06-02".into(),
+            location,
+        };
+        let expected = ElementScore {
+            base: BaseValue { hundredths: base, table: TABLE, notation: notation.into(),
+                source: table_source(format!("p. {page}, Jumps, BASE column, row {notation}")) },
+            goe: grade, goe_hundredths: adjustment, score_hundredths: total,
+            goe_source: table_source(format!("p. {page}, Jumps, GOE column {grade:+}, row {notation}")),
+            consistency_source: SourceReference { document: "ISU Handbook for Referees and Judges".into(),
+                version: "2026-05-19".into(),
+                location: "pp. 2, 6, maximum starting GOE for errors and q; Communication 2788 pp. 14, 16, call and fall reductions".into() },
+        };
+        let r = unit(&["2F"], vec![component(0, call)]);
+        assert_eq!(
+            score_element(TABLE, &r, &[], grade, Some(false)).unwrap(),
+            expected
+        );
+        for unknown_or_empty in [ElementExecutionEvidence::default(), evidence(vec![])] {
+            assert_eq!(
+                score_element_with_execution(TABLE, &r, &[], grade, Some(false), &unknown_or_empty)
+                    .unwrap(),
+                expected
+            );
+        }
+    }
+}
+
+#[test]
+fn more_than_one_full_revolution_never_reuses_the_one_turn_numeric_rule() {
+    // TPH p. 31 supplies a structural consequence; Handbook p. 5 only gives GOE for one.
+    for count in [2, 3, u8::MAX] {
+        let unknown_rule = evidence(vec![JumpExecutionError::FullRevolutionBetween {
+            before_component: 1,
+            full_revolutions: count,
+        }]);
+        let r = interrupted();
+        assert!(matches!(
+            lookup_base_value(TABLE, &r, &[]),
+            Ok(BaseValueOutcome::Value(BaseValue {
+                hundredths: 210,
+                ..
+            }))
+        ));
+        assert_eq!(
+            score_element_with_execution(TABLE, &r, &[], -1, Some(false), &unknown_rule),
+            Err(ElementScoreError::UnsupportedMarks)
+        );
+        assert_eq!(
+            score_element_with_execution(TABLE, &r, &[], -5, Some(false), &unknown_rule),
+            Err(ElementScoreError::UnsupportedMarks)
+        );
+    }
+}
+
 fn unit(codes: &[&str], calls: Vec<RecordedCall>) -> PanelRecognition {
     PanelRecognition {
         ruleset: RULESET,
@@ -168,8 +232,9 @@ fn full_revolutions_and_euler_step_over_use_verified_distinct_rules() {
         before_component: 1,
         full_revolutions: 2,
     }]);
-    assert!(
-        score_element_with_execution(TABLE, &interrupted(), &[], -1, Some(false), &excess).is_ok()
+    assert_eq!(
+        score_element_with_execution(TABLE, &interrupted(), &[], -1, Some(false), &excess),
+        Err(ElementScoreError::UnsupportedMarks)
     );
     assert_eq!(
         score_element_with_execution(TABLE, &r, &[], -1, Some(false), &excess),

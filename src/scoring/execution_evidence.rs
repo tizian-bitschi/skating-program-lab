@@ -33,9 +33,8 @@ fn landing_error(error: &JumpExecutionError) -> bool {
     )
 }
 
-pub(super) fn validate(
+fn validate(
     recognition: &PanelRecognition,
-    fall: Option<bool>,
     evidence: &ElementExecutionEvidence,
 ) -> Result<Option<Adjustment>, ElementScoreError> {
     let Some(errors) = evidence.errors.as_ref() else {
@@ -100,7 +99,7 @@ pub(super) fn validate(
                 full_revolutions, ..
             } => {
                 if index == 0
-                    || full_revolutions == 0
+                    || full_revolutions != 1
                     || !jump
                     || !components[index - 1].as_str().starts_with(char::is_numeric)
                         && components[index - 1].as_str() != "Eu"
@@ -112,9 +111,6 @@ pub(super) fn validate(
                 result.minimum_reduction += 3;
                 result.starting_cap = 2;
                 result.errors += 1;
-                if full_revolutions > 1 {
-                    result.break_positions.push(index);
-                }
             }
             JumpExecutionError::EulerStepOver { .. } => {
                 if components[index].as_str() != "Eu" {
@@ -126,10 +122,6 @@ pub(super) fn validate(
                 result.errors += 1;
             }
         }
-    }
-    let observed_fall = result.fall_count > 0;
-    if fall.is_some_and(|value| value != observed_fall) {
-        return Err(ElementScoreError::InconsistentFall);
     }
     for boundary in &result.break_positions {
         if *boundary >= components.len() {
@@ -151,4 +143,31 @@ pub(super) fn validate(
         }
     }
     Ok(Some(result))
+}
+
+/// The single resolution point for unknown/complete observations and fall consistency.
+pub(super) struct Resolved {
+    pub adjustment: Option<Adjustment>,
+    pub fall: Option<bool>,
+}
+
+pub(super) fn resolve(
+    recognition: &PanelRecognition,
+    fall: Option<bool>,
+    evidence: Option<&ElementExecutionEvidence>,
+) -> Result<Resolved, ElementScoreError> {
+    let adjustment = evidence.map_or(Ok(None), |evidence| validate(recognition, evidence))?;
+    let observed_fall = if let Some(extra) = &adjustment {
+        let observed = extra.fall_count > 0;
+        if fall.is_some_and(|value| value != observed) {
+            return Err(ElementScoreError::InconsistentFall);
+        }
+        Some(observed)
+    } else {
+        fall
+    };
+    Ok(Resolved {
+        adjustment,
+        fall: observed_fall,
+    })
 }

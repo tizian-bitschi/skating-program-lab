@@ -45,7 +45,7 @@ The matching additive `score_program_with_execution` and `score_planning_scenari
 | Located fall | -5 per separately located fall; cap +2 | 2788 pp. 14, 16. The fall boolean is corroborated, never added as another fall |
 | Step-out | -3; cap +2 | 2788 p. 14. A followed step-out must match a supplied interrupted/starred tail |
 | One full revolution between jumps | -3; cap +2 | Judges Handbook p. 5: full revolution / two three turns. It does not prove an interruption |
-| More than one full revolution | -3; cap +2, with a matching interrupted/starred tail | TPH p. 31 plus Judges Handbook p. 5. The count is explicit so one revolution is not misclassified |
+| More than one full revolution | UnsupportedMarks | TPH p. 31 verifies structural consequences, not a numerical class for arbitrary counts; [follow-up #58](https://github.com/tizian-bitschi/skating-program-lab/issues/58) |
 | Euler step-over | -2; ordinary single-error cap +4, or +2 with multiple errors | 2788 p. 16; Judges Handbook pp. 2, 5. The target must be the supplied Euler |
 | Touch-down with weight transfer alone | UnsupportedMarks | No unambiguous numerical class is verified from this observation alone; [follow-up #56](https://github.com/tizian-bitschi/skating-program-lab/issues/56) |
 
@@ -56,3 +56,5 @@ A concrete interruption cause must explain the actual supplied boundary. Later e
 Planning rejects a length mismatch with InvalidInput. Timed scoring returns no TES, per-element InvalidInput and invalid-input deductions for a length mismatch. Invalid evidence on one element keeps the relevant program total incomplete; unaffected supported elements retain their scores. Unknown evidence has the same results as the original entry points.
 
 This API does not authorize automatic panel inference, new categories, Pair scoring or a complete execution-quality evaluator. Unmodelled quality remains the responsibility of the supplied hypothetical judge. Ambiguous repeated physical errors on one component need finer evidence; they are not silently double-counted.
+
+Legacy q, under-rotation and unclear-edge ElementScore structures are frozen against main a0f8d939, including every SourceReference field. Extended Handbook descriptions apply only when a new execution rule actually uses that source. One internal resolver owns validation and resolved fall status for scalar, planning and timed scoring. Starting caps are combined as numerical limits, not encoded as a special Boolean value.
