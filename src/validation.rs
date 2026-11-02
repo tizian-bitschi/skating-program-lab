@@ -165,7 +165,7 @@ struct Validator {
     jump_count: usize,
     eulers: usize,
     repetition_unknown: bool,
-    unspecified: bool,
+    unspecified: usize,
     axel: bool,
     axel_unknown: bool,
 }
@@ -179,7 +179,7 @@ impl Validator {
             jump_count: 0,
             eulers: 0,
             repetition_unknown: false,
-            unspecified: false,
+            unspecified: 0,
             axel: false,
             axel_unknown: false,
         }
@@ -250,7 +250,8 @@ impl Validator {
         }
         match (jump.kind, jump.rotations) {
             (Some(JumpKind::Axel), Some(1..)) => self.axel = true,
-            (None, _) | (Some(JumpKind::Axel), None | Some(0)) => self.axel_unknown = true,
+            (_, Some(0)) => {}
+            (None, _) | (Some(JumpKind::Axel), None) => self.axel_unknown = true,
             _ => {}
         }
         if let (Some(kind), Some(rotations @ 1..)) = (jump.kind, jump.rotations) {
@@ -287,10 +288,10 @@ impl Validator {
                             Some(i),
                             "Euler is prohibited in a Bronze combination.",
                         );
-                    } else if i == 0
-                        || i + 1 == parts.len()
-                        || !matches!(parts.get(i.wrapping_sub(1)), Some(JumpPart::Jump(_)))
-                        || !matches!(parts.get(i + 1), Some(JumpPart::Jump(_)))
+                    } else if !parts[..i].iter().any(|p| matches!(p, JumpPart::Jump(_)))
+                        || !parts[i + 1..]
+                            .iter()
+                            .any(|p| matches!(p, JumpPart::Jump(_)))
                     {
                         self.add(
                             FindingKind::Violation,
@@ -441,7 +442,12 @@ impl Validator {
                     "At most two combinations, or one combination and one sequence, are permitted."
                 },
             );
-        } else if self.unspecified {
+        } else if (self.policy.bronze() && combinations + self.unspecified > 1)
+            || (!self.policy.bronze()
+                && self.unspecified > 0
+                && (self.compounds.len() + self.unspecified > 2
+                    || sequences + self.unspecified > 1))
+        {
             self.add(
                 FindingKind::Unknown,
                 Rule::CompoundCount,
@@ -504,7 +510,7 @@ impl Validator {
                     "The program exceeds the category's jump element limit."
                 },
             );
-        } else if self.unspecified {
+        } else if self.jump_count + self.unspecified > self.policy.max_jumps {
             self.add(
                 FindingKind::Unknown,
                 Rule::Count,
@@ -558,7 +564,7 @@ pub fn validate_program(program: &Program) -> ValidationResult {
     for (index, element) in program.elements.iter().enumerate() {
         match element {
             PlannedElement::Unspecified => {
-                validator.unspecified = true;
+                validator.unspecified += 1;
                 validator.repetition_unknown = true;
                 validator.axel_unknown = true;
             }
