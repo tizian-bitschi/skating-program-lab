@@ -16,9 +16,10 @@ use std::{ops::ControlFlow, time::Instant};
 fn validate_compound_source(
     request: &JumpOptimizerRequest,
     element: &JumpElement,
+    profile: &crate::RuleProfile,
 ) -> Result<(), JumpOptimizerError> {
     let mut elements = vec![PlannedElement::Jump(element.clone())];
-    if request.category == AdultCategory::Masters {
+    if profile.jumps.require_axel {
         elements.push(PlannedElement::Jump(JumpElement::Solo(ListedJump {
             kind: Some(JumpKind::Axel),
             rotations: Some(1),
@@ -35,7 +36,7 @@ fn validate_compound_source(
         sources: vec![],
         elements,
     };
-    let findings: Vec<_> = validate_program(&program)
+    let findings: Vec<_> = crate::validation::validate_elements(&program.elements, profile)
         .findings
         .into_iter()
         .filter(|f| f.kind != FindingKind::Violation)
@@ -50,7 +51,10 @@ fn validate_compound_source(
     }
 }
 
-fn universe(request: &JumpOptimizerRequest) -> Result<Vec<JumpElement>, JumpOptimizerError> {
+fn universe(
+    request: &JumpOptimizerRequest,
+    profile: &crate::RuleProfile,
+) -> Result<Vec<JumpElement>, JumpOptimizerError> {
     let mut universe = Vec::new();
     for jump in &request.allowed_jumps {
         jump_code(jump)?;
@@ -79,7 +83,7 @@ fn universe(request: &JumpOptimizerRequest) -> Result<Vec<JumpElement>, JumpOpti
         }) {
             continue;
         }
-        validate_compound_source(request, element)?;
+        validate_compound_source(request, element, profile)?;
         value(element, request)?;
         if !universe.contains(element) {
             universe.push(element.clone());
@@ -118,6 +122,7 @@ fn result(
     request: &JumpOptimizerRequest,
     universe: Vec<JumpElement>,
     sources: Vec<SourceReference>,
+    profile: &crate::RuleProfile,
 ) -> JumpOptimizerResult {
     JumpOptimizerResult {
         request: request.clone(), universe,
@@ -125,7 +130,7 @@ fn result(
         equivalence: "Identical ordered jump-element sequences.",
         proof_scope: "Maximum unfactored table BV within this finite modeled jump subsection; not a complete or official program optimum.",
         objective: OptimizerObjective::MaximizeUnfactoredBaseValueHundredths,
-        implemented_rules: crate::validation::jump_rule_ids(request.category), sources,
+        implemented_rules: profile.jump_bindings().iter().map(|b| b.id).collect(), sources,
         examined_subsections: 0, status: OptimizerStatus::Incomplete, enumeration_complete: false,
         termination_reason: JumpTerminationReason::Interrupted, candidates: Vec::new(),
     }
@@ -140,6 +145,25 @@ pub(super) fn optimize(
 fn optimize_inner(
     request: &JumpOptimizerRequest,
     stop_after_incumbent: bool,
+) -> Result<JumpOptimizerResult, JumpOptimizerError> {
+    optimize_profile_inner(
+        request,
+        stop_after_incumbent,
+        &crate::adult_profile(request.category),
+    )
+}
+
+pub(super) fn optimize_profile(
+    request: &JumpOptimizerRequest,
+    profile: &crate::RuleProfile,
+) -> Result<JumpOptimizerResult, JumpOptimizerError> {
+    optimize_profile_inner(request, false, profile)
+}
+
+fn optimize_profile_inner(
+    request: &JumpOptimizerRequest,
+    stop_after_incumbent: bool,
+    profile: &crate::RuleProfile,
 ) -> Result<JumpOptimizerResult, JumpOptimizerError> {
     if request.ruleset != BRONZE_RULESET
         || request.scoring_table != BRONZE_TABLE
@@ -158,8 +182,8 @@ fn optimize_inner(
                 .ok_or(JumpOptimizerError::InvalidRequest)
         })
         .transpose()?;
-    let universe = universe(request)?;
-    let mut sources = crate::validation::jump_rule_sources(request.category);
+    let universe = universe(request, profile)?;
+    let mut sources: Vec<_> = profile.jump_sources();
     let mut values = vec![0i32];
     for element in &universe {
         let score = value(element, request)?;
@@ -168,13 +192,13 @@ fn optimize_inner(
             sources.push(score.source);
         }
     }
-    let mut result = result(request, universe, sources);
+    let mut result = result(request, universe, sources, profile);
     if end.is_some_and(|deadline| Instant::now() >= deadline) {
         return Ok(result);
     }
     if result.universe.is_empty() || request.max_elements == 0 {
         result.examined_subsections = 1;
-        match checked_candidate(request, &[])? {
+        match checked_profile_candidate(request, &[], profile)? {
             Some(candidate) => {
                 result.status = OptimizerStatus::OptimalProven;
                 result.candidates.push(candidate);
@@ -269,7 +293,7 @@ fn optimize_inner(
         };
         result.examined_subsections += 1;
         let elements = decode(solution.as_reference(), &slots, &result.universe)?;
-        if let Some(candidate) = checked_candidate(request, &elements)? {
+        if let Some(candidate) = checked_profile_candidate(request, &elements, profile)? {
             if i32::from(candidate.base_hundredths) != solution.get_integer_value(objective) {
                 return Err(JumpOptimizerError::InconsistentSolverResult);
             }
@@ -295,7 +319,7 @@ fn optimize_inner(
                         &mut result.candidates,
                         |s| {
                             let elements = decode(s, &slots, &result.universe)?;
-                            let candidate = checked_candidate(request, &elements)?;
+                            let candidate = checked_profile_candidate(request, &elements, profile)?;
                             if let Some(ref candidate) = candidate {
                                 if i32::from(candidate.base_hundredths)
                                     != s.get_integer_value(objective)
@@ -334,7 +358,7 @@ fn optimize_inner(
                         _ => Err(JumpOptimizerError::InconsistentSolverResult),
                     })
                     .collect::<Result<Vec<_>, _>>()?;
-                let checked = checked_candidate(request, &elements)?
+                let checked = checked_profile_candidate(request, &elements, profile)?
                     .ok_or(JumpOptimizerError::InconsistentSolverResult)?;
                 if checked.base_hundredths != candidate.base_hundredths {
                     return Err(JumpOptimizerError::InconsistentSolverResult);

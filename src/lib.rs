@@ -134,3 +134,6 @@ pub use catalog::*;
 
 mod optimizer;
 pub use optimizer::*;
+
+mod profiles;
+pub use profiles::*;

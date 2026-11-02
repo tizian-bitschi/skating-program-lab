@@ -51,3 +51,27 @@ There are no unresolved extraction mismatches. The source audit and visual
 cross-check limits, including the lack of independent human cell-by-cell review,
 are explicit in the catalog reference. Notes and PCS factors are recorded data,
 not added scoring/eligibility rules or an implemented PCS calculation.
+
+## Versioned rule profiles (#47)
+
+`ProfileRegistry::adult` registers the four current Adult definitions.
+`validate_profile_program`, `score_profile_program` and feature-gated
+`optimize_profile_jumps` select exact identities and share the existing engines.
+The old APIs and struct literals remain supported. `tests/profiles.rs` covers
+source-backed Adult eligibility, adapter equivalence, identity/version errors,
+invalid sources and policies, override ordering/conflicts, unsupported scope and
+mechanisms, typed family/repetition policy, scoring and a synthetic extension.
+Existing validation, scoring, catalog and optimizer fixtures remain unchanged.
+
+Registry validation checks citation metadata, not source authenticity. Feature
+and level policies block selection as unsupported. Numerical scoring retains
+partial scope and does not establish category eligibility. The solver retains
+its finite jump domain and maximum five slots. No real Junior, Senior or national
+profile has been added. See the [ADR](adr/0002-rule-profiles-proposal.md).
+
+Review regression tests additionally reject contradictory Axel/sequence/family
+requirements, missing or mismatched SOV source editions and unsupported scoring
+binding overrides. Optimizer sources contain each exact citation once, in stable
+order; distinct SOV row locations remain distinct. ProfileRule is shared by
+registry and validator. Scoring binding overrides are explicitly unsupported;
+new versioned scoring policies use explicit policy citations.

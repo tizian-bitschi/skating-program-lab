@@ -28,3 +28,13 @@ Correctness and source traceability take priority over convenience and speed. Us
 **AC-07 — Versioning:** Identical input and explicit versions must produce identical results. Unknown versions must be rejected; adding a season must preserve earlier fixtures and sources. Incomplete or unsupported results must not claim complete compliance or an exact score.
 
 See the [Adult rules](rules/isu-adult-2026-27.md), [scoring](specs/scoring.md) and [optimization](specs/optimization.md) specifications for detailed requirements and examples, and [implementation status](implementation-status.md) for current support.
+
+## Extensible profile selection (#47)
+
+Explicit profiles identify discipline, segment, season, federation/event scope,
+category, policy version and exact source editions, with a separate SOV edition.
+Supported typed policy can be registered without extending `AdultCategory`.
+Legacy Adult APIs remain supported. A synthetic fixture exercises extension and
+has no official category status. Pair/Short Program, feature/level recognition
+and unknown mechanisms remain unsupported. See the accepted
+[profile migration contract](adr/0002-rule-profiles-proposal.md).
