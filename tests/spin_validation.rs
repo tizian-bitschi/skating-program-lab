@@ -26,6 +26,7 @@ fn data(kind: RegularSpinKind, entry: SpinEntry, change_foot: bool) -> ProgramVa
                 planned_level: Some(Level::Basic),
                 feature_attempts: Some(vec![]),
                 panel: None,
+                final_upright_wind_up: None,
             },
         }],
     }
@@ -153,12 +154,17 @@ fn all_twenty_spin_abbreviations_use_profile_roles() {
         for kind in [Camel, Sit, Upright, Layback, Combination] {
             for entry in [SpinEntry::NonFlying, SpinEntry::Flying] {
                 for changed in [false, true] {
-                    let mut steps = vec![position(Some(SpinPosition::Camel), Some(4))];
+                    let base = match kind {
+                        Camel | Combination => SpinPosition::Camel,
+                        Sit => SpinPosition::Sit,
+                        Upright | Layback => SpinPosition::Upright,
+                    };
+                    let mut steps = vec![position(Some(base), Some(4))];
+                    if kind == Combination {
+                        steps.push(position(Some(SpinPosition::Sit), Some(4)));
+                    }
                     if changed {
-                        steps.extend([
-                            SpinStep::ChangeFoot,
-                            position(Some(SpinPosition::Camel), Some(4)),
-                        ]);
+                        steps.extend([SpinStep::ChangeFoot, position(Some(base), Some(4))]);
                     }
                     let r = validate_program_with_evidence(
                         &program(category, vec![spin(entry, steps)]),
@@ -216,7 +222,8 @@ fn basic_positions_per_foot_and_no_value_are_conditional_and_distinct_from_prohi
         vec![
             position(Some(SpinPosition::Sit), Some(1)),
             SpinStep::ChangeFoot,
-            position(Some(SpinPosition::Sit), Some(1)),
+            position(Some(SpinPosition::Camel), Some(1)),
+            position(Some(SpinPosition::Upright), Some(1)),
         ],
         &d,
     );
@@ -589,5 +596,245 @@ fn one_position_foot_checks_require_the_intended_position_and_panel_never_fills_
     assert_eq!(
         findings(&r, "spin-panel-target")[0].kind,
         FindingKind::Violation
+    );
+}
+
+#[test]
+fn additional_basic_positions_and_explicit_feature_free_final_wind_up() {
+    // Handbook July 15 pp. 14, 18: >2 rev in another position, with explicit
+    // feature-free final upright wind-up exception. No panel reclassification.
+    for (kind, first, other) in [
+        (RegularSpinKind::Sit, SpinPosition::Sit, SpinPosition::Camel),
+        (
+            RegularSpinKind::Camel,
+            SpinPosition::Camel,
+            SpinPosition::Sit,
+        ),
+        (
+            RegularSpinKind::Upright,
+            SpinPosition::Upright,
+            SpinPosition::Camel,
+        ),
+    ] {
+        let d = data(kind, SpinEntry::NonFlying, false);
+        for (n, conflict) in [(2, false), (3, true)] {
+            let r = check(
+                AdultCategory::Bronze,
+                vec![
+                    position(Some(first), Some(3)),
+                    position(Some(other), Some(n)),
+                ],
+                &d,
+            );
+            let f = findings(&r, "spin-position-type");
+            assert_eq!(!f.is_empty(), conflict);
+            if conflict {
+                assert_eq!(f[0].component_index, Some(1));
+                assert_eq!(f[0].kind, FindingKind::Unknown);
+            }
+        }
+    }
+    let steps = vec![
+        position(Some(SpinPosition::Sit), Some(3)),
+        position(Some(SpinPosition::Upright), Some(4)),
+    ];
+    let mut d = data(RegularSpinKind::Sit, SpinEntry::NonFlying, false);
+    assert!(!findings(
+        &check(AdultCategory::Bronze, steps.clone(), &d),
+        "spin-position-type"
+    )
+    .is_empty());
+    d.spins[0].spin.final_upright_wind_up = Some(1);
+    assert!(findings(
+        &check(AdultCategory::Bronze, steps.clone(), &d),
+        "spin-position-type"
+    )
+    .is_empty());
+    d.spins[0].spin.feature_attempts = Some(vec![SpinFeatureAttempt {
+        feature: SpinFeature::ChangeOfEdge,
+        position_step: 1,
+        outcome: FeatureAttemptOutcome::Successful,
+    }]);
+    assert!(!findings(
+        &check(AdultCategory::Bronze, steps.clone(), &d),
+        "spin-position-type"
+    )
+    .is_empty());
+    d.spins[0].spin.final_upright_wind_up = Some(usize::MAX);
+    assert_eq!(
+        findings(
+            &check(AdultCategory::Bronze, steps, &d),
+            "spin-wind-up-target"
+        )[0]
+        .kind,
+        FindingKind::Violation
+    );
+}
+
+#[test]
+fn layback_needs_specific_posture_even_with_the_same_upright_base_position() {
+    // Handbook p. 14: basic-position class does not establish Layback posture.
+    let steps = vec![position(Some(SpinPosition::Upright), Some(4))];
+    let upright = check(
+        AdultCategory::Silver,
+        steps.clone(),
+        &data(RegularSpinKind::Upright, SpinEntry::NonFlying, false),
+    );
+    assert!(findings(&upright, "spin-layback-position").is_empty());
+    let layback = check(
+        AdultCategory::Silver,
+        steps,
+        &data(RegularSpinKind::Layback, SpinEntry::NonFlying, false),
+    );
+    let f = findings(&layback, "spin-layback-position")[0];
+    assert_eq!(f.kind, FindingKind::Unknown);
+    assert!(f.source.location.contains("14"));
+}
+
+#[test]
+fn per_foot_findings_identify_each_affected_step_and_local_uncertainty() {
+    let r = check(
+        AdultCategory::Bronze,
+        vec![
+            position(Some(SpinPosition::Sit), Some(2)),
+            SpinStep::ChangeFoot,
+            position(Some(SpinPosition::Sit), Some(2)),
+        ],
+        &data(RegularSpinKind::Sit, SpinEntry::NonFlying, true),
+    );
+    let f = findings(&r, "spin-per-foot-revolutions");
+    assert_eq!(
+        f.iter().map(|f| f.component_index).collect::<Vec<_>>(),
+        vec![Some(0), Some(2)]
+    );
+    assert!(f.iter().all(|f| f.explanation.contains("conditional V")));
+    let r = check(
+        AdultCategory::Bronze,
+        vec![
+            position(Some(SpinPosition::Sit), Some(2)),
+            SpinStep::ChangeFoot,
+            position(None, None),
+        ],
+        &data(RegularSpinKind::Sit, SpinEntry::NonFlying, true),
+    );
+    let f = findings(&r, "spin-per-foot-revolutions");
+    assert!(f[0].explanation.contains("conditional V"));
+    assert!(f[1].explanation.contains("Incomplete"));
+}
+
+#[test]
+fn one_position_combination_no_value_is_distinct_from_unknown_and_short_movement() {
+    let d = data(RegularSpinKind::Combination, SpinEntry::NonFlying, false);
+    let r = check(
+        AdultCategory::Silver,
+        vec![
+            position(Some(SpinPosition::Sit), Some(4)),
+            position(Some(SpinPosition::Camel), Some(1)),
+        ],
+        &d,
+    );
+    let f = findings(&r, "spin-combination-positions")[0];
+    assert_eq!(f.kind, FindingKind::Unknown);
+    assert!(f.explanation.contains("clearly visibly attempted"));
+    assert!(f.explanation.contains("conditional no-value"));
+    assert!(f.source.location.contains("18"));
+    let r = check(
+        AdultCategory::Silver,
+        vec![
+            position(Some(SpinPosition::Sit), Some(4)),
+            position(None, None),
+        ],
+        &d,
+    );
+    assert!(findings(&r, "spin-combination-positions")[0]
+        .explanation
+        .contains("Missing"));
+    let r = check(
+        AdultCategory::Silver,
+        vec![position(Some(SpinPosition::Sit), Some(2))],
+        &d,
+    );
+    assert!(findings(&r, "spin-combination-positions").is_empty());
+    assert!(findings(&r, "spin-recognition-minimum")[0]
+        .explanation
+        .contains("skating-movement"));
+}
+
+#[test]
+fn synthetic_position_and_foot_rules_require_explicit_sources_and_thresholds() {
+    let mut profile = adult_profile(AdultCategory::Silver);
+    profile.id.name = "synthetic-foot-boundaries".into();
+    profile.provenance = ProfileProvenance::Synthetic;
+    let mut policy = adult_regular_spin_policy(AdultCategory::Silver);
+    policy.profile = profile.id.clone();
+    policy.source = SourceReference {
+        document: "Synthetic spin rules".into(),
+        version: "v1".into(),
+        location: "at least 2 rev total; 1 per foot; synthetic positions".into(),
+    };
+    policy.min_change_foot_revolutions = 2;
+    policy.required.clear();
+    policy.positions = None;
+    policy.per_foot = None;
+    let mut registry = ProfileRegistry::adult();
+    registry.register(profile.clone()).unwrap();
+    let p = ProfileProgram {
+        profile: profile.id,
+        scoring_table: ScoringTableId::Isu2786June2_2026,
+        elements: vec![spin(
+            SpinEntry::NonFlying,
+            vec![
+                position(Some(SpinPosition::Sit), Some(1)),
+                SpinStep::ChangeFoot,
+                position(Some(SpinPosition::Sit), Some(1)),
+            ],
+        )],
+    };
+    let d = data(RegularSpinKind::Sit, SpinEntry::NonFlying, true);
+    let r = validate_profile_program_with_evidence(&registry, &p, &d, Some(&policy)).unwrap();
+    for rule in ["spin-position-policy", "spin-per-foot-policy"] {
+        assert_eq!(findings(&r, rule)[0].kind, FindingKind::Unsupported);
+    }
+    assert!(r
+        .validation
+        .findings
+        .iter()
+        .all(|f| !f.source.document.starts_with("ISU")));
+    policy.per_foot = Some(SpinFootRules {
+        source: policy.source.clone(),
+        min_revolutions: 1,
+        min_basic_revolutions: 1,
+    });
+    let r = validate_profile_program_with_evidence(&registry, &p, &d, Some(&policy)).unwrap();
+    assert!(findings(&r, "spin-per-foot-revolutions").is_empty());
+    policy.per_foot.as_mut().unwrap().min_revolutions = 2;
+    let r = validate_profile_program_with_evidence(&registry, &p, &d, Some(&policy)).unwrap();
+    assert_eq!(findings(&r, "spin-per-foot-revolutions").len(), 2);
+    assert!(findings(&r, "spin-per-foot-revolutions")
+        .iter()
+        .all(|f| f.source == policy.source));
+    policy.per_foot.as_mut().unwrap().source.location.clear();
+    assert_eq!(
+        validate_profile_program_with_evidence(&registry, &p, &d, Some(&policy))
+            .unwrap_err()
+            .kind,
+        ProfileErrorKind::Invalid
+    );
+}
+
+#[test]
+fn three_duplicate_evidence_entries_never_select_an_arbitrary_value() {
+    let mut d = data(RegularSpinKind::Sit, SpinEntry::NonFlying, false);
+    d.spins.push(d.spins[0].clone());
+    d.spins.push(d.spins[0].clone());
+    let r = check(
+        AdultCategory::Silver,
+        vec![position(Some(SpinPosition::Sit), Some(4))],
+        &d,
+    );
+    assert_eq!(findings(&r, "spin-evidence-target").len(), 2);
+    assert_eq!(
+        findings(&r, "spin-abbreviation")[0].kind,
+        FindingKind::Unknown
     );
 }
