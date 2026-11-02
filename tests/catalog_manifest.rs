@@ -60,7 +60,7 @@ fn check_manifest(manifest: &str) {
         assert!((2..=14).contains(&page));
         pages[page - 2] += 1;
         assert_eq!(cells[2].parse::<usize>().unwrap(), pages[page - 2]);
-        assert!(!cells[3].is_empty());
+        assert_eq!(cells[3], expected_section(page, pages[page - 2], code));
         assert!(matches!(cells[4], "SingleAndPair" | "Pair"));
         *families.entry(cells[5]).or_insert(0) += 1;
         assert!(seen.insert(cells[6]), "duplicate code {}", cells[6]);
@@ -75,6 +75,36 @@ fn check_manifest(manifest: &str) {
     for code in ["Eu", "3A", "3Ab", "3Aq", "3Aqb", "5Lz!<<", "PiF1", "ChPLi1"] {
         assert!(seen.contains(code), "missing easily omitted row {code}");
     }
+}
+
+fn expected_section(page: usize, row: usize, code: &str) -> String {
+    // Boundaries read from the printed section headers, independently of catalog data.
+    match (page, row) {
+        (2..=5, _) => "Jumps",
+        (6, 1..=20) => {
+            "Spin in one position and no change of foot (upright, layback, camel or sit)"
+        }
+        (6, _) | (7, 1..=10) => "Flying Spin (any position - upright, layback, camel or sit)",
+        (7, _) | (8, 1..=35) => "Spins with change of foot",
+        (8, _) => "Spin Combination with change of position and no change of foot",
+        (9, 1..=20) => "Spin Combination with change of position and change of foot",
+        (9, 21..=25) => "Step Sequence",
+        (9, _) => return format!("Lifts / Group {}", &code[..1]),
+        (10, 1..=25) => return format!("Lifts / Group {}", &code[..2]),
+        (10, _) | (11, 1..=20) => "Twist Lifts",
+        (11..=12, _) | (13, 1..=6) => "Throw Jumps",
+        (13, 7..=26) => "Death Spirals",
+        (13, 27..=34) => "Advanced Novice Death Spirals eligible for bonus (b)",
+        (13, 35) => "Pivot Figure",
+        (13, _) => "Pair Spins",
+        (14, 1..=10) => "Pair Spin Combination",
+        (14, 11) => "Choreographic Step Sequence",
+        (14, 12) => "Choreographic Spin",
+        (14, 13) => "Choreographic Pair Spin",
+        (14, 14) => "Choreographic Pair Lift",
+        _ => panic!("unexpected page/row {page}/{row}"),
+    }
+    .into()
 }
 
 fn expected_level<'a>(code: &'a str, family: &str) -> &'a str {
@@ -136,6 +166,7 @@ fn expected_notes(code: &str, family: &str) -> String {
 #[test]
 fn inventory_validation_rejects_source_and_metadata_corruption() {
     for (before, after) in [
+        ("\tJumps\t", "\tWrong section\t"),
         ("\tStSq4\t", "\tStSq5\t"),
         ("\t1,legend\t", "\tINVALID_NOTE\t"),
         ("\tStSq4\t4\t", "\tStSq4\t3\t"),

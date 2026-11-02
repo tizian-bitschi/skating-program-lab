@@ -90,14 +90,35 @@ lookup, then migrates existing scorer rows without extending engine behavior.
 C adds Pair data and completes the independent fixture/completeness audit. Issue
 #45 stays open until C is reviewed, checked and merged.
 
-At A, there are no production catalog rows and no lookup API yet. Scoring values
-and behavior remain unchanged; catalog and scorer now use one private source
-resolver on `ScoringTableId` for document/edition identity. The manifest test
-checks every code against the separate source reference, metadata consistency,
-unique identifiers, per-page and per-family counts, row ordinals, edition and
-column counts. Later parity tests
-compare production data with this separate manifest. Manifest updates require a
-fresh source review; never regenerate expected coverage from production rows.
+A was merged as [PR #50](https://github.com/tizian-bitschi/skating-program-lab/pull/50)
+after [independent GPT-6 review](https://chatgpt.com/c/6ae8b660-63b4-83ed-b2c7-524e78d13735)
+returned APPROVE for commit `58b5a21`.
+
+B embeds 402 shared rows: 215 jumps (including Euler), 180 spins, five step
+sequences and two choreographic rows. `catalog_row(table, exact_code)` returns an
+immutable static row or `None`, with no parsing, category filtering or fallback.
+The complete 625-row source manifest is retained; 223 Pair-specific rows remain
+pending C and return `None` at this intermediate stage.
+
+The old hard-coded `jump_row` values and CSSp1/ChSp1 arrays are removed. The scorer
+reads the existing single/double subset and these two spin rows from the shared
+catalog. Its recognition limits, unsupported errors, final-GOE restrictions and
+legacy source descriptions are preserved. Catalog presence does not extend engine
+support for triples, quints, other spins or steps.
+
+Tests compare every shared row's source/metadata/notes to the independently
+reviewed manifest and 23 manually source-read numerical fixtures cover all five
+shared families and all GOE columns, including several levels and reduced/bonus
+variants. Existing twelve-jump all-column scoring fixtures remain unchanged.
+An internal cardinality/uniqueness test rejects extra or duplicate production
+codes. Page/row boundaries independently validate every manifest section name;
+this exposed and corrected the CSp and FCSp section labels on p. 6 (15 rows,
+without changing any values). Eight corruption cases cover the manifest checker.
+The remaining Pair data and numerical fixtures are completed in C.
+
+Manifest updates require source review; never regenerate expected coverage from
+production rows. Printed numerical values are transcribed directly, including
+rounded V rows, rather than recomputed using percentage arithmetic.
 
 Pair data availability will not imply Pair recognition/scoring/validation support.
 Category filtering does not belong in the catalog. Unknown table strings retain

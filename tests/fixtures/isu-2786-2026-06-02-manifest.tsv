@@ -224,11 +224,11 @@ isu-2786-2026-06-02	6	7	Spin in one position and no change of foot (upright, lay
 isu-2786-2026-06-02	6	8	Spin in one position and no change of foot (upright, layback, camel or sit)	SingleAndPair	Spin	LSp2	2	11	1	render-cross-checked
 isu-2786-2026-06-02	6	9	Spin in one position and no change of foot (upright, layback, camel or sit)	SingleAndPair	Spin	LSp3	3	11	1	render-cross-checked
 isu-2786-2026-06-02	6	10	Spin in one position and no change of foot (upright, layback, camel or sit)	SingleAndPair	Spin	LSp4	4	11	1	render-cross-checked
-isu-2786-2026-06-02	6	11	Spins with change of foot	SingleAndPair	Spin	CSpB	B	11	1	render-cross-checked
-isu-2786-2026-06-02	6	12	Spins with change of foot	SingleAndPair	Spin	CSp1	1	11	1	render-cross-checked
-isu-2786-2026-06-02	6	13	Spins with change of foot	SingleAndPair	Spin	CSp2	2	11	1	render-cross-checked
-isu-2786-2026-06-02	6	14	Spins with change of foot	SingleAndPair	Spin	CSp3	3	11	1	render-cross-checked
-isu-2786-2026-06-02	6	15	Spins with change of foot	SingleAndPair	Spin	CSp4	4	11	1	render-cross-checked
+isu-2786-2026-06-02	6	11	Spin in one position and no change of foot (upright, layback, camel or sit)	SingleAndPair	Spin	CSpB	B	11	1	render-cross-checked
+isu-2786-2026-06-02	6	12	Spin in one position and no change of foot (upright, layback, camel or sit)	SingleAndPair	Spin	CSp1	1	11	1	render-cross-checked
+isu-2786-2026-06-02	6	13	Spin in one position and no change of foot (upright, layback, camel or sit)	SingleAndPair	Spin	CSp2	2	11	1	render-cross-checked
+isu-2786-2026-06-02	6	14	Spin in one position and no change of foot (upright, layback, camel or sit)	SingleAndPair	Spin	CSp3	3	11	1	render-cross-checked
+isu-2786-2026-06-02	6	15	Spin in one position and no change of foot (upright, layback, camel or sit)	SingleAndPair	Spin	CSp4	4	11	1	render-cross-checked
 isu-2786-2026-06-02	6	16	Spin in one position and no change of foot (upright, layback, camel or sit)	SingleAndPair	Spin	SSpB	B	11	1	render-cross-checked
 isu-2786-2026-06-02	6	17	Spin in one position and no change of foot (upright, layback, camel or sit)	SingleAndPair	Spin	SSp1	1	11	1	render-cross-checked
 isu-2786-2026-06-02	6	18	Spin in one position and no change of foot (upright, layback, camel or sit)	SingleAndPair	Spin	SSp2	2	11	1	render-cross-checked
@@ -254,16 +254,16 @@ isu-2786-2026-06-02	6	37	Flying Spin (any position - upright, layback, camel or 
 isu-2786-2026-06-02	6	38	Flying Spin (any position - upright, layback, camel or sit)	SingleAndPair	Spin	FLSp2V	2	11	1,3,legend	render-cross-checked
 isu-2786-2026-06-02	6	39	Flying Spin (any position - upright, layback, camel or sit)	SingleAndPair	Spin	FLSp3V	3	11	1,3,legend	render-cross-checked
 isu-2786-2026-06-02	6	40	Flying Spin (any position - upright, layback, camel or sit)	SingleAndPair	Spin	FLSp4V	4	11	1,3,legend	render-cross-checked
-isu-2786-2026-06-02	6	41	Spins with change of foot	SingleAndPair	Spin	FCSpB	B	11	1	render-cross-checked
-isu-2786-2026-06-02	6	42	Spins with change of foot	SingleAndPair	Spin	FCSp1	1	11	1	render-cross-checked
-isu-2786-2026-06-02	6	43	Spins with change of foot	SingleAndPair	Spin	FCSp2	2	11	1	render-cross-checked
-isu-2786-2026-06-02	6	44	Spins with change of foot	SingleAndPair	Spin	FCSp3	3	11	1	render-cross-checked
-isu-2786-2026-06-02	6	45	Spins with change of foot	SingleAndPair	Spin	FCSp4	4	11	1	render-cross-checked
-isu-2786-2026-06-02	6	46	Spins with change of foot	SingleAndPair	Spin	FCSpBV	B	11	1,3,legend	render-cross-checked
-isu-2786-2026-06-02	6	47	Spins with change of foot	SingleAndPair	Spin	FCSp1V	1	11	1,3,legend	render-cross-checked
-isu-2786-2026-06-02	6	48	Spins with change of foot	SingleAndPair	Spin	FCSp2V	2	11	1,3,legend	render-cross-checked
-isu-2786-2026-06-02	6	49	Spins with change of foot	SingleAndPair	Spin	FCSp3V	3	11	1,3,legend	render-cross-checked
-isu-2786-2026-06-02	6	50	Spins with change of foot	SingleAndPair	Spin	FCSp4V	4	11	1,3,legend	render-cross-checked
+isu-2786-2026-06-02	6	41	Flying Spin (any position - upright, layback, camel or sit)	SingleAndPair	Spin	FCSpB	B	11	1	render-cross-checked
+isu-2786-2026-06-02	6	42	Flying Spin (any position - upright, layback, camel or sit)	SingleAndPair	Spin	FCSp1	1	11	1	render-cross-checked
+isu-2786-2026-06-02	6	43	Flying Spin (any position - upright, layback, camel or sit)	SingleAndPair	Spin	FCSp2	2	11	1	render-cross-checked
+isu-2786-2026-06-02	6	44	Flying Spin (any position - upright, layback, camel or sit)	SingleAndPair	Spin	FCSp3	3	11	1	render-cross-checked
+isu-2786-2026-06-02	6	45	Flying Spin (any position - upright, layback, camel or sit)	SingleAndPair	Spin	FCSp4	4	11	1	render-cross-checked
+isu-2786-2026-06-02	6	46	Flying Spin (any position - upright, layback, camel or sit)	SingleAndPair	Spin	FCSpBV	B	11	1,3,legend	render-cross-checked
+isu-2786-2026-06-02	6	47	Flying Spin (any position - upright, layback, camel or sit)	SingleAndPair	Spin	FCSp1V	1	11	1,3,legend	render-cross-checked
+isu-2786-2026-06-02	6	48	Flying Spin (any position - upright, layback, camel or sit)	SingleAndPair	Spin	FCSp2V	2	11	1,3,legend	render-cross-checked
+isu-2786-2026-06-02	6	49	Flying Spin (any position - upright, layback, camel or sit)	SingleAndPair	Spin	FCSp3V	3	11	1,3,legend	render-cross-checked
+isu-2786-2026-06-02	6	50	Flying Spin (any position - upright, layback, camel or sit)	SingleAndPair	Spin	FCSp4V	4	11	1,3,legend	render-cross-checked
 isu-2786-2026-06-02	7	1	Flying Spin (any position - upright, layback, camel or sit)	SingleAndPair	Spin	FSSpB	B	11	1	render-cross-checked
 isu-2786-2026-06-02	7	2	Flying Spin (any position - upright, layback, camel or sit)	SingleAndPair	Spin	FSSp1	1	11	1	render-cross-checked
 isu-2786-2026-06-02	7	3	Flying Spin (any position - upright, layback, camel or sit)	SingleAndPair	Spin	FSSp2	2	11	1	render-cross-checked
