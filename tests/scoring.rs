@@ -4,6 +4,15 @@ const TABLE: ScoringTableId = ScoringTableId::Isu2786June2_2026;
 
 #[test]
 fn single_non_jump_scores_match_independent_source_extraction() {
+    let inventory: std::collections::BTreeMap<_, _> =
+        include_str!("fixtures/isu-2786-2026-06-02-manifest.tsv")
+            .lines()
+            .skip(1)
+            .map(|line| line.split('\t').collect::<Vec<_>>())
+            .filter(|fields| fields[4] == "SingleAndPair" && fields[5] != "Jump")
+            .map(|fields| (fields[6], fields))
+            .collect();
+    assert_eq!(inventory.len(), 187);
     let mut count = 0;
     // Independent PDF extraction maintained in #45, not production catalog values.
     for line in include_str!("fixtures/isu-2786-2026-06-02-source-values.tsv").lines() {
@@ -12,6 +21,9 @@ fn single_non_jump_scores_match_independent_source_extraction() {
             continue;
         }
         let notation = fields[3];
+        let Some(metadata) = inventory.get(notation) else {
+            continue;
+        };
         let reduced = notation.ends_with('V');
         let unmarked = notation.strip_suffix('V').unwrap_or(notation);
         let (code, level) = if matches!(unmarked, "ChSp1" | "ChSq1") {
@@ -33,10 +45,10 @@ fn single_non_jump_scores_match_independent_source_extraction() {
         if !(code.ends_with("Sp") || code == "StSq" || matches!(code, "ChSp1" | "ChSq1")) {
             continue;
         }
-        // Pair rows remain outside the recognition/scoring domain.
-        if ComponentCode::try_from(code).is_err() {
-            continue;
-        }
+        assert!(
+            ComponentCode::try_from(code).is_ok(),
+            "missing Single code {code}"
+        );
         let calls = if reduced {
             vec![PanelCall::ReducedSpinValue]
         } else {
@@ -68,6 +80,15 @@ fn single_non_jump_scores_match_independent_source_extraction() {
                 .contains(&format!("p. {},", fields[1])));
             assert_eq!(score.base.table, TABLE);
             assert_eq!(score.base.source.version, "2026-06-02");
+            if !matches!(notation, "CSSp1" | "ChSp1") {
+                assert!(score.base.source.location.contains(metadata[3]));
+                assert!(score
+                    .base
+                    .source
+                    .location
+                    .contains(&format!("value row {}, code {notation}", metadata[2])));
+                assert!(score.goe_source.location.contains(metadata[3]));
+            }
             assert_eq!(
                 score_element(TABLE, &r, &[], goe, Some(true)).is_ok(),
                 goe <= -3
@@ -79,7 +100,33 @@ fn single_non_jump_scores_match_independent_source_extraction() {
         );
         count += 1;
     }
-    assert_eq!(count, 167);
+    assert_eq!(count, inventory.len());
+}
+
+#[test]
+fn change_foot_layback_variants_have_explicit_source_fixtures() {
+    // Communication 2786 p. 7, value rows 31, 36, 45 and 50.
+    for (code, level, reduced, base, adjustment) in [
+        ("CLSp", Level::Basic, false, 200, 20),
+        ("CLSp", Level::Basic, true, 150, 15),
+        ("FCLSp", Level::Four, false, 380, 38),
+        ("FCLSp", Level::Four, true, 285, 29),
+    ] {
+        let r = recognition(
+            code,
+            Some(level),
+            Some(if reduced {
+                vec![PanelCall::ReducedSpinValue]
+            } else {
+                vec![]
+            }),
+        );
+        let score = score_element(TABLE, &r, &[], 1, Some(false)).unwrap();
+        assert_eq!(
+            (score.base.hundredths, score.goe_hundredths),
+            (base, adjustment)
+        );
+    }
 }
 
 #[test]
@@ -87,7 +134,7 @@ fn non_jump_marks_and_missing_levels_do_not_fabricate_values() {
     for code in ["CSSp", "StSq"] {
         assert_eq!(
             lookup_base_value(TABLE, &recognition(code, None, Some(vec![])), &[]),
-            Err(BaseValueError::Unsupported)
+            Err(BaseValueError::UnknownDetails)
         );
         for call in [
             PanelCall::Quarter,

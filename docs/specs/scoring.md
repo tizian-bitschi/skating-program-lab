@@ -30,7 +30,7 @@ The scorer uses the common immutable catalog from Communication 2786, updated 2 
 
 | Family / mark | BV and single-judge GOE support | Rule and evidence boundary |
 | --- | --- | --- |
-| Regular spins, all representable variants, B and 1–4 | Exact published row and GOE column, pp. 6–9 | Supplied level required; no feature inference or category validation |
+| Regular spins, all variants including CLSp/FCLSp, B and 1–4 | Exact published row and GOE column, pp. 6–9 | Supplied level required; no feature inference or category validation |
 | Spin V | Exact reduced row and GOE column, pp. 6–9 and p. 14 remark 3 | Handbook p. 25 limits V to flying, combination and change-foot cases; only published V rows supported. No deduction inferred from V alone: its cause can be a chosen two-position combination, not a GOE error. Caller supplies final GOE after assessing execution errors |
 | StSq B and 1–4 | Exact row and GOE column, p. 9 | Supplied level required; no turn/feature inference (2788 pp. 2–3; Q&A 2 p. 1) |
 | ChSq1 and ChSp1 | Exact fixed BV and choreographic GOE scale, p. 14 | Recognition supplied; no movement inference (2788 pp. 3–6; Q&A 1 p. 1) |
@@ -39,7 +39,7 @@ The scorer uses the common immutable catalog from Communication 2786, updated 2 
 | Pair families | Catalog only; unsupported recognition/scoring | No Pair rules or fabricated Single-style score |
 | *, +REP, +COMBO, +SEQ, Euler, three-component combinations | Unsupported | Handbook pp. 2, 6, 25, 30–33 and Q&A 3 require additional contextual consequences. No generic percentage/default is applied |
 
-`tests/scoring.rs` checks all 167 representable non-jump rows and all eleven GOE columns against the independent PDF extraction, including rounded V values (for example FCSpBV 1.43 and GOE +1 = 0.14). Each row also tests fall limits and missing fall observations. Mixed-family timed and timestamp-free fixtures keep non-jumps outside the second-half selection and deductions outside TES. Published levels and V are accepted panel inputs, not assertions about the observed movement or program legality. Unimplemented jump consequences remain explicit below and need a separate contextual-recognition slice before support expands.
+`tests/scoring.rs` checks all 187 representable non-jump rows and all eleven GOE columns against the independent PDF extraction, including rounded V values (for example FCSpBV 1.43 and GOE +1 = 0.14). Each row also tests fall limits and missing fall observations. Mixed-family timed and timestamp-free fixtures keep non-jumps outside the second-half selection and deductions outside TES. Published levels and V are accepted panel inputs, not assertions about the observed movement or program legality. Unimplemented jump consequences remain explicit below and need a separate contextual-recognition slice before support expands.
 
 | Variant of a supported single jump | Base value | Single-judge score |
 | --- | --- | --- |
@@ -71,3 +71,13 @@ See [implementation status](../implementation-status.md#scoring) for supported r
 ## Timestamp-free planning scenarios
 
 `score_planning_scenario` calculates a hypothetical single-judge sum without skating times. With no boundary it uses unfactored values and categorizes no element as second half. An optional index marks the first element assumed to be in the second half; the resulting credit is conditional on that assumption. The index is not evidence of an actual start time, event applicability or an official TES. Unknown elements can leave the conditional selection incomplete. `score_program` remains the separate time-dependent path and requires timing and applicable rule evidence for exact claims; duration remains available for deductions.
+
+## Remaining contextual jump work (#46)
+
+The following bounded work remains before issue #46 is complete:
+
+- Resolve cumulative GOE reductions for multiple calls on one or multiple jumps, using 2788 and the handbook rather than inferring consequences from table rows.
+- Model the evidence needed for +REP, +COMBO, +SEQ, starred components, three-jump combinations and Euler, including Adult-specific applicability and Q&A 3 consequences.
+- Add independently source-derived fixtures for each newly supported contextual outcome and retain explicit unsupported results until the required evidence is representable.
+
+Missing levels on a regular spin or StSq return the existing `UnknownDetails` error, as required for missing panel evidence; fully specified but unimplemented variants remain `Unsupported`. No new public type or signature is introduced. New families use `CatalogSource::reference` for page, section, numeric value-row and exact code. Previously supported jump/CSSp1/ChSp1 source strings retain their compatibility format.

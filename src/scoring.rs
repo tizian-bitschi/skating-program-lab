@@ -34,11 +34,17 @@ struct TableRow {
     table: ScoringTableId,
     notation: String,
     section: &'static str,
+    catalog_source: Option<crate::CatalogSource>,
     goe_reference: Option<String>,
 }
 
 impl TableRow {
     fn source(&self, column: &str) -> SourceReference {
+        if let Some(source) = self.catalog_source {
+            let mut reference = source.reference(&self.notation);
+            reference.location.push_str(&format!(", {column}"));
+            return reference;
+        }
         self.table
             .source_reference(format!("{}, {column}, row {}", self.section, self.notation))
     }
@@ -114,11 +120,16 @@ fn table_row(
             table,
             notation: notation.clone(),
             section: "pp. 2–4, Jumps; p. 14, combination reference",
+            catalog_source: None,
             goe_reference: Some(reference.to_owned()),
         });
     }
     if details.components().len() != 1 {
         return Err(BaseValueError::Unsupported);
+    }
+    let component = details.components()[0].as_str();
+    if details.level().is_none() && (component.ends_with("Sp") || component == "StSq") {
+        return Err(BaseValueError::UnknownDetails);
     }
     let catalog = crate::catalog_row(table, &notation).ok_or(BaseValueError::Unsupported)?;
     if catalog.discipline != CatalogDiscipline::SingleAndPair || catalog.level != details.level() {
@@ -134,15 +145,11 @@ fn table_row(
         | CatalogFamily::StepSequence
         | CatalogFamily::ChoreographicSpin
         | CatalogFamily::ChoreographicSequence => {
-            let section = match catalog.source.page {
-                5 => "p. 5, Spins",
-                6 => "p. 6, Spins",
-                7 => "p. 7, Spins",
-                8 => "p. 8, Spins",
-                9 if catalog.family == CatalogFamily::StepSequence => "p. 9, Step Sequence",
-                9 => "p. 9, Spins",
-                14 => "p. 14, Choreographic Elements",
-                _ => return Err(BaseValueError::Unsupported),
+            // Preserve source strings only for the previously supported public outputs.
+            let section = match notation.as_str() {
+                "CSSp1" => "p. 8, Spins",
+                "ChSp1" => "p. 14, Choreographic Elements",
+                _ => "",
             };
             (
                 catalog.base_hundredths,
@@ -156,8 +163,15 @@ fn table_row(
         hundredths,
         goe,
         table,
-        notation,
         section,
+        catalog_source: if catalog.family == CatalogFamily::Jump
+            || matches!(notation.as_str(), "CSSp1" | "ChSp1")
+        {
+            None
+        } else {
+            Some(catalog.source)
+        },
+        notation,
         goe_reference: None,
     })
 }
