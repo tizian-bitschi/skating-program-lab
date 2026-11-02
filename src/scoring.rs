@@ -52,165 +52,24 @@ impl TableRow {
     }
 }
 
-// ISU Communication 2786, updated 2026-06-02, pp. 2-4: BASE and GOE columns.
-fn jump_row(notation: &str) -> Option<(u16, &'static str, [i16; 11])> {
-    match notation {
-        "1T" | "1S" | "1Tq" | "1Sq" | "1Lo<" | "1F<" | "1Fe" | "1Feq" | "1F!<" => Some((
-            40,
-            "p. 2, Jumps",
-            [-20, -16, -12, -8, -4, 0, 4, 8, 12, 16, 20],
-        )),
-        "1Lo" | "1F" | "1Loq" | "1Fq" | "1F!" | "1F!q" => Some((
-            50,
-            "p. 2, Jumps",
-            [-25, -20, -15, -10, -5, 0, 5, 10, 15, 20, 25],
-        )),
-        "1Lz" | "1Lzq" | "1Lz!" | "1Lz!q" => Some((
-            60,
-            "p. 2, Jumps",
-            [-30, -24, -18, -12, -6, 0, 6, 12, 18, 24, 30],
-        )),
-        "1T<" | "1S<" => Some((
-            32,
-            "p. 2, Jumps",
-            [-16, -13, -10, -6, -3, 0, 3, 6, 10, 13, 16],
-        )),
-        "1Lz<" | "1Lze" | "1Lzeq" | "1Lz!<" => Some((
-            48,
-            "p. 2, Jumps",
-            [-24, -19, -14, -10, -5, 0, 5, 10, 14, 19, 24],
-        )),
-        "1T<<" | "1S<<" | "1Lo<<" | "1F<<" | "1Lz<<" | "1Fe<<" | "1Lze<<" | "1F!<<" | "1Lz!<<" => {
-            Some((0, "p. 2, Jumps", [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]))
-        }
-        "1Fe<" => Some((
-            30,
-            "p. 2, Jumps",
-            [-15, -12, -9, -6, -3, 0, 3, 6, 9, 12, 15],
-        )),
-        "1Lze<" => Some((
-            36,
-            "p. 2, Jumps",
-            [-18, -14, -11, -7, -4, 0, 4, 7, 11, 14, 18],
-        )),
-        "1A" | "1Aq" => Some((
-            110,
-            "p. 2, Jumps",
-            [-55, -44, -33, -22, -11, 0, 11, 22, 33, 44, 55],
-        )),
-        "2T" | "2S" | "2Tq" | "2Sq" => Some((
-            130,
-            "p. 2, Jumps",
-            [-65, -52, -39, -26, -13, 0, 13, 26, 39, 52, 65],
-        )),
-        "2Lo" | "2Loq" => Some((
-            170,
-            "p. 2, Jumps",
-            [-85, -68, -51, -34, -17, 0, 17, 34, 51, 68, 85],
-        )),
-        "2F" | "2Fq" => Some((
-            180,
-            "p. 2, Jumps",
-            [-90, -72, -54, -36, -18, 0, 18, 36, 54, 72, 90],
-        )),
-        "2Lz" | "2Lzq" => Some((
-            210,
-            "p. 2, Jumps",
-            [-105, -84, -63, -42, -21, 0, 21, 42, 63, 84, 105],
-        )),
-        "1A<" => Some((
-            88,
-            "p. 2, Jumps",
-            [-44, -35, -26, -18, -9, 0, 9, 18, 26, 35, 44],
-        )),
-        "2T<" | "2S<" => Some((
-            104,
-            "p. 2, Jumps",
-            [-52, -42, -31, -21, -10, 0, 10, 21, 31, 42, 52],
-        )),
-        "2Lo<" => Some((
-            136,
-            "p. 2, Jumps",
-            [-68, -54, -41, -27, -14, 0, 14, 27, 41, 54, 68],
-        )),
-        "2F<" => Some((
-            144,
-            "p. 2, Jumps",
-            [-72, -58, -43, -29, -14, 0, 14, 29, 43, 58, 72],
-        )),
-        "2Lz<" => Some((
-            168,
-            "p. 2, Jumps",
-            [-84, -67, -50, -34, -17, 0, 17, 34, 50, 67, 84],
-        )),
-        "1A<<" => Some((0, "p. 3, Jumps", [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])),
-        "2T<<" | "2S<<" | "2Fe<<" => Some((
-            40,
-            "p. 3, Jumps",
-            [-20, -16, -12, -8, -4, 0, 4, 8, 12, 16, 20],
-        )),
-        "2Lo<<" | "2F<<" | "2F!<<" => Some((
-            50,
-            "p. 3, Jumps",
-            [-25, -20, -15, -10, -5, 0, 5, 10, 15, 20, 25],
-        )),
-        "2Lz<<" | "2Lz!<<" => Some((
-            60,
-            "p. 3, Jumps",
-            [-30, -24, -18, -12, -6, 0, 6, 12, 18, 24, 30],
-        )),
-        "2Fe" | "2Feq" | "2F!<" => Some((
-            144,
-            "p. 3, Jumps",
-            [-72, -58, -43, -29, -14, 0, 14, 29, 43, 58, 72],
-        )),
-        "2Fe<" => Some((
-            108,
-            "p. 3, Jumps",
-            [-54, -43, -32, -22, -11, 0, 11, 22, 32, 43, 54],
-        )),
-        "2Lze" | "2Lzeq" | "2Lz!<" => Some((
-            168,
-            "p. 3, Jumps",
-            [-84, -67, -50, -34, -17, 0, 17, 34, 50, 67, 84],
-        )),
-        "2Lze<" => Some((
-            126,
-            "p. 3, Jumps",
-            [-63, -50, -38, -25, -13, 0, 13, 25, 38, 50, 63],
-        )),
-        "2Lze<<" => Some((
-            48,
-            "p. 3, Jumps",
-            [-24, -19, -14, -10, -5, 0, 5, 10, 14, 19, 24],
-        )),
-        "2F!" | "2F!q" => Some((
-            180,
-            "p. 3, Jumps",
-            [-90, -72, -54, -36, -18, 0, 18, 36, 54, 72, 90],
-        )),
-        "2Lz!" | "2Lz!q" => Some((
-            210,
-            "p. 3, Jumps",
-            [-105, -84, -63, -42, -21, 0, 21, 42, 63, 84, 105],
-        )),
-        "2A" | "2Aq" => Some((
-            330,
-            "p. 3, Jumps",
-            [-165, -132, -99, -66, -33, 0, 33, 66, 99, 132, 165],
-        )),
-        "2A<" => Some((
-            264,
-            "p. 3, Jumps",
-            [-132, -106, -79, -53, -26, 0, 26, 53, 79, 106, 132],
-        )),
-        "2A<<" => Some((
-            110,
-            "p. 4, Jumps",
-            [-55, -44, -33, -22, -11, 0, 11, 22, 33, 44, 55],
-        )),
-        _ => None,
+// Keep engine support at the existing single/double subset; catalog presence is data only.
+fn jump_row(table: ScoringTableId, notation: &str) -> Option<(u16, &'static str, [i16; 11])> {
+    let unmarked = notation.trim_end_matches(['q', '<', '!', 'e']);
+    if !matches!(
+        unmarked,
+        "1T" | "1S" | "1Lo" | "1F" | "1Lz" | "1A" | "2T" | "2S" | "2Lo" | "2F" | "2Lz" | "2A"
+    ) {
+        return None;
     }
+    let row = crate::catalog_row(table, notation)?;
+    // Preserve existing public source descriptions during this data migration.
+    let section = match row.source.page {
+        2 => "p. 2, Jumps",
+        3 => "p. 3, Jumps",
+        4 => "p. 4, Jumps",
+        _ => return None,
+    };
+    Some((row.base_hundredths, section, row.goe_hundredths))
 }
 
 fn table_row(
@@ -241,8 +100,9 @@ fn table_row(
         if parts.next().is_some() {
             return Err(BaseValueError::Unsupported);
         }
-        let (first_bv, _, first_goe) = jump_row(first).ok_or(BaseValueError::Unsupported)?;
-        let (second_bv, _, second_goe) = jump_row(second).ok_or(BaseValueError::Unsupported)?;
+        let (first_bv, _, first_goe) = jump_row(table, first).ok_or(BaseValueError::Unsupported)?;
+        let (second_bv, _, second_goe) =
+            jump_row(table, second).ok_or(BaseValueError::Unsupported)?;
         let (reference, goe) = if first_bv >= second_bv {
             (first, first_goe)
         } else {
@@ -262,18 +122,19 @@ fn table_row(
     }
     let (hundredths, section, goe) = match table {
         ScoringTableId::Isu2786June2_2026 => match (notation.as_str(), details.level()) {
-            ("CSSp1", Some(Level::One)) => (
-                230,
-                "p. 8, Spins",
-                Some([-115, -92, -69, -46, -23, 0, 23, 46, 69, 92, 115]),
-            ),
-            ("ChSp1", None) => (
-                350,
-                "p. 14, Choreographic Elements",
-                Some([-250, -200, -150, -100, -50, 0, 50, 100, 150, 200, 250]),
-            ),
+            ("CSSp1", Some(Level::One)) | ("ChSp1", None) => {
+                let row =
+                    crate::catalog_row(table, &notation).ok_or(BaseValueError::Unsupported)?;
+                let section = if notation == "CSSp1" {
+                    "p. 8, Spins"
+                } else {
+                    "p. 14, Choreographic Elements"
+                };
+                (row.base_hundredths, section, Some(row.goe_hundredths))
+            }
             (name, None) => {
-                let (base, section, goe) = jump_row(name).ok_or(BaseValueError::Unsupported)?;
+                let (base, section, goe) =
+                    jump_row(table, name).ok_or(BaseValueError::Unsupported)?;
                 (base, section, Some(goe))
             }
             _ => return Err(BaseValueError::Unsupported),

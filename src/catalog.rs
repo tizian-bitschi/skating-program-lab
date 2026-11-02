@@ -1,6 +1,19 @@
 //! Immutable Scale of Values data, independent of recognition and scoring support.
 use crate::{Level, ScoringTableId, SourceReference};
 
+mod shared;
+
+/// Exact published-code lookup in the selected immutable edition.
+/// Unknown notation returns `None`; this does not infer calls or engine support.
+/// Pair-specific rows are added in issue #45 slice C.
+pub fn catalog_row(table: ScoringTableId, notation: &str) -> Option<&'static CatalogRow> {
+    match table {
+        ScoringTableId::Isu2786June2_2026 => {
+            shared::ROWS.iter().find(|row| row.notation == notation)
+        }
+    }
+}
+
 /// SHA-256 of the official PDF whose cover states "Updated as of 2 June, 2026".
 /// The PDF's internal title still names the superseded May edition.
 pub const ISU_2786_JUNE_2_2026_SHA256: &str =
@@ -87,4 +100,64 @@ pub struct CatalogRow {
     pub goe_hundredths: [i16; 11],
     pub source: CatalogSource,
     pub notes: &'static [CatalogNote],
+}
+
+// Compact typed initializers keep the printed data visible without repeated field names.
+const fn row(
+    notation: &'static str,
+    family: CatalogFamily,
+    level: Option<Level>,
+    base_hundredths: u16,
+    goe_hundredths: [i16; 11],
+    source: (u8, u8, &'static str),
+    notes: &'static [CatalogNote],
+) -> CatalogRow {
+    let discipline = match family {
+        CatalogFamily::Jump
+        | CatalogFamily::Spin
+        | CatalogFamily::StepSequence
+        | CatalogFamily::ChoreographicSequence
+        | CatalogFamily::ChoreographicSpin => CatalogDiscipline::SingleAndPair,
+        CatalogFamily::Lift
+        | CatalogFamily::TwistLift
+        | CatalogFamily::ThrowJump
+        | CatalogFamily::DeathSpiral
+        | CatalogFamily::PivotFigure
+        | CatalogFamily::PairSpin
+        | CatalogFamily::PairSpinCombination
+        | CatalogFamily::ChoreographicPairSpin
+        | CatalogFamily::ChoreographicPairLift => CatalogDiscipline::Pair,
+    };
+    CatalogRow {
+        notation,
+        discipline,
+        family,
+        level,
+        base_hundredths,
+        goe_hundredths,
+        source: CatalogSource {
+            table: ScoringTableId::Isu2786June2_2026,
+            page: source.0,
+            row: source.1,
+            section: source.2,
+        },
+        notes,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::BTreeSet;
+
+    #[test]
+    fn embedded_rows_have_no_extra_or_duplicate_codes() {
+        assert_eq!(shared::ROWS.len(), 402);
+        let codes: BTreeSet<_> = shared::ROWS.iter().map(|row| row.notation).collect();
+        assert_eq!(codes.len(), shared::ROWS.len());
+        for row in shared::ROWS {
+            assert_eq!(row.source.table, ScoringTableId::Isu2786June2_2026);
+            assert_eq!(row.goe_hundredths[5], 0);
+        }
+    }
 }
