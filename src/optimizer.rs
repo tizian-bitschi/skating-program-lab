@@ -64,6 +64,8 @@ pub use pumpkin::*;
 #[cfg(feature = "optimizer")]
 mod jumps;
 #[cfg(feature = "optimizer")]
+mod solver_common;
+#[cfg(feature = "optimizer")]
 pub use jumps::*;
 
 /// Enumerate every slot assignment. Exclusion removes 1Lz from every slot.
