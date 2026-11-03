@@ -3,26 +3,50 @@ use crate::*;
 
 const REQUIRED_CHOREOGRAPHIC_SPIN_RULE: &str = "program-required-choreographic-spin";
 
-pub(crate) const RULE_IDS: &[&str] = &[
-    "program-choreographic-plan-consistency",
-    "program-choreographic-sequence",
-    "program-choreographic-spin",
-    "program-eight-position",
-    "program-eight-revolutions",
-    "program-family-cap",
-    "program-feature-once-per-program",
-    "program-feature-per-foot",
-    "program-feature-qualification",
-    "program-feature-position",
-    "program-flying-feature-entry",
-    REQUIRED_CHOREOGRAPHIC_SPIN_RULE,
-    crate::validation::SEQUENCE_DIRECT_STEP_RULE,
-    "program-spin-level-credit",
-    "program-spin-level-four-feature",
-    "program-step-feature-dependency",
-    "program-step-level-credit",
-    "program-step-recognition",
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum EvaluationBasis {
+    Plan,
+    Qualification,
+}
+
+struct RuleDescriptor {
+    id: &'static str,
+    basis: EvaluationBasis,
+}
+
+// One metadata declaration supplies optimizer inventory and coverage semantics.
+macro_rules! program_rules {
+    ($(($id:expr, $basis:ident)),* $(,)?) => {
+        pub(crate) const RULE_IDS: &[&str] = &[$($id),*];
+        const RULES: &[RuleDescriptor] = &[$(RuleDescriptor { id: $id, basis: EvaluationBasis::$basis }),*];
+    };
+}
+program_rules![
+    ("program-choreographic-plan-consistency", Plan),
+    ("program-choreographic-sequence", Qualification),
+    ("program-choreographic-spin", Qualification),
+    ("program-eight-position", Plan),
+    ("program-eight-revolutions", Qualification),
+    ("program-family-cap", Plan),
+    ("program-feature-once-per-program", Qualification),
+    ("program-feature-per-foot", Qualification),
+    ("program-feature-qualification", Qualification),
+    ("program-feature-position", Plan),
+    ("program-flying-feature-entry", Plan),
+    (REQUIRED_CHOREOGRAPHIC_SPIN_RULE, Plan),
+    (crate::validation::SEQUENCE_DIRECT_STEP_RULE, Qualification),
+    ("program-spin-level-credit", Qualification),
+    ("program-spin-level-four-feature", Qualification),
+    ("program-step-feature-dependency", Qualification),
+    ("program-step-level-credit", Qualification),
+    ("program-step-recognition", Qualification),
 ];
+
+pub(crate) fn assumption_rule(id: &str) -> bool {
+    RULES
+        .iter()
+        .any(|rule| rule.id == id && rule.basis == EvaluationBasis::Qualification)
+}
 
 /// Additional family rules are explicit for custom profiles, never inferred by name.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -286,7 +310,8 @@ pub fn validate_supported_program(
     }
     let feature_source = policy.feature_source.clone();
     let mut consumed = Vec::new();
-    let mut uncertain_success = Vec::new();
+    let mut eight_success_seen = false;
+    let mut eight_uncertain_seen = false;
     for (index, (element, data)) in program.elements.iter().zip(evidence).enumerate() {
         match data {
             ElementPlanEvidence::Spin {
@@ -307,6 +332,9 @@ pub fn validate_supported_program(
                         .count())
                 ];
                 let mut previous_target = None;
+                let mut eight_success_in_spin = false;
+                let mut eight_uncertain_in_spin = false;
+                let mut eight_success_feet = Vec::new();
                 for attempt in spin.feature_attempts.iter().flatten() {
                     checks.apply(
                         "program-feature-qualification",
@@ -366,6 +394,8 @@ pub fn validate_supported_program(
                             })
                         )
                     {
+                        eight_uncertain_in_spin |=
+                            attempt.outcome != FeatureAttemptOutcome::Unsuccessful;
                         checks.add(FindingKind::Unsupported, "program-eight-position", Some(index), "This bounded eight-revolution subset supports plain camel only; difficult variation and Layback evidence remain unmodeled.", &feature_source);
                         continue;
                     }
@@ -379,28 +409,42 @@ pub fn validate_supported_program(
                         &feature_source,
                     );
                     let first_success = attempt.feature == SpinFeature::EightRevolutions;
-                    let available = !consumed.contains(&attempt.feature);
+                    let available = if first_success {
+                        !eight_success_seen
+                    } else {
+                        !consumed.contains(&attempt.feature)
+                    };
                     if !first_success {
                         consumed.push(attempt.feature);
                     }
-                    if first_success && attempt.outcome == FeatureAttemptOutcome::Unknown {
-                        uncertain_success.push(attempt.feature);
+                    if first_success
+                        && (attempt.outcome == FeatureAttemptOutcome::Unknown
+                            || (attempt.outcome == FeatureAttemptOutcome::Successful
+                                && !local_feature_qualification_assumed))
+                    {
+                        eight_uncertain_in_spin = true;
                     }
-                    if matches!(
+                    let position_limited = matches!(
                         attempt.feature,
                         SpinFeature::ChangeOfEdge
                             | SpinFeature::BothDirections
                             | SpinFeature::IncreaseOfSpeed
                             | SpinFeature::DifficultBlade
-                    ) && !matches!(
-                        position,
-                        Some(SpinStep::Position {
-                            position: Some(SpinPosition::Camel | SpinPosition::Sit),
-                            ..
-                        })
-                    ) && !spin
-                        .abbreviation
-                        .is_some_and(|a| a.kind == RegularSpinKind::Layback)
+                    );
+                    if position_limited {
+                        checks.apply("program-feature-position", Some(index), &feature_source);
+                    }
+                    if position_limited
+                        && !matches!(
+                            position,
+                            Some(SpinStep::Position {
+                                position: Some(SpinPosition::Camel | SpinPosition::Sit),
+                                ..
+                            })
+                        )
+                        && !spin
+                            .abbreviation
+                            .is_some_and(|a| a.kind == RegularSpinKind::Layback)
                     {
                         checks.add(FindingKind::Unsupported, "program-feature-position", Some(index), "This feature requires camel, sit, Layback, Biellmann or a difficult upright variation; generic upright or missing position evidence cannot qualify it.", &feature_source);
                         continue;
@@ -422,18 +466,27 @@ pub fn validate_supported_program(
                         if attempt.feature == SpinFeature::EightRevolutions
                             && !matches!(steps.get(attempt.position_step), Some(SpinStep::Position { revolutions: Some(n), .. }) if *n >= 8)
                         {
+                            eight_uncertain_in_spin |= matches!(
+                                steps.get(attempt.position_step),
+                                Some(SpinStep::Position {
+                                    revolutions: None,
+                                    ..
+                                })
+                            );
                             checks.add(FindingKind::Unknown, "program-eight-revolutions", Some(index), "Eight uninterrupted revolutions are not established at the feature target.", &feature_source);
                             continue;
                         }
+                        if per_foot.len() > 1 {
+                            checks.apply("program-feature-per-foot", Some(index), &feature_source);
+                        }
                         if first_success {
-                            if uncertain_success.contains(&attempt.feature) {
+                            eight_success_in_spin = true;
+                            if eight_uncertain_seen {
                                 checks.add(FindingKind::Unknown, "program-feature-once-per-program", Some(index), "An earlier attempt has an unknown outcome; first successful execution is not established.", &feature_source);
                                 continue;
                             }
-                            consumed.push(attempt.feature);
-                        }
-                        if per_foot.len() > 1 {
-                            checks.apply("program-feature-per-foot", Some(index), &feature_source);
+                            eight_success_feet.push(foot);
+                            continue;
                         }
                         if per_foot.len() > 1 && per_foot[foot] >= 2 {
                             continue;
@@ -450,6 +503,18 @@ pub fn validate_supported_program(
                         );
                     }
                 }
+                // Allocate feature 10 after the first-attempt features, so its
+                // choice of foot is independent of assertion order on that foot.
+                if eight_success_feet
+                    .iter()
+                    .any(|foot| per_foot.len() == 1 || per_foot[*foot] < 2)
+                {
+                    credit += 1;
+                }
+                // Feature 10 is reserved by the first successful spin, while
+                // either foot in that spin can receive its single credit.
+                eight_success_seen |= eight_success_in_spin;
+                eight_uncertain_seen |= eight_uncertain_in_spin && !eight_success_in_spin;
                 if spin.planned_level == Some(Level::Four) {
                     checks.apply(
                         "program-spin-level-four-feature",
@@ -635,6 +700,7 @@ pub(crate) fn completion_findings(
     profile: &RuleProfile,
     program: &ProfileProgram,
     policy: &ProgramPolicy,
+    evidence: &[ElementPlanEvidence],
 ) -> Vec<usize> {
     let count = |family| {
         program
@@ -648,63 +714,59 @@ pub(crate) fn completion_findings(
         .iter()
         .filter(|e| matches!(e, PlannedElement::Jump(_)))
         .count();
-    let missing_spins = report
-        .validation
-        .findings
-        .iter()
-        .filter(|f| {
-            f.kind == FindingKind::Violation
-                && matches!(
-                    f.rule_id,
-                    "spin-required-role" | REQUIRED_CHOREOGRAPHIC_SPIN_RULE
-                )
-        })
-        .count();
-    let spin_room = count(ProfileElementFamily::RegularSpin)
-        + count(ProfileElementFamily::ChoreographicSpin)
-        + missing_spins
-        <= policy.spins.max_spins;
-    let family_room = profile
-        .families
-        .required
-        .iter()
-        .filter(|f| count(**f) == 0)
-        .all(|f| match f {
-            ProfileElementFamily::SoloJump => jump_count < profile.jumps.max_jumps,
-            ProfileElementFamily::Combination => {
-                jump_count < profile.jumps.max_jumps && profile.jumps.max_combinations > 0
-            }
-            ProfileElementFamily::JumpSequence => {
-                jump_count < profile.jumps.max_jumps && profile.jumps.max_sequences > 0
-            }
-            ProfileElementFamily::RegularSpin => spin_room && policy.spins.max_spins > 0,
-            ProfileElementFamily::ChoreographicSpin => {
-                spin_room && policy.max_choreographic_spins > 0
-            }
-            ProfileElementFamily::StepSequence => policy.max_steps > 0,
-            ProfileElementFamily::ChoreographicSequence => policy.max_choreographic_sequences > 0,
-        });
+    let spin_slots = policy.spins.max_spins.saturating_sub(
+        count(ProfileElementFamily::RegularSpin) + count(ProfileElementFamily::ChoreographicSpin),
+    );
+    let Some(missing_regular_roles) =
+        crate::spin_validation::required_spin_insertions(&policy.spins, evidence, spin_slots)
+    else {
+        return vec![];
+    };
+    let missing =
+        |family| usize::from(profile.families.required.contains(&family) && count(family) == 0);
+    let missing_axel = usize::from(report.validation.findings.iter().any(|f| {
+        f.rule_id == profile.binding(ProfileRule::Axel).id && f.kind == FindingKind::Violation
+    }));
+    let missing_chsp = missing(ProfileElementFamily::ChoreographicSpin).max(usize::from(
+        policy.require_choreographic_spin && count(ProfileElementFamily::ChoreographicSpin) == 0,
+    ));
+    let missing_regular = missing(ProfileElementFamily::RegularSpin).max(missing_regular_roles);
+    let missing_combos = missing(ProfileElementFamily::Combination);
+    let missing_sequences = missing(ProfileElementFamily::JumpSequence);
+    let needed_jumps =
+        (missing(ProfileElementFamily::SoloJump) + missing_combos + missing_sequences)
+            .max(missing_axel);
+    // Missing families share the same capacity. An Axel can occupy one of the
+    // required jump families; ChSp and regular roles cannot share an element.
+    let jointly_insertable = jump_count + needed_jumps <= profile.jumps.max_jumps
+        && count(ProfileElementFamily::Combination) + missing_combos
+            <= profile.jumps.max_combinations
+        && count(ProfileElementFamily::JumpSequence) + missing_sequences
+            <= profile.jumps.max_sequences
+        && count(ProfileElementFamily::Combination)
+            + count(ProfileElementFamily::JumpSequence)
+            + missing_combos
+            + missing_sequences
+            <= profile.jumps.max_compounds
+        && count(ProfileElementFamily::RegularSpin)
+            + count(ProfileElementFamily::ChoreographicSpin)
+            + missing_regular
+            + missing_chsp
+            <= policy.spins.max_spins
+        && count(ProfileElementFamily::ChoreographicSpin) + missing_chsp
+            <= policy.max_choreographic_spins
+        && count(ProfileElementFamily::StepSequence) + missing(ProfileElementFamily::StepSequence)
+            <= policy.max_steps
+        && count(ProfileElementFamily::ChoreographicSequence)
+            + missing(ProfileElementFamily::ChoreographicSequence)
+            <= policy.max_choreographic_sequences;
     report
         .validation
         .findings
         .iter()
         .enumerate()
         .filter(|(_, f)| f.kind == FindingKind::Violation && is_program_obligation(f, profile))
-        .filter(|(_, f)| {
-            if matches!(
-                f.rule_id,
-                "spin-required-role" | REQUIRED_CHOREOGRAPHIC_SPIN_RULE
-            ) {
-                spin_room
-                    && (f.rule_id != REQUIRED_CHOREOGRAPHIC_SPIN_RULE
-                        || count(ProfileElementFamily::ChoreographicSpin)
-                            < policy.max_choreographic_spins)
-            } else if f.rule_id == profile.binding(ProfileRule::Axel).id {
-                jump_count < profile.jumps.max_jumps
-            } else {
-                family_room
-            }
-        })
+        .filter(|_| jointly_insertable)
         .map(|(i, _)| i)
         .collect()
 }

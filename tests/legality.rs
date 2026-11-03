@@ -444,3 +444,348 @@ fn unqualified_spin_is_missing_evidence_in_both_stages() {
             .any(|i| r.validation.validation.findings[*i].element_index == Some(0)));
     }
 }
+
+#[test]
+fn missing_local_qualification_preserves_earlier_possible_eight_revolution_success() {
+    let mut first = spin(
+        SpinPosition::Camel,
+        Level::Basic,
+        Some(attempt(FeatureAttemptOutcome::Successful)),
+        8,
+    );
+    if let ElementPlanEvidence::Spin {
+        local_feature_qualification_assumed,
+        ..
+    } = &mut first.1
+    {
+        *local_feature_qualification_assumed = false;
+    }
+    let later = spin(
+        SpinPosition::Camel,
+        Level::One,
+        Some(attempt(FeatureAttemptOutcome::Successful)),
+        8,
+    );
+    let r = report(
+        AdultCategory::Silver,
+        vec![first, later],
+        SubmissionState::Complete,
+    );
+    assert!(finding(
+        &r,
+        "program-feature-once-per-program",
+        Some(1),
+        FindingKind::Unknown
+    ));
+    assert!(finding(
+        &r,
+        "program-spin-level-credit",
+        Some(1),
+        FindingKind::Unknown
+    ));
+}
+
+#[test]
+fn first_success_is_spin_scoped_and_can_use_the_second_foot() {
+    // 2788 p. 2: feature 10 may use either qualifying foot in its first spin.
+    let mut entry = spin(SpinPosition::Camel, Level::Three, None, 8);
+    if let PlannedElement::RegularSpin(plan) = &mut entry.0 {
+        let steps = plan.steps.as_mut().unwrap();
+        steps.push(SpinStep::ChangeFoot);
+        steps.push(steps[0].clone());
+    }
+    if let ElementPlanEvidence::Spin { spin, .. } = &mut entry.1 {
+        spin.abbreviation.as_mut().unwrap().change_foot = true;
+        spin.feature_attempts = Some(vec![
+            SpinFeatureAttempt {
+                feature: SpinFeature::ChangeOfEdge,
+                position_step: 0,
+                outcome: FeatureAttemptOutcome::Successful,
+            },
+            SpinFeatureAttempt {
+                feature: SpinFeature::IncreaseOfSpeed,
+                position_step: 0,
+                outcome: FeatureAttemptOutcome::Successful,
+            },
+            attempt(FeatureAttemptOutcome::Successful),
+            SpinFeatureAttempt {
+                position_step: 2,
+                ..attempt(FeatureAttemptOutcome::Successful)
+            },
+        ]);
+    }
+    let later = spin(
+        SpinPosition::Camel,
+        Level::One,
+        Some(attempt(FeatureAttemptOutcome::Successful)),
+        8,
+    );
+    let r = report(
+        AdultCategory::Masters,
+        vec![entry.clone(), later],
+        SubmissionState::Complete,
+    );
+    assert!(!finding(
+        &r,
+        "program-spin-level-credit",
+        Some(0),
+        FindingKind::Unknown
+    ));
+    assert!(finding(
+        &r,
+        "program-spin-level-credit",
+        Some(1),
+        FindingKind::Unknown
+    ));
+    if let ElementPlanEvidence::Spin { spin, .. } = &mut entry.1 {
+        spin.feature_attempts.as_mut().unwrap().swap(0, 2);
+    }
+    let r = report(
+        AdultCategory::Masters,
+        vec![entry.clone()],
+        SubmissionState::Complete,
+    );
+    assert!(!finding(
+        &r,
+        "program-spin-level-credit",
+        Some(0),
+        FindingKind::Unknown
+    ));
+    if let ElementPlanEvidence::Spin { spin, .. } = &mut entry.1 {
+        spin.feature_attempts.as_mut().unwrap().swap(0, 2);
+    }
+    // An unknown attempt on one foot does not change the first successful spin.
+    if let ElementPlanEvidence::Spin { spin, .. } = &mut entry.1 {
+        spin.feature_attempts.as_mut().unwrap()[2].outcome = FeatureAttemptOutcome::Unknown;
+    }
+    let r = report(
+        AdultCategory::Masters,
+        vec![entry],
+        SubmissionState::Complete,
+    );
+    assert!(!finding(
+        &r,
+        "program-spin-level-credit",
+        Some(0),
+        FindingKind::Unknown
+    ));
+}
+
+#[test]
+fn coverage_retains_violation_and_unknown_for_the_same_rule_instance() {
+    let entry = (
+        PlannedElement::Jump(JumpElement::Solo(ListedJump {
+            kind: Some(JumpKind::Axel),
+            rotations: None,
+        })),
+        ElementPlanEvidence::Jump {
+            direct_transitions_assumed: false,
+        },
+    );
+    let r = report(AdultCategory::Bronze, vec![entry], SubmissionState::Draft);
+    let eligibility: Vec<_> = r
+        .rules
+        .iter()
+        .filter(|r| {
+            r.rule_id == "isu-adult-2026-27-bronze-jump-eligibility" && r.element_index == Some(0)
+        })
+        .collect();
+    assert!(eligibility
+        .iter()
+        .any(|r| r.state == RuleCoverageState::MissingEvidence));
+    assert!(eligibility
+        .iter()
+        .any(|r| r.state == RuleCoverageState::Evaluated
+            && r.reason == "Axel jumps are prohibited in Bronze."));
+}
+
+#[test]
+fn successful_position_prerequisites_are_traced_and_combination_type_is_not_applicable() {
+    let entry = spin(
+        SpinPosition::Camel,
+        Level::One,
+        Some(SpinFeatureAttempt {
+            feature: SpinFeature::IncreaseOfSpeed,
+            position_step: 0,
+            outcome: FeatureAttemptOutcome::Successful,
+        }),
+        8,
+    );
+    let r = report(
+        AdultCategory::Bronze,
+        vec![entry],
+        SubmissionState::Complete,
+    );
+    assert!(r.rules.iter().any(
+        |r| r.rule_id == "program-feature-position" && r.state == RuleCoverageState::Evaluated
+    ));
+    let mut combo = spin(SpinPosition::Camel, Level::Basic, None, 8);
+    if let PlannedElement::RegularSpin(plan) = &mut combo.0 {
+        for position in [SpinPosition::Sit, SpinPosition::Upright] {
+            plan.steps.as_mut().unwrap().push(SpinStep::Position {
+                position: Some(position),
+                revolutions: Some(2),
+                feature_attempts: Some(vec![]),
+            });
+        }
+    }
+    if let ElementPlanEvidence::Spin { spin, .. } = &mut combo.1 {
+        spin.abbreviation.as_mut().unwrap().kind = RegularSpinKind::Combination;
+    }
+    let r = report(
+        AdultCategory::Silver,
+        vec![combo],
+        SubmissionState::Complete,
+    );
+    assert!(r
+        .rules
+        .iter()
+        .any(|r| r.rule_id == "spin-position-type" && r.state == RuleCoverageState::NotApplicable));
+    assert!(r
+        .rules
+        .iter()
+        .any(|r| r.rule_id == "spin-combination-positions"
+            && r.state == RuleCoverageState::Evaluated));
+}
+
+fn custom_report(profile: RuleProfile, policy: ProgramPolicy) -> ProgramLegalityReport {
+    custom_report_entries(profile, policy, vec![])
+}
+
+fn custom_report_entries(
+    profile: RuleProfile,
+    policy: ProgramPolicy,
+    entries: Vec<(PlannedElement, ElementPlanEvidence)>,
+) -> ProgramLegalityReport {
+    let mut registry = ProfileRegistry::adult();
+    registry.register(profile.clone()).unwrap();
+    let (elements, evidence): (Vec<_>, Vec<_>) = entries.into_iter().unzip();
+    assess_program_legality(
+        &registry,
+        &ProfileProgram {
+            profile: profile.id,
+            scoring_table: TABLE,
+            elements,
+        },
+        &evidence,
+        &policy,
+        SubmissionState::Draft,
+    )
+    .unwrap()
+}
+fn custom_identity() -> (RuleProfile, ProgramPolicy) {
+    let mut profile = adult_profile(AdultCategory::Silver);
+    profile.id = ProfileId {
+        name: "synthetic-review".into(),
+        version: "test-1".into(),
+    };
+    profile.provenance = ProfileProvenance::Synthetic;
+    let mut policy = adult_program_policy(AdultCategory::Silver);
+    policy.spins.profile = profile.id.clone();
+    (profile, policy)
+}
+
+#[test]
+fn competing_required_jump_families_are_not_jointly_insertable_in_one_slot() {
+    let (mut profile, policy) = custom_identity();
+    profile.jumps.max_jumps = 1;
+    profile.families.required = vec![
+        ProfileElementFamily::SoloJump,
+        ProfileElementFamily::Combination,
+    ];
+    // The exact empty/max-one reproduction is rejected by the registry already.
+    assert!(ProfileRegistry::adult().register(profile.clone()).is_err());
+    profile.jumps.max_jumps = 2;
+    let eligibility = profile
+        .bindings
+        .iter()
+        .find(|b| b.rule == ProfileRule::Eligibility)
+        .unwrap()
+        .id;
+    let sequence = (
+        PlannedElement::Jump(JumpElement::Sequence(vec![
+            JumpPart::Jump(ListedJump {
+                kind: Some(JumpKind::ToeLoop),
+                rotations: Some(1),
+            }),
+            JumpPart::Jump(ListedJump {
+                kind: Some(JumpKind::Axel),
+                rotations: Some(1),
+            }),
+        ])),
+        ElementPlanEvidence::Jump {
+            direct_transitions_assumed: true,
+        },
+    );
+    let r = custom_report_entries(profile.clone(), policy.clone(), vec![sequence]);
+    assert!(finding(&r, eligibility, None, FindingKind::Violation));
+    assert!(!r
+        .repairable_absences
+        .iter()
+        .any(|i| r.validation.validation.findings[*i].rule_id == eligibility));
+    let r = custom_report(profile, policy);
+    assert!(r
+        .repairable_absences
+        .iter()
+        .any(|i| r.validation.validation.findings[*i].rule_id == eligibility));
+}
+
+#[test]
+fn unevaluated_transition_retains_selected_event_replacement() {
+    let (mut profile, policy) = custom_identity();
+    let mut binding = profile
+        .bindings
+        .iter()
+        .find(|b| b.rule == ProfileRule::Transition)
+        .unwrap()
+        .clone();
+    let replaces = binding.id;
+    binding.id = "synthetic-transition-override";
+    binding.source = SourceReference {
+        document: "Synthetic transition fixture".into(),
+        version: "test-1".into(),
+        location: "no compound in this plan".into(),
+    };
+    profile.sources.push(binding.source.clone());
+    let selected = RuleOverride {
+        replaces,
+        replacement: binding,
+        event_scope: profile.event_scope.clone(),
+        justification: "test inventory provenance".into(),
+    };
+    profile.overrides.push(selected.clone());
+    let r = custom_report(profile, policy);
+    assert!(r.rules.iter().any(|r| r.rule_id == selected.replacement.id
+        && r.state == RuleCoverageState::NotApplicable
+        && r.event_override.as_ref() == Some(&selected)));
+}
+
+#[test]
+fn compatible_spin_obligations_can_share_one_insertion() {
+    let (profile, mut policy) = custom_identity();
+    policy.spins.max_spins = 1;
+    policy.spins.required = vec![
+        vec![SpinRequirement {
+            kind: None,
+            entry: Some(SpinEntry::NonFlying),
+            change_foot: Some(false),
+        }],
+        vec![SpinRequirement {
+            kind: Some(RegularSpinKind::Sit),
+            entry: Some(SpinEntry::NonFlying),
+            change_foot: Some(false),
+        }],
+    ];
+    let r = custom_report(profile, policy);
+    let missing: Vec<_> = r
+        .validation
+        .validation
+        .findings
+        .iter()
+        .enumerate()
+        .filter(|(_, f)| f.rule_id == "spin-required-role")
+        .map(|(i, _)| i)
+        .collect();
+    assert_eq!(missing.len(), 2);
+    assert!(missing.iter().all(|i| r.repairable_absences.contains(i)));
+}

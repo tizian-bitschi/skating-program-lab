@@ -104,3 +104,136 @@ numerical GOE) remain open nonblocking scoring follow-ups. They do not turn an
 unsupported numerical outcome into an exact score. Full difficult-variation
 recognition requires a separate typed evidence contract; no panel outcome is
 inferred from descriptive choreography.
+
+## Per-rule, per-profile implementation matrix
+
+This matrix describes the supported mechanism, not the outcome of a particular
+program. Runtime applicability also depends on the submitted element/feature.
+`I`: implemented structural check; `C`: implemented subject to supplied evidence
+or recognition/qualification assumptions; `U`: unsupported mechanism; `N`: not
+applicable to that profile. `I/U` and `C/U` identify the bounded subsets described
+in the inventory above. A missing input changes an instance to MissingEvidence;
+a violation remains a separate evaluated result. Several entries can share a
+rule/source/index: every finding is retained, including simultaneous Violation,
+Unknown and Unsupported. Consumers must never interpret one missing-evidence
+entry as replacing the other results for that instance.
+
+Source keys retain the editions in rule-sources.md:
+
+- A: Adult announcement **2026-07-16**, Bronze p. 11, Silver p. 10, Gold p. 9,
+  Masters p. 8, section 4 Free Skating; precedence p. 4.
+- L2/L3/L4/L5/L6: Communication 2788 **2026-05-19**, printed pages 2/3/4/5/6.
+- H14/H18/H33: Single Technical Panel Handbook **2026-07-15**, printed pages
+  14 (positions/wind-up), 18 (combination recognition), 33 (Euler consequences).
+- S65: Sports Rules **2026-06-12**, p. 65 Rule 610 (jump combinations).
+- Q1: Committee Q&A 1 **2026-04-21**, p. 1 Choreospins Q1.
+- Q2: Committee Q&A 2 **2026-05-19**, p. 1 step feature 5.
+- Q3: Committee Q&A 3 **2026-10-08**, p. 1 Q4 difficult camel recognition.
+- IN: Skating Program Lab input contract, issue-39 (listed-jump rotation),
+  issue-48-slice-1 (indexed spin evidence), issue-49 (typed choreography reconciliation).
+  These validate input representation; they are not regulatory authority.
+
+Fixtures: V = tests/validation.rs; SV = tests/spin_validation.rs;
+PV = tests/program_validation.rs; L = tests/legality.rs; A64 = tests/assessment.rs.
+Each file contains independent neighboring cases. The new L regression fixtures
+are named explicitly after this table. Source-derived numerical fixtures remain
+in tests/scoring.rs and tests/execution_scoring.rs and do not establish plan permission.
+
+| Stable rule ID | Bronze | Silver | Gold | Masters | Exact source key/location | Fixtures |
+| --- | --- | --- | --- | --- | --- | --- |
+| listed-jump-invalid-rotations | I | I | I | I | IN issue-39, ListedJump rotation count | V |
+| isu-adult-2026-27-bronze-jump-eligibility | I | N | N | N | A p. 11 jumps | V, L |
+| isu-adult-2026-27-silver-jump-eligibility | N | I | N | N | A p. 10 jumps | V, A64 |
+| isu-adult-2026-27-gold-jump-eligibility | N | N | I | N | A p. 9 jumps | V, L |
+| isu-adult-2026-27-masters-jump-eligibility | N | N | N | I | A p. 8 jumps | V |
+| isu-adult-2026-27-bronze-jump-element-count | I | N | N | N | A p. 11 a | V |
+| isu-adult-2026-27-jump-element-count | N | I | I | I | A pp. 8-10 a | V |
+| isu-adult-2026-27-bronze-combination-count | I | N | N | N | A p. 11 a | V |
+| isu-adult-2026-27-combination-count | N | I | I | I | A pp. 8-10 a | V |
+| isu-adult-2026-27-bronze-combination-structure | I | N | N | N | A p. 11 a | V |
+| isu-adult-2026-27-combination-structure | N | C | C | C | A pp. 8-10 a, direct Axel step | V, PV, L |
+| isu-adult-2026-27-bronze-combination-euler | I | N | N | N | A p. 11 a, Euler prohibition | V |
+| isu-adult-2026-27-combination-euler | N | C/U | C/U | C/U | A pp. 8-10 a; H33, automatic panel consequence deferred | V, PV |
+| isu-adult-2026-27-bronze-jump-repetition | I | N | N | N | A p. 11 a, listed-jump occurrences | V |
+| isu-adult-2026-27-jump-repetition | N | I | I | I | A pp. 8-10 a, listed-jump occurrences | V, L |
+| isu-adult-2026-27-masters-axel-required | N | N | N | I | A p. 8 a | V, L |
+| isu-sports-2026-jump-transition | C | C | C | C | S65 Rule 610 | V, PV |
+| program-sequence-direct-step | N | C | C | C | L3 jump sequences; A pp. 8-10 a | PV, L |
+| spin-count | I | I | I | I | A category page b, including ChSp | SV |
+| spin-required-role | N | I | I | I | A category page b | SV, A64, L |
+| spin-distinct-abbreviation | I | I | I | I | A category page b | SV |
+| spin-abbreviation | I | I | I | I | A category page b | SV |
+| spin-eligibility | I | I | I | I | A category page b | SV |
+| spin-entry | I | I | I | I | A category page b | SV |
+| spin-level-cap | C | C | C | C | A category page, technical-element level cap | SV |
+| spin-minimum-revolutions | I | I | I | I | A category page b, minimum revolutions | SV |
+| spin-rotations | C | C | C | C | A category page b, unspecified holds | SV |
+| spin-position-policy | U* | U* | U* | U* | IN issue-48, explicit source-bound policy requirement | SV |
+| spin-position-evidence | C | C | C | C | H14/H18, consecutive basic-position holds | SV |
+| spin-basic-position | C | C | C | C | H14, basic-position recognition | SV |
+| spin-recognition-minimum | C | C | C | C | H14, minimum spin revolutions | SV |
+| spin-position-type | C | C | C | C | H14, only one-position types; N for combination instances | SV, L |
+| spin-combination-positions | N | C | C | C | H18, two-position/full-value requirements | SV, L |
+| spin-layback-position | C | C | C | C | H14, posture not represented by Upright alone | SV |
+| spin-per-foot-policy | U* | U* | U* | U* | IN issue-48, explicit per-foot policy requirement | SV |
+| spin-per-foot-revolutions | C | C | C | C | L4, change-foot holds; A category page b | SV |
+| spin-multiple-foot-changes | U | U | U | U | L4, unsupported multi-change-foot evidence | SV |
+| spin-evidence-target | I | I | I | I | IN issue-48, one correctly indexed spin entry | SV |
+| spin-evidence-entry | I | I | I | I | IN issue-48, abbreviation/entry consistency | SV |
+| spin-evidence-foot-change | I | I | I | I | IN issue-48, abbreviation/ordered changes | SV |
+| spin-wind-up-target | I | I | I | I | IN issue-48, explicit final upright wind-up target | SV |
+| spin-feature-target | I | I | I | I | IN issue-48, position-step and attempt order | SV, A64 |
+| spin-feature-evidence | C | C | C | C | IN issue-48, absent versus empty assertions | SV |
+| spin-feature-credit | U* | U* | U* | U* | IN issue-48, standalone feature evaluator deferred | SV, PV |
+| spin-execution-recognition | C | C | C | C | IN issue-48; H14/H18, plan/actual execution boundary | SV, A64 |
+| spin-panel-target | I | I | I | I | IN issue-48, independently supplied panel association | SV, A64 |
+| spin-panel-reconciliation | U | U | U | U | IN issue-48, actual panel reconciliation deferred | SV, A64 |
+| program-feature-once-per-program | C | C | C | C | L2, first attempt / first successful spin | PV, L |
+| program-feature-per-foot | C | C | C | C | L2, at most two credited features per foot | PV, L |
+| program-feature-qualification | C/U | C/U | C/U | C/U | L2/L4/L5, supported subset and explicit qualification | PV, L |
+| program-feature-position | I/U | I/U | I/U | I/U | L2 features 7-9/12; L5 blade/speed positions | L |
+| program-flying-feature-entry | N | I | I | I | L2 feature 11, flying entry prerequisite; A category page b | PV |
+| program-eight-position | I/U | I/U | I/U | I/U | L2 feature 10, bounded plain-camel subset | PV |
+| program-eight-revolutions | C | C | C | C | L2 feature 10, uninterrupted same-foot hold | PV, L |
+| program-spin-level-credit | C | C | C | C | L2, level feature counts | PV, L |
+| program-spin-level-four-feature | N | N | N | C | L4, one mandatory level-four feature | PV |
+| program-step-recognition | N | N | C | C | A pp. 8-9 c; L2/L5 clean turns/full coverage | PV |
+| program-step-feature-dependency | N | N | C | C | L5; Q2 p. 1 feature 5 depends on feature 4 | PV |
+| program-step-level-credit | N | N | C | C | A pp. 8-9 level cap/Gold movement; L2 | PV |
+| program-choreographic-sequence | C | C | N | N | A pp. 10-11 c; L6 two distinct visible movements | PV, L |
+| program-choreographic-plan-consistency | I | I | N | N | IN issue-49, ordered exact typed vocabulary | PV |
+| program-choreographic-spin | N | N | C | C | Q1 p. 1 Q1, consecutive same-foot hold | PV |
+| program-required-choreographic-spin | N | N | I | I | A pp. 8-9 b | PV, L |
+| program-family-cap | I | I | I | I | A category page b/c, explicit family caps including zero | PV |
+| program-duration | C | C | C | C | A category page duration; A p. 6 deductions | L |
+| program-performance-panel | C | C | C | C | L2/L4-L6 actual edges/holds/identification; H14/H18 | L |
+| program-waltz-recognition | U | U | U | U | A pp. 9-11 Waltz treatment; Masters scope unresolved | L |
+| program-variation-categories | U | U | U | U | L2 category quotas/reuse; L5 used-position feature; Q3 Q4 | PV, L |
+
+`U*` is an inactive guard for built-in mixed-program checks: the built-in policies
+supply position/per-foot mechanisms and use program-wide feature evaluation.
+Standalone or custom calls without those mechanisms return Unsupported rather
+than inheriting Adult rules. N describes regulatory nonapplicability; a supplied
+prohibited element can still produce a successful prerequisite check alongside
+its separate eligibility violation. For example, a prohibited Bronze flying spin
+can trigger a flying-entry diagnostic without making that family permissible.
+
+Review regression tests in L:
+
+- `missing_local_qualification_preserves_earlier_possible_eight_revolution_success`
+  and `first_success_is_spin_scoped_and_can_use_the_second_foot`: L2 feature 10.
+- `coverage_retains_violation_and_unknown_for_the_same_rule_instance`: A p. 11,
+  a prohibited Axel remains visible despite missing rotations.
+- `successful_position_prerequisites_are_traced_and_combination_type_is_not_applicable`:
+  L2/L5, H14/H18 applicability and successful trace entries.
+- `competing_required_jump_families_are_not_jointly_insertable_in_one_slot`:
+  synthetic explicit family/count policy, including registry rejection of the
+  original contradictory max-one profile and a reachable max-two neighbor.
+- `unevaluated_transition_retains_selected_event_replacement`: synthetic scoped
+  Transition binding, exact override metadata even without compound elements.
+
+Draft repairability is a shared capacity check, not a proof of an optimizer
+completion within a supplied finite domain. Missing families compete jointly for
+jump, compound, spin and choreography slots. A required Axel can share a required
+jump-family insertion; a regular-spin insertion cannot serve as a ChSp. Manual
+assessment and completion-original assessment use this same shared calculation.

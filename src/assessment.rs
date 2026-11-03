@@ -199,6 +199,7 @@ pub fn assess_manual_program(
         profile,
         &program,
         &request.policy,
+        &evidence,
     );
     let status = if validation
         .validation

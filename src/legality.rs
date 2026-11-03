@@ -44,7 +44,13 @@ pub fn assess_program_legality(
     let validation = validate_supported_program(registry, program, evidence, policy)?;
     let profile = registry.resolve(&program.profile, program.scoring_table)?;
     let repairable_absences = if submission == SubmissionState::Draft {
-        crate::program_validation::completion_findings(&validation, profile, program, policy)
+        crate::program_validation::completion_findings(
+            &validation,
+            profile,
+            program,
+            policy,
+            evidence,
+        )
     } else {
         vec![]
     };
@@ -54,25 +60,15 @@ pub fn assess_program_legality(
             .validation
             .findings
             .iter()
-            .filter(|f| {
+            .enumerate()
+            .filter(|(_, f)| {
                 f.rule_id == applied.rule_id
                     && f.element_index == applied.element_index
                     && f.component_index == applied.component_index
                     && f.source == applied.source
             })
             .collect();
-        let (state, reason) = if let Some(f) =
-            findings.iter().find(|f| f.kind == FindingKind::Unsupported)
-        {
-            (RuleCoverageState::Unsupported, f.explanation)
-        } else if let Some(f) = findings.iter().find(|f| f.kind == FindingKind::Unknown) {
-            (RuleCoverageState::MissingEvidence, f.explanation)
-        } else if repairable_absences.iter().any(|i| {
-            let f = &validation.validation.findings[*i];
-            f.rule_id == applied.rule_id && f.source == applied.source
-        }) {
-            (RuleCoverageState::Conditional, "A definite draft omission can be repaired by adding required content; final checks retain the violation.")
-        } else if applied.rule_id == crate::validation::SEQUENCE_DIRECT_STEP_RULE
+        let (state, reason) = if applied.rule_id == crate::validation::SEQUENCE_DIRECT_STEP_RULE
             && applied.element_index.is_some_and(|i| {
                 matches!(
                     evidence[i],
@@ -80,13 +76,12 @@ pub fn assess_program_legality(
                         direct_transitions_assumed: false
                     }
                 )
-            })
-        {
+            }) {
             (
                 RuleCoverageState::MissingEvidence,
                 "The direct step into the Axel has not been supplied as an explicit assumption.",
             )
-        } else if conditional_rule(applied.rule_id) {
+        } else if crate::program_validation::assumption_rule(applied.rule_id) {
             (RuleCoverageState::Conditional, "Checked against supplied qualification or transition assumptions; actual execution and panel recognition are not established.")
         } else {
             (
@@ -94,19 +89,34 @@ pub fn assess_program_legality(
                 "Checked against the supplied technical plan; see findings for violations.",
             )
         };
-        rules.push(RuleCoverageEntry {
+        let entry = RuleCoverageEntry {
             rule_id: applied.rule_id,
             source: applied.source.clone(),
             element_index: applied.element_index,
             component_index: applied.component_index,
             state,
             reason,
-            event_override: profile
-                .overrides
-                .iter()
-                .find(|o| o.replacement.id == applied.rule_id)
-                .cloned(),
-        });
+            event_override: None,
+        };
+        if findings.is_empty() {
+            rules.push(entry);
+        } else {
+            // Each finding survives independently: missing evidence must never
+            // hide a confirmed violation of the very same rule instance.
+            for (i, finding) in findings {
+                let (state, reason) = match finding.kind {
+                    FindingKind::Violation if repairable_absences.contains(&i) => (RuleCoverageState::Conditional, "A definite draft omission has capacity for insertion; final checks retain the violation."),
+                    FindingKind::Violation => (RuleCoverageState::Evaluated, finding.explanation),
+                    FindingKind::Unknown => (RuleCoverageState::MissingEvidence, finding.explanation),
+                    FindingKind::Unsupported => (RuleCoverageState::Unsupported, finding.explanation),
+                };
+                rules.push(RuleCoverageEntry {
+                    state,
+                    reason,
+                    ..entry.clone()
+                });
+            }
+        }
     }
     // Inventory is separate from the execution trace: absent families and rules
     // blocked by missing structure still need an explicit coverage entry.
@@ -208,12 +218,13 @@ pub fn assess_program_legality(
                     ElementPlanEvidence::Spin { spin, .. } => spin,
                     _ => unreachable!(),
                 };
-                let not_applicable = (*id == "spin-combination-positions"
-                    && data
-                        .abbreviation
-                        .is_some_and(|a| a.kind != RegularSpinKind::Combination))
-                    || (*id == "spin-per-foot-revolutions"
-                        && data.abbreviation.is_some_and(|a| !a.change_foot));
+                let not_applicable =
+                    (matches!(*id, "spin-combination-positions" | "spin-position-type")
+                        && data.abbreviation.is_some_and(|a| {
+                            crate::spin_validation::position_type_rule(a.kind) != *id
+                        }))
+                        || (*id == "spin-per-foot-revolutions"
+                            && data.abbreviation.is_some_and(|a| !a.change_foot));
                 inventory(&mut rules, id, source.unwrap_or(&policy.spins.source), Some(index),
                     if not_applicable { RuleCoverageState::NotApplicable } else if source.is_some() { RuleCoverageState::MissingEvidence } else { RuleCoverageState::Unsupported },
                     "Position/foot checks require both explicit policy opt-in and sufficient ordered evidence.");
@@ -228,6 +239,7 @@ pub fn assess_program_legality(
                 "program-feature-once-per-program",
                 "program-feature-per-foot",
                 "program-feature-qualification",
+                "program-feature-position",
             ][..],
             &policy.feature_source,
         ),
@@ -291,21 +303,19 @@ pub fn assess_program_legality(
                 "Difficult-variation categories, two-variation quota, category reuse and dependent feature reuse require typed variation evidence; generic feature assertions do not establish them.");
         }
     }
+    for entry in &mut rules {
+        entry.event_override = profile
+            .overrides
+            .iter()
+            .find(|o| o.replacement.id == entry.rule_id)
+            .cloned();
+    }
     Ok(ProgramLegalityReport {
         validation,
         submission,
         rules,
         repairable_absences,
     })
-}
-
-fn conditional_rule(id: &str) -> bool {
-    id.starts_with("program-feature-")
-        || id.starts_with("program-spin-level-")
-        || id.starts_with("program-step-")
-        || id == "program-choreographic-sequence"
-        || id == "program-choreographic-spin"
-        || id == crate::validation::SEQUENCE_DIRECT_STEP_RULE
 }
 
 fn inventory(
