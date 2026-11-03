@@ -493,9 +493,17 @@ fn first_success_is_spin_scoped_and_can_use_the_second_foot() {
         let steps = plan.steps.as_mut().unwrap();
         steps.push(SpinStep::ChangeFoot);
         steps.push(steps[0].clone());
+        for position in [SpinPosition::Sit, SpinPosition::Upright] {
+            steps.push(SpinStep::Position {
+                position: Some(position),
+                revolutions: Some(2),
+                feature_attempts: Some(vec![]),
+            });
+        }
     }
     if let ElementPlanEvidence::Spin { spin, .. } = &mut entry.1 {
         spin.abbreviation.as_mut().unwrap().change_foot = true;
+        spin.abbreviation.as_mut().unwrap().kind = RegularSpinKind::Combination;
         spin.feature_attempts = Some(vec![
             SpinFeatureAttempt {
                 feature: SpinFeature::ChangeOfEdge,
@@ -514,17 +522,29 @@ fn first_success_is_spin_scoped_and_can_use_the_second_foot() {
             },
         ]);
     }
-    let later = spin(
+    let mut later = spin(
         SpinPosition::Camel,
         Level::One,
         Some(attempt(FeatureAttemptOutcome::Successful)),
         8,
     );
+    if let PlannedElement::RegularSpin(plan) = &mut later.0 {
+        plan.entry = Some(SpinEntry::Flying);
+    }
+    if let ElementPlanEvidence::Spin { spin, .. } = &mut later.1 {
+        spin.abbreviation.as_mut().unwrap().entry = SpinEntry::Flying;
+    }
     let r = report(
-        AdultCategory::Masters,
+        AdultCategory::Gold,
         vec![entry.clone(), later],
         SubmissionState::Complete,
     );
+    assert!(!r
+        .validation
+        .validation
+        .findings
+        .iter()
+        .any(|f| f.rule_id == "spin-eligibility" && f.kind == FindingKind::Violation));
     assert!(!finding(
         &r,
         "program-spin-level-credit",
@@ -541,10 +561,16 @@ fn first_success_is_spin_scoped_and_can_use_the_second_foot() {
         spin.feature_attempts.as_mut().unwrap().swap(0, 2);
     }
     let r = report(
-        AdultCategory::Masters,
+        AdultCategory::Gold,
         vec![entry.clone()],
         SubmissionState::Complete,
     );
+    assert!(!r
+        .validation
+        .validation
+        .findings
+        .iter()
+        .any(|f| f.rule_id == "spin-eligibility" && f.kind == FindingKind::Violation));
     assert!(!finding(
         &r,
         "program-spin-level-credit",
@@ -558,11 +584,13 @@ fn first_success_is_spin_scoped_and_can_use_the_second_foot() {
     if let ElementPlanEvidence::Spin { spin, .. } = &mut entry.1 {
         spin.feature_attempts.as_mut().unwrap()[2].outcome = FeatureAttemptOutcome::Unknown;
     }
-    let r = report(
-        AdultCategory::Masters,
-        vec![entry],
-        SubmissionState::Complete,
-    );
+    let r = report(AdultCategory::Gold, vec![entry], SubmissionState::Complete);
+    assert!(!r
+        .validation
+        .validation
+        .findings
+        .iter()
+        .any(|f| f.rule_id == "spin-eligibility" && f.kind == FindingKind::Violation));
     assert!(!finding(
         &r,
         "program-spin-level-credit",
@@ -788,4 +816,84 @@ fn compatible_spin_obligations_can_share_one_insertion() {
         .collect();
     assert_eq!(missing.len(), 2);
     assert!(missing.iter().all(|i| r.repairable_absences.contains(i)));
+}
+
+#[test]
+fn unknown_feature_lists_and_uncheckable_targets_differ_from_explicitly_empty_lists() {
+    // None is missing data. An explicitly empty list establishes no prior attempt.
+    for feature in [SpinFeature::EightRevolutions, SpinFeature::IncreaseOfSpeed] {
+        let attempted = SpinFeatureAttempt {
+            feature,
+            position_step: 0,
+            outcome: FeatureAttemptOutcome::Successful,
+        };
+        for (attempts, missing_steps, uncertain) in [
+            (None, false, true),
+            (Some(vec![]), false, false),
+            (Some(vec![attempted.clone()]), true, true),
+        ] {
+            let mut first = spin(SpinPosition::Camel, Level::Basic, None, 8);
+            if let ElementPlanEvidence::Spin { spin, .. } = &mut first.1 {
+                spin.feature_attempts = attempts;
+            }
+            if missing_steps {
+                if let PlannedElement::RegularSpin(plan) = &mut first.0 {
+                    plan.steps = None;
+                }
+            }
+            let mut later = spin(SpinPosition::Camel, Level::One, Some(attempted.clone()), 8);
+            if let PlannedElement::RegularSpin(plan) = &mut later.0 {
+                plan.entry = Some(SpinEntry::Flying);
+            }
+            if let ElementPlanEvidence::Spin { spin, .. } = &mut later.1 {
+                spin.abbreviation.as_mut().unwrap().entry = SpinEntry::Flying;
+            }
+            let r = report(
+                AdultCategory::Silver,
+                vec![first, later],
+                SubmissionState::Complete,
+            );
+            assert!(!r
+                .validation
+                .validation
+                .findings
+                .iter()
+                .any(|f| f.rule_id == "spin-eligibility" && f.kind == FindingKind::Violation));
+            assert_eq!(
+                finding(
+                    &r,
+                    "program-feature-once-per-program",
+                    Some(1),
+                    FindingKind::Unknown
+                ),
+                uncertain
+            );
+            assert_eq!(
+                finding(
+                    &r,
+                    "program-spin-level-credit",
+                    Some(1),
+                    FindingKind::Unknown
+                ),
+                uncertain
+            );
+            for id in [
+                "program-feature-qualification",
+                "program-feature-position",
+                "program-feature-once-per-program",
+            ] {
+                let expected = if uncertain {
+                    RuleCoverageState::MissingEvidence
+                } else {
+                    RuleCoverageState::NotApplicable
+                };
+                assert!(
+                    r.rules.iter().any(|r| r.rule_id == id
+                        && r.element_index == Some(0)
+                        && r.state == expected),
+                    "{id} should be {expected:?}"
+                );
+            }
+        }
+    }
 }

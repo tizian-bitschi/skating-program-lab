@@ -275,7 +275,7 @@ pub fn assess_program_legality(
             } else {
                 for &i in &indices {
                     inventory(&mut rules, id, source, Some(i),
-                        if family == ProfileElementFamily::RegularSpin { RuleCoverageState::NotApplicable } else { RuleCoverageState::MissingEvidence },
+                        crate::program_validation::unevaluated_rule_state(id, &program.elements[i], &evidence[i]),
                         "No applicable feature attempt, or evidence needed by this family check is missing.");
                 }
             }

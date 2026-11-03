@@ -237,3 +237,20 @@ completion within a supplied finite domain. Missing families compete jointly for
 jump, compound, spin and choreography slots. A required Axel can share a required
 jump-family insertion; a regular-spin insertion cannot serve as a ChSp. Manual
 assessment and completion-original assessment use this same shared calculation.
+
+### Missing feature evidence across ordered spins
+
+`RegularSpinEvidence.feature_attempts: None` is an unknown list. It cannot establish
+that any once-per-program feature is still available. `Some(vec![])` explicitly
+establishes no attempts. A supplied attempt whose position target cannot be checked
+because ordered steps are missing also preserves program-wide uncertainty; a
+known invalid target remains an input contradiction and receives no credit.
+These rules apply to first-attempt features and the first-success feature 10.
+
+The shared rule descriptors declare which checks require feature-attempt evidence.
+Unevaluated feature checks with missing lists or steps report MissingEvidence;
+explicitly empty lists report NotApplicable. The regression
+`unknown_feature_lists_and_uncheckable_targets_differ_from_explicitly_empty_lists`
+exercises both EightRevolutions and IncreaseOfSpeed with distinct, permitted Silver
+abbreviations. The two-foot feature-10 regression uses a permitted Gold change-foot
+combination and verifies absence of spin-eligibility violations.
