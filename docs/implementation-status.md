@@ -1,5 +1,18 @@
 # Implementation status
 
+## Locked program completion (#66)
+
+`complete_program` preserves caller-identified original entries and inserts finite
+supported variants at explicit original boundaries. It extends the existing
+Pumpkin ordered-slot search and shared whole-program validation. Results carry
+ordered provenance, evidence, catalog BV subtotals, manual assessments and source
+traces, with separate optimum and tie-enumeration proof. Unknown originals,
+immutable violations and global exclusion conflicts remain distinct. Tests cover
+an independent tiny Silver oracle, ordered feature use, repetitions, mandatory
+roles in Gold/Masters, exclusions, positions and search limits. See the
+[contract](specs/bounded-program-optimizer.md#immutable-ordered-completion-66).
+Proof covers supplied finite conditional domains, never full official compliance.
+
 ## Manual program assessment (#64)
 
 `assess_manual_program` accepts one profile-selected ordered program with typed

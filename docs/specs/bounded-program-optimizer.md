@@ -1,5 +1,45 @@
 # Bounded mixed Single Skating optimizer
 
+## Immutable ordered completion (#66)
+
+The additive `complete_program` contract was approved on 2026-11-03; see the
+[request/result specification](locked-program-completion-proposal.md).
+The optimizer feature gates this API. Original manual entries retain their IDs,
+plans, evidence, assumptions and relative order, including entries marked unlocked.
+Insertion boundaries refer to the original list, not a shifting completed index.
+Absolute positions are a separate opt-in constraint. Only supplied recognition
+index references are rebound to their new completed positions.
+
+Completion extends the shared ordered Pumpkin model: each original has one
+channelled position, positions increase, and forbidden gaps exclude additions.
+It optimizes the full completed catalog BV and uses the existing whole-program
+validator for every proposal. It reports separate existing/added/total BV and
+reassesses each completion with the manual assessment API. GOE is preserved as
+an optional scenario and never enters the objective. Unknown or unsupported
+original recognition is an explicit error with its draft assessment; immutable
+violations are a different error. Missing required draft elements can be repaired.
+Unsupported requested addition definitions fail even when excluded.
+
+Personal predicates filter additions only. Explicit global predicates also
+check originals and report conflicting IDs; global variant indices are invalid.
+Atomic compounds remain intact and their jump components count across the whole
+program. Output identity compares ordered entries including evidence and supplied
+recognition/scenarios, excluding internal anchor assignments. Identical visible
+words are returned once even if an inserted element matches an original.
+
+Proof and tie completeness cover only the supplied finite domain and supported
+conditional rules. Attached generation audits retain omissions and domain caps;
+they never expand proof scope. Time/proposal/output caps retain the existing
+optimizer semantics. Total slots remain bounded at ten, original plus addition
+definitions at 1,000, and validator proposals at 100,000. An empty request with
+zero maximum total slots is rejected. Evidence requiring unsupported panel paths
+remains indeterminate rather than being converted into a proven optimum.
+
+`tests/program_completion.rs` independently enumerates the Silver 1A/SSp1 tiny
+domain (24 optimal words, 3.50 BV), checks first-attempt feature order, compound
+repetitions, family caps, global exclusions, absolute positions, draft repair,
+unknown/illegal originals, Gold/Masters required roles, interruption and caps.
+
 The additive interface and prerequisite validation work were approved on
 2026-11-03. `optimize_program(registry, request)` handles the four current Adult
 profiles and custom profiles using supported mechanisms and an explicit

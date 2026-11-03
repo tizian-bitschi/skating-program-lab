@@ -4,6 +4,11 @@ An open-source Rust library for planning technical figure skating programs. The 
 
 ## Current capabilities
 
+- **Locked completion:** `complete_program` inserts finite supported additions
+  around immutable original entries, with explicit insertion boundaries, full
+  ordered validation, provenance, BV subtotals and bounded equal-optimum proof.
+  See the [completion contract](docs/specs/bounded-program-optimizer.md#immutable-ordered-completion-66).
+
 - **Domain model:** Ordered programs with planned jumps, combinations, sequences and spin structures; versioned ruleset/table identities; and separately supplied execution observations, panel recognition and technical calls.
 - **Validation:** Additive, profile-selected regular-spin plan checks with typed evidence and explicit family coverage, plus partial, source-linked jump checks for all four Adult categories, including jump eligibility, jump-element limits, combinations/sequences, Euler, repetitions and the Masters Axel requirement. Unresolved transitions and other missing information remain explicit; an empty finding list **does not** prove full program compliance.
 - **Scoring:** Versioned base values and hypothetical final single-judge GOE for the twelve clean single and double jumps (1T through 2A) and supported technical-call variants, including cumulative error limits and supplied single-jump +REP. A limited set of recognized two- and three-jump combinations, supplied Euler/sequence units and component stars, all representable regular/V spins and levels, StSq, ChSq1, ChSp1 and selected zero-value outcomes are supported. Additive `*_with_execution` entry points accept separately supplied error evidence for verified interrupted-unit scenarios. Program scenarios can report TES and separate deductions where the required inputs and rules are supported; an optional second-half boundary is only a hypothetical planning assumption.

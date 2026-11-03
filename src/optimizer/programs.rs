@@ -362,6 +362,23 @@ fn optimize(
     request: &ProgramOptimizationRequest,
     stop_after_incumbent: bool,
 ) -> Result<ProgramOptimizationResult, ProgramOptimizationError> {
+    optimize_anchored(registry, request, stop_after_incumbent, None)
+}
+
+pub(super) struct AnchoredPlacement {
+    pub first_anchor: usize,
+    pub count: usize,
+    pub boundaries: Vec<usize>,
+    pub absolute: Vec<(usize, usize)>,
+    pub equivalence_keys: Vec<usize>,
+}
+
+pub(super) fn optimize_anchored(
+    registry: &ProfileRegistry,
+    request: &ProgramOptimizationRequest,
+    stop_after_incumbent: bool,
+    anchors: Option<&AnchoredPlacement>,
+) -> Result<ProgramOptimizationResult, ProgramOptimizationError> {
     use ProgramOptimizationError as E;
     let start = Instant::now();
     let profile = registry
@@ -408,7 +425,8 @@ fn optimize(
     let mut sources = profile.sources.clone();
     // Verify all requested variants before exclusions; unsupported inputs are never hidden.
     for (i, variant) in request.variants.iter().enumerate() {
-        if request.variants[..i].contains(variant) {
+        if request.variants[..i].contains(variant) && !anchors.is_some_and(|a| i >= a.first_anchor)
+        {
             return Err(E::InvalidRequest("duplicate candidate variants"));
         }
         let prepared = prepare_variant(
@@ -452,6 +470,9 @@ fn optimize(
         status: OptimizerStatus::Incomplete, enumeration_complete: false, termination_reason: JumpTerminationReason::Interrupted, examined_programs: 0, candidates: vec![] };
     let (mut solver, slots, objective) =
         solver_common::ordered_slots(&values, request.max_elements, request.min_elements);
+    if let Some(a) = anchors {
+        solver_common::anchor_slots(&mut solver, &slots, &result.universe, a);
+    }
     let mut deadline = Deadline(end);
     let mut enumerating = false;
     loop {
@@ -519,7 +540,19 @@ fn optimize(
                     result.applied_rules.push(rule.clone());
                 }
             }
-            result.candidates.push(candidate);
+            if !anchors.is_some_and(|a| {
+                result.candidates.iter().any(|c| {
+                    c.variant_indices
+                        .iter()
+                        .map(|i| a.equivalence_keys[*i])
+                        .eq(candidate
+                            .variant_indices
+                            .iter()
+                            .map(|i| a.equivalence_keys[*i]))
+                })
+            }) {
+                result.candidates.push(candidate);
+            }
             if !enumerating {
                 result.status = status;
                 if status != OptimizerStatus::OptimalProven {
