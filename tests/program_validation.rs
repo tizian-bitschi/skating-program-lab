@@ -292,6 +292,87 @@ fn missing_qualification_or_unmodeled_variations_never_prove_level_credit() {
 }
 
 #[test]
+fn feature_evaluation_scope_preserves_local_checks_and_legacy_limits() {
+    let (element, data) = spin(
+        RegularSpinKind::Sit,
+        Level::One,
+        vec![attempt(
+            SpinFeature::IncreaseOfSpeed,
+            FeatureAttemptOutcome::Successful,
+        )],
+    );
+    let ElementPlanEvidence::Spin {
+        spin: mut evidence, ..
+    } = data.clone()
+    else {
+        unreachable!()
+    };
+    let profile = adult_profile(AdultCategory::Bronze);
+    let program = ProfileProgram {
+        profile: profile.id,
+        scoring_table: ScoringTableId::Isu2786June2_2026,
+        elements: vec![element.clone()],
+    };
+    let local = |spin| {
+        validate_profile_program_with_evidence(
+            &ProfileRegistry::adult(),
+            &program,
+            &ProgramValidationEvidence {
+                spins: vec![IndexedSpinEvidence {
+                    element_index: 0,
+                    spin,
+                }],
+            },
+            None,
+        )
+        .unwrap()
+    };
+    let legacy = local(evidence.clone());
+    assert!(legacy
+        .validation
+        .findings
+        .iter()
+        .any(|f| f.rule_id == "spin-feature-credit" && f.kind == FindingKind::Unsupported));
+    let mixed = validate(AdultCategory::Bronze, vec![(element.clone(), data)]);
+    assert!(!mixed
+        .applied_rules
+        .iter()
+        .any(|r| r.rule_id == "spin-feature-credit"));
+    assert!(!mixed
+        .validation
+        .findings
+        .iter()
+        .any(|f| f.rule_id == "spin-feature-credit"));
+    assert!(mixed
+        .applied_rules
+        .iter()
+        .any(|r| r.rule_id == "program-spin-level-credit"));
+    assert!(!has(&mixed, "program-spin-level-credit", Some(0)));
+
+    evidence.feature_attempts.as_mut().unwrap()[0].position_step = 99;
+    let invalid_local = local(evidence.clone());
+    let invalid_mixed = validate(
+        AdultCategory::Bronze,
+        vec![(
+            element,
+            ElementPlanEvidence::Spin {
+                spin: evidence,
+                local_feature_qualification_assumed: true,
+            },
+        )],
+    );
+    for report in [invalid_local, invalid_mixed] {
+        assert!(report
+            .validation
+            .findings
+            .iter()
+            .any(|f| f.rule_id == "spin-feature-target"
+                && f.kind == FindingKind::Violation
+                && f.component_index == Some(99)));
+    }
+}
+
+#[test]
 fn sequence_assumptions_resolve_only_the_supported_direct_step_uncertainty() {
     let element = PlannedElement::Jump(JumpElement::Sequence(vec![
         JumpPart::Jump(ListedJump {
@@ -312,8 +393,32 @@ fn sequence_assumptions_resolve_only_the_supported_direct_step_uncertainty() {
             },
         )],
     );
-    assert!(missing.validation.findings.iter().any(|f| f.explanation
-        == "The plan does not establish the direct step into the Axel or panel recognition."));
+    let diagnostics: Vec<_> = missing
+        .validation
+        .findings
+        .iter()
+        .filter(|f| f.element_index == Some(0))
+        .collect();
+    assert_eq!(diagnostics.len(), 1);
+    let diagnostic = diagnostics[0];
+    assert_eq!(diagnostic.kind, FindingKind::Unknown);
+    assert_eq!(
+        diagnostic.rule_id,
+        "isu-adult-2026-27-combination-structure"
+    );
+    assert_eq!(
+        diagnostic.explanation,
+        "The plan does not establish the direct step into the Axel or panel recognition."
+    );
+    assert_eq!(
+        diagnostic.source.document,
+        "International Adult Figure Skating Competitions Technical Announcement"
+    );
+    assert_eq!(diagnostic.source.version, "2026-07-16");
+    assert_eq!(
+        diagnostic.source.location,
+        "p. 10, Silver Free Skating, jumps"
+    );
     let supplied = validate(
         AdultCategory::Silver,
         vec![(
@@ -325,6 +430,25 @@ fn sequence_assumptions_resolve_only_the_supported_direct_step_uncertainty() {
     );
     assert!(!supplied.validation.findings.iter().any(|f| f.explanation
         == "The plan does not establish the direct step into the Axel or panel recognition."));
+    for report in [&missing, &supplied] {
+        let traces: Vec<_> = report
+            .applied_rules
+            .iter()
+            .filter(|r| r.rule_id == "program-sequence-direct-step")
+            .collect();
+        assert_eq!(traces.len(), 1);
+        let trace = traces[0];
+        assert_eq!(trace.element_index, Some(0));
+        assert_eq!(trace.source.document, "ISU Communication 2788");
+        assert_eq!(trace.source.version, "2026-05-19");
+        assert_eq!(trace.source.location, "p. 3, jump sequences");
+        assert!(report.sources.contains(&trace.source));
+        assert!(report.sources.contains(&diagnostic.source));
+        assert!(!report
+            .sources
+            .iter()
+            .any(|s| s.document == "ISU Communication 2788" && s.location.contains("Adult")));
+    }
     let PlannedElement::Jump(JumpElement::Sequence(mut parts)) = element else {
         unreachable!()
     };

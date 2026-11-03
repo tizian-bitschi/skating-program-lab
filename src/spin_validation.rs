@@ -255,7 +255,20 @@ pub fn validate_profile_program_with_evidence(
     evidence: &ProgramValidationEvidence,
     policy: Option<&RegularSpinPolicy>,
 ) -> Result<EvidenceValidationReport, ProfileSelectionError> {
-    validate_profile_program_with_assumptions(registry, program, evidence, policy, &[])
+    validate_profile_program_with_assumptions(
+        registry,
+        program,
+        evidence,
+        policy,
+        &[],
+        FeatureCreditEvaluation::Deferred,
+    )
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(crate) enum FeatureCreditEvaluation {
+    Deferred,
+    ProgramWide,
 }
 
 pub(crate) fn validate_profile_program_with_assumptions(
@@ -264,6 +277,7 @@ pub(crate) fn validate_profile_program_with_assumptions(
     evidence: &ProgramValidationEvidence,
     policy: Option<&RegularSpinPolicy>,
     assumed_direct_sequences: &[usize],
+    feature_credit: FeatureCreditEvaluation,
 ) -> Result<EvidenceValidationReport, ProfileSelectionError> {
     let profile = registry.resolve(&program.profile, program.scoring_table)?;
     let built_in = [
@@ -308,6 +322,7 @@ pub(crate) fn validate_profile_program_with_assumptions(
     let mut check = SpinValidator {
         findings: jump_validation.findings,
         applied_rules,
+        feature_credit,
     };
     let indexed = check.index_evidence(&program.elements, evidence);
     if let Some(policy) = policy {
@@ -360,6 +375,7 @@ pub(crate) fn validate_profile_program_with_assumptions(
 struct SpinValidator {
     findings: Vec<Finding>,
     applied_rules: Vec<AppliedRule>,
+    feature_credit: FeatureCreditEvaluation,
 }
 impl SpinValidator {
     fn apply(&mut self, id: &'static str, index: Option<usize>, source: &SourceReference) {
@@ -525,6 +541,14 @@ impl SpinValidator {
         self.check_abbreviation(index, spin, data, policy);
         self.check_wind_up_target(index, spin, data);
         self.check_feature_targets(index, spin, data);
+        if self.feature_credit == FeatureCreditEvaluation::Deferred
+            && data
+                .and_then(|d| d.feature_attempts.as_ref())
+                .is_some_and(|a| !a.is_empty())
+        {
+            self.add(FindingKind::Unsupported, "spin-feature-credit", Some(index), None,
+                "Feature assertions are stored in order; success does not establish eligibility, reuse credit or a level in this slice.", &input_source());
+        }
         self.check_panel(index, data, recognition_ruleset);
         let Some(steps) = &spin.steps else {
             self.add(
@@ -698,10 +722,6 @@ impl SpinValidator {
                 );
             }
             previous = Some(attempt.position_step);
-        }
-        if !attempts.is_empty() {
-            self.add(FindingKind::Unsupported, "spin-feature-credit", Some(index), None,
-                "Feature assertions are stored in order; success does not establish eligibility, reuse credit or a level in this slice.", &input_source());
         }
     }
 

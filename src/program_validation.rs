@@ -13,7 +13,7 @@ pub(crate) const RULE_IDS: &[&str] = &[
     "program-feature-qualification",
     "program-flying-feature-entry",
     "program-required-choreographic-spin",
-    "program-sequence-direct-step",
+    crate::validation::SEQUENCE_DIRECT_STEP_RULE,
     "program-spin-level-credit",
     "program-spin-level-four-feature",
     "program-step-feature-dependency",
@@ -225,15 +225,8 @@ pub fn validate_supported_program(
         &spin_evidence,
         Some(&policy.spins),
         &assumed_direct_sequences,
+        crate::spin_validation::FeatureCreditEvaluation::ProgramWide,
     )?;
-    // Only this dedicated evaluator supersedes the old feature-credit placeholder.
-    report
-        .validation
-        .findings
-        .retain(|f| f.rule_id != "spin-feature-credit");
-    report
-        .applied_rules
-        .retain(|r| r.rule_id != "spin-feature-credit");
     let mut checks = MixedChecks {
         findings: &mut report.validation.findings,
         applied_rules: &mut report.applied_rules,
@@ -536,22 +529,7 @@ pub fn validate_supported_program(
                     checks.add(FindingKind::Unknown, "program-choreographic-spin", Some(index), "Recognition needs three consecutive revolutions on the same foot; split holds cannot be added.", &qa);
                 }
             }
-            ElementPlanEvidence::Jump {
-                direct_transitions_assumed,
-            } => {
-                if matches!(element, PlannedElement::Jump(JumpElement::Sequence(_))) {
-                    checks.apply(
-                        "program-sequence-direct-step",
-                        Some(index),
-                        &source("p. 3, jump sequences; Adult pp. 8-10"),
-                    );
-                }
-                if matches!(element, PlannedElement::Jump(JumpElement::Sequence(_)))
-                    && !direct_transitions_assumed
-                {
-                    checks.add(FindingKind::Unknown, "program-sequence-direct-step", Some(index), "A planned sequence needs an explicit direct Axel-step assumption; recognition is not inferred.", &source("p. 3, jump sequences; Adult pp. 8-10"));
-                }
-            }
+            ElementPlanEvidence::Jump { .. } => {}
         }
     }
     for coverage in &mut report.coverage {

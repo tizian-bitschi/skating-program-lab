@@ -12,6 +12,7 @@ pub(crate) const STRUCTURE_RULE: &str = "isu-adult-2026-27-bronze-combination-st
 pub(crate) const EULER_RULE: &str = "isu-adult-2026-27-bronze-combination-euler";
 pub(crate) const REPETITION_RULE: &str = "isu-adult-2026-27-bronze-jump-repetition";
 const SCOPE_RULE: &str = "validator-scope";
+pub(crate) const SEQUENCE_DIRECT_STEP_RULE: &str = "program-sequence-direct-step";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FindingKind {
@@ -446,6 +447,17 @@ impl<'a> Validator<'a> {
             self.transition(parts, index, sequence);
         }
         if sequence && self.policy.max_sequences > 0 && listed.len() >= 2 {
+            record_rule(
+                &mut self.applied_rules,
+                SEQUENCE_DIRECT_STEP_RULE,
+                Some(index),
+                None,
+                &SourceReference {
+                    document: "ISU Communication 2788".into(),
+                    version: "2026-05-19".into(),
+                    location: "p. 3, jump sequences".into(),
+                },
+            );
             let later = &listed[1..];
             if !later.iter().any(|j| j.kind == Some(JumpKind::Axel)) {
                 self.add(
