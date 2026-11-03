@@ -106,9 +106,9 @@ pub enum ProgramOptimizationError {
 }
 
 /// Construct only the declared clean recognition subset, using the shared scorer.
-fn score(
+pub(super) fn score(
     variant: &ProgramVariant,
-    request: &ProgramOptimizationRequest,
+    table: ScoringTableId,
     ruleset: RulesetId,
 ) -> Result<BaseValue, ProgramOptimizationError> {
     use ProgramOptimizationError as E;
@@ -158,13 +158,17 @@ fn score(
         outcome: RecognitionOutcome::Recognized,
         details: Some(details),
     };
-    match lookup_base_value(request.scoring_table, &panel, &[]).map_err(E::Scoring)? {
+    match lookup_base_value(table, &panel, &[]).map_err(E::Scoring)? {
         BaseValueOutcome::Value(v) => Ok(v),
         _ => Err(unsupported()),
     }
 }
 
-fn excluded(variant: &ProgramVariant, exclusion: &PersonalExclusion, index: usize) -> bool {
+pub(super) fn excluded(
+    variant: &ProgramVariant,
+    exclusion: &PersonalExclusion,
+    index: usize,
+) -> bool {
     let jumps: Vec<_> = match &variant.element {
         PlannedElement::Jump(JumpElement::Solo(j)) => vec![j],
         PlannedElement::Jump(JumpElement::Combination(parts) | JumpElement::Sequence(parts)) => {
@@ -245,7 +249,7 @@ fn checked(
     }
     let per_element = indices
         .iter()
-        .map(|i| score(&request.variants[*i], request, ruleset))
+        .map(|i| score(&request.variants[*i], request.scoring_table, ruleset))
         .collect::<Result<Vec<_>, _>>()?;
     for (index, value) in per_element.iter().enumerate() {
         crate::validation::record_rule(
@@ -332,7 +336,8 @@ fn optimize(
         if request.variants[..i].contains(variant) {
             return Err(E::InvalidRequest("duplicate candidate variants"));
         }
-        let value = score(variant, request, ruleset).map_err(|_| E::UnsupportedVariant(i))?;
+        let value =
+            score(variant, request.scoring_table, ruleset).map_err(|_| E::UnsupportedVariant(i))?;
         let single = ProfileProgram {
             profile: request.profile.clone(),
             scoring_table: request.scoring_table,

@@ -86,3 +86,11 @@ Legacy jump findings and their source references remain compatible; the mixed
 entry point no longer adds a duplicate Unknown for the same missing assumption.
 `tests/program_validation.rs` verifies both spin scopes, invalid local targets,
 one sequence diagnostic and exact independent document/version/page references.
+
+## Product candidate-domain coverage (#65)
+
+| Area | Evidence | Boundary |
+| --- | --- | --- |
+| Automatic jump domain | Literal four-profile solo and tiny compound oracles; component exclusion and sequence tests | Direct T/Lo combinations and Axel continuations only; no Euler or general physical-transition model |
+| Spin and movement domains | Automatic Basic plans, explicit feature qualification, missing-evidence and movement-family fixtures | Layback posture and difficult variations remain unsupported; richer levels need explicit supported evidence |
+| Bounds, manual subset and integration | Candidate/expansion caps, supported empty domain, invalid manual input, deduplication, four ordered optimizer ties | Completeness concerns only the declared finite supported domain; retain generation audit alongside solver proof |

@@ -225,3 +225,8 @@ mod tests {
         }
     }
 }
+
+#[cfg(feature = "optimizer")]
+mod generation;
+#[cfg(feature = "optimizer")]
+pub use generation::*;
