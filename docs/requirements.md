@@ -38,3 +38,5 @@ Legacy Adult APIs remain supported. A synthetic fixture exercises extension and
 has no official category status. Pair/Short Program, feature/level recognition
 and unknown mechanisms remain unsupported. See the accepted
 [profile migration contract](adr/0002-rule-profiles-proposal.md).
+
+The implemented bounded mixed-element scenario contract, finite domains, personal restrictions and proof limits are specified in [bounded program optimization](specs/bounded-program-optimizer.md).

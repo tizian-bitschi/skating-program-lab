@@ -67,6 +67,10 @@ mod jumps;
 mod solver_common;
 #[cfg(feature = "optimizer")]
 pub use jumps::*;
+#[cfg(feature = "optimizer")]
+mod programs;
+#[cfg(feature = "optimizer")]
+pub use programs::*;
 
 /// Enumerate every slot assignment. Exclusion removes 1Lz from every slot.
 /// Lookup errors abort the search rather than producing an incomplete optimum.

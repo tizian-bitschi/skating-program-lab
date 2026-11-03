@@ -42,3 +42,5 @@ the bounded jump solver share profile policy through additive entry points;
 legacy APIs select built-in Adult definitions. SOV values remain in the catalog.
 Unknown identities retain the request and error reason. Missing sources,
 conflicting overrides and unsupported mechanisms never fall back to Adult rules.
+
+The additive `program_validation` module checks bounded ordered mixed-program evidence using shared jump/spin validation. `optimizer/programs.rs` consumes that validator and catalog scoring; the Pumpkin ordered-slot/value helper is shared with the jump optimizer. See [mixed-program contract](specs/bounded-program-optimizer.md).

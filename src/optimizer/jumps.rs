@@ -68,7 +68,7 @@ pub enum JumpOptimizerError {
     InconsistentSolverResult,
 }
 
-fn jump_code(jump: &ListedJump) -> Result<ComponentCode, JumpOptimizerError> {
+pub(super) fn jump_code(jump: &ListedJump) -> Result<ComponentCode, JumpOptimizerError> {
     let suffix = match jump.kind {
         Some(JumpKind::ToeLoop) => "T",
         Some(JumpKind::Salchow) => "S",
