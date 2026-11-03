@@ -245,6 +245,21 @@ pub(super) fn prepare_variant(
         .resolve(profile_id, table)
         .map_err(ProgramOptimizationError::Profile)?;
     let value = score(variant, table, profile.scoring.recognition_ruleset)?;
+    prepare_with_base(registry, profile_id, table, policy, variant, value)
+}
+
+/// A fixed original's base comes from its validated manual recognition, not a clean reconstruction.
+pub(super) fn prepare_with_base(
+    registry: &ProfileRegistry,
+    profile_id: &ProfileId,
+    table: ScoringTableId,
+    policy: &ProgramPolicy,
+    variant: &ProgramVariant,
+    value: BaseValue,
+) -> Result<PreparedVariant, ProgramOptimizationError> {
+    let profile = registry
+        .resolve(profile_id, table)
+        .map_err(ProgramOptimizationError::Profile)?;
     let program = ProfileProgram {
         profile: profile_id.clone(),
         scoring_table: table,
@@ -282,6 +297,7 @@ fn checked(
     request: &ProgramOptimizationRequest,
     indices: &[usize],
     ruleset: RulesetId,
+    anchors: Option<&AnchoredPlacement>,
 ) -> Result<Option<ProgramCandidate>, ProgramOptimizationError> {
     if indices.len() < request.min_elements
         || request
@@ -324,7 +340,7 @@ fn checked(
     }
     let per_element = indices
         .iter()
-        .map(|i| score(&request.variants[*i], request.scoring_table, ruleset))
+        .map(|i| variant_base(request, *i, ruleset, anchors))
         .collect::<Result<Vec<_>, _>>()?;
     for (index, value) in per_element.iter().enumerate() {
         crate::validation::record_rule(
@@ -361,6 +377,36 @@ fn optimize(
     registry: &ProfileRegistry,
     request: &ProgramOptimizationRequest,
     stop_after_incumbent: bool,
+) -> Result<ProgramOptimizationResult, ProgramOptimizationError> {
+    optimize_anchored(registry, request, stop_after_incumbent, None)
+}
+
+pub(super) struct AnchoredPlacement {
+    pub first_anchor: usize,
+    pub count: usize,
+    pub boundaries: Vec<usize>,
+    pub absolute: Vec<(usize, usize)>,
+    pub equivalence_keys: Vec<usize>,
+    pub original_values: Vec<BaseValue>,
+}
+
+fn variant_base(
+    request: &ProgramOptimizationRequest,
+    index: usize,
+    ruleset: RulesetId,
+    anchors: Option<&AnchoredPlacement>,
+) -> Result<BaseValue, ProgramOptimizationError> {
+    if let Some(a) = anchors.filter(|a| index >= a.first_anchor) {
+        return Ok(a.original_values[index - a.first_anchor].clone());
+    }
+    score(&request.variants[index], request.scoring_table, ruleset)
+}
+
+pub(super) fn optimize_anchored(
+    registry: &ProfileRegistry,
+    request: &ProgramOptimizationRequest,
+    stop_after_incumbent: bool,
+    anchors: Option<&AnchoredPlacement>,
 ) -> Result<ProgramOptimizationResult, ProgramOptimizationError> {
     use ProgramOptimizationError as E;
     let start = Instant::now();
@@ -408,15 +454,19 @@ fn optimize(
     let mut sources = profile.sources.clone();
     // Verify all requested variants before exclusions; unsupported inputs are never hidden.
     for (i, variant) in request.variants.iter().enumerate() {
-        if request.variants[..i].contains(variant) {
+        if request.variants[..i].contains(variant) && !anchors.is_some_and(|a| i >= a.first_anchor)
+        {
             return Err(E::InvalidRequest("duplicate candidate variants"));
         }
-        let prepared = prepare_variant(
+        let value =
+            variant_base(request, i, ruleset, anchors).map_err(|_| E::UnsupportedVariant(i))?;
+        let prepared = prepare_with_base(
             registry,
             &request.profile,
             request.scoring_table,
             &request.policy,
             variant,
+            value,
         )
         .map_err(|e| match e {
             ProgramOptimizationError::Profile(_) => e,
@@ -452,6 +502,10 @@ fn optimize(
         status: OptimizerStatus::Incomplete, enumeration_complete: false, termination_reason: JumpTerminationReason::Interrupted, examined_programs: 0, candidates: vec![] };
     let (mut solver, slots, objective) =
         solver_common::ordered_slots(&values, request.max_elements, request.min_elements);
+    if let Some(a) = anchors {
+        result.assumptions = "Original recognition, calls and qualification assumptions are supplied and retained; additions use explicit clean recognition and supplied feature qualification. No official recognition, execution, GOE or second-half credit is inferred.";
+        solver_common::anchor_slots(&mut solver, &slots, &result.universe, a);
+    }
     let mut deadline = Deadline(end);
     let mut enumerating = false;
     loop {
@@ -505,7 +559,7 @@ fn optimize(
                 (v > 0).then(|| result.universe[v as usize - 1])
             })
             .collect();
-        if let Some(candidate) = checked(registry, request, &indices, ruleset)? {
+        if let Some(candidate) = checked(registry, request, &indices, ruleset, anchors)? {
             if candidate.base_hundredths != solution.get_integer_value(objective) as u32 {
                 return Err(E::InconsistentSolverResult);
             }
@@ -519,7 +573,19 @@ fn optimize(
                     result.applied_rules.push(rule.clone());
                 }
             }
-            result.candidates.push(candidate);
+            if !anchors.is_some_and(|a| {
+                result.candidates.iter().any(|c| {
+                    c.variant_indices
+                        .iter()
+                        .map(|i| a.equivalence_keys[*i])
+                        .eq(candidate
+                            .variant_indices
+                            .iter()
+                            .map(|i| a.equivalence_keys[*i]))
+                })
+            }) {
+                result.candidates.push(candidate);
+            }
             if !enumerating {
                 result.status = status;
                 if status != OptimizerStatus::OptimalProven {

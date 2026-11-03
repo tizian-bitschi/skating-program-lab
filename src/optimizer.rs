@@ -230,3 +230,7 @@ mod tests {
 mod generation;
 #[cfg(feature = "optimizer")]
 pub use generation::*;
+#[cfg(feature = "optimizer")]
+mod completion;
+#[cfg(feature = "optimizer")]
+pub use completion::*;

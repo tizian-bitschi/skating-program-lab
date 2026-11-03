@@ -1,0 +1,642 @@
+#![cfg(feature = "optimizer")]
+use skating_program_lab::*;
+use std::{collections::BTreeSet, time::Duration};
+
+fn pos(position: SpinPosition, n: u16) -> SpinStep {
+    SpinStep::Position {
+        position: Some(position),
+        revolutions: Some(n),
+        feature_attempts: Some(vec![]),
+    }
+}
+fn jump(kind: JumpKind) -> ProgramVariant {
+    ProgramVariant {
+        element: PlannedElement::Jump(JumpElement::Solo(ListedJump {
+            kind: Some(kind),
+            rotations: Some(1),
+        })),
+        evidence: ElementPlanEvidence::Jump {
+            direct_transitions_assumed: false,
+        },
+        recognition_assumed: true,
+    }
+}
+fn spin(
+    kind: RegularSpinKind,
+    entry: SpinEntry,
+    changed: bool,
+    target: Level,
+    features: Vec<SpinFeatureAttempt>,
+) -> ProgramVariant {
+    let steps = if kind == RegularSpinKind::Combination {
+        vec![
+            pos(SpinPosition::Camel, 3),
+            pos(SpinPosition::Sit, 3),
+            SpinStep::ChangeFoot,
+            pos(SpinPosition::Upright, 3),
+        ]
+    } else {
+        vec![pos(
+            if kind == RegularSpinKind::Camel {
+                SpinPosition::Camel
+            } else {
+                SpinPosition::Sit
+            },
+            8,
+        )]
+    };
+    ProgramVariant {
+        element: PlannedElement::RegularSpin(RegularSpin {
+            entry: Some(entry),
+            steps: Some(steps),
+        }),
+        evidence: ElementPlanEvidence::Spin {
+            spin: RegularSpinEvidence {
+                abbreviation: Some(SpinAbbreviation {
+                    kind,
+                    entry,
+                    change_foot: changed,
+                }),
+                planned_level: Some(target),
+                feature_attempts: Some(features),
+                panel: None,
+                final_upright_wind_up: None,
+            },
+            local_feature_qualification_assumed: true,
+        },
+        recognition_assumed: true,
+    }
+}
+fn feature(f: SpinFeature, outcome: FeatureAttemptOutcome) -> SpinFeatureAttempt {
+    SpinFeatureAttempt {
+        feature: f,
+        position_step: 0,
+        outcome,
+    }
+}
+fn chsp() -> ProgramVariant {
+    ProgramVariant {
+        element: PlannedElement::ChoreographicSpin,
+        evidence: ElementPlanEvidence::ChoreographicSpin {
+            consecutive_revolutions_per_foot: Some(vec![3]),
+        },
+        recognition_assumed: true,
+    }
+}
+
+fn entry(id: &str, v: ProgramVariant) -> CompletionEntry {
+    let details = match &v.element {
+        PlannedElement::Jump(JumpElement::Solo(j)) => RecognitionDetails::new(
+            vec![ComponentCode::try_from(match j.kind.unwrap() {
+                JumpKind::Axel => "1A",
+                JumpKind::ToeLoop => "1T",
+                JumpKind::Salchow => "1S",
+                _ => panic!("fixture jump"),
+            })
+            .unwrap()],
+            None,
+            Some(vec![]),
+        )
+        .unwrap(),
+        PlannedElement::RegularSpin(_) => {
+            let ElementPlanEvidence::Spin { spin, .. } = &v.evidence else {
+                panic!()
+            };
+            RecognitionDetails::new(
+                vec![
+                    ComponentCode::try_from(match spin.abbreviation.unwrap().kind {
+                        RegularSpinKind::Sit => "SSp",
+                        RegularSpinKind::Camel => "CSp",
+                        RegularSpinKind::Combination => "CCoSp",
+                        _ => panic!(),
+                    })
+                    .unwrap(),
+                ],
+                spin.planned_level,
+                Some(vec![]),
+            )
+            .unwrap()
+        }
+        _ => panic!("fixture element"),
+    };
+    CompletionEntry {
+        id: id.into(),
+        locked: true,
+        entry: ManualProgramEntry {
+            planned: v.element,
+            evidence: v.evidence,
+            scenario: None,
+            intended_recognition: Some(PanelRecognition {
+                ruleset: RulesetId::IsuAdult2026_27July16,
+                source: None,
+                planned_element: None,
+                observed_element: None,
+                outcome: RecognitionOutcome::Recognized,
+                details: Some(details),
+            }),
+        },
+    }
+}
+fn sit() -> ProgramVariant {
+    spin(
+        RegularSpinKind::Sit,
+        SpinEntry::NonFlying,
+        false,
+        Level::One,
+        vec![feature(
+            SpinFeature::IncreaseOfSpeed,
+            FeatureAttemptOutcome::Successful,
+        )],
+    )
+}
+fn request() -> ProgramCompletionRequest {
+    let p = adult_profile(AdultCategory::Silver);
+    ProgramCompletionRequest {
+        season: p.season,
+        profile: p.id,
+        scoring_table: p.scoring_table,
+        policy: adult_program_policy(AdultCategory::Silver),
+        original: vec![entry("axel", jump(JumpKind::Axel)), entry("sit", sit())],
+        variants: vec![jump(JumpKind::ToeLoop), jump(JumpKind::Salchow)],
+        generated_domain: None,
+        exclusions: vec![],
+        global_exclusions: vec![],
+        insertion: CompletionInsertionPolicy {
+            boundaries: vec![0, 1, 2],
+            absolute_positions: vec![],
+        },
+        min_additions: 2,
+        max_additions: 2,
+        objective: OptimizerObjective::MaximizeUnfactoredBaseValueHundredths,
+        max_proposals: 100_000,
+        max_solutions: 1000,
+        enumerate_equal_optima: true,
+        time_limit: None,
+    }
+}
+fn result(r: &ProgramCompletionRequest) -> ProgramCompletionResult {
+    complete_program(&ProfileRegistry::adult(), r).unwrap()
+}
+fn words(r: &ProgramCompletionResult) -> BTreeSet<Vec<usize>> {
+    r.candidates
+        .iter()
+        .map(|c| {
+            c.provenance
+                .iter()
+                .map(|p| match p {
+                    CompletionProvenance::Original { original_index, .. } => 2 + original_index,
+                    CompletionProvenance::Inserted { variant_index, .. } => *variant_index,
+                })
+                .collect()
+        })
+        .collect()
+}
+
+#[test]
+fn silver_all_optimal_words_match_independent_oracle_and_assessment() {
+    let req = request();
+    let r = result(&req);
+    // Independent literal coefficients: 1T=.40, 1S=.40, 1A=1.10, SSp1=1.60.
+    // Enumerate length-four words, exactly one of each immutable original,
+    // axel before sit, at most two identical inserted jumps.
+    let mut expected = BTreeSet::new();
+    for mut code in 0..4usize.pow(4) {
+        let w: Vec<_> = (0..4)
+            .map(|_| {
+                let v = code % 4;
+                code /= 4;
+                v
+            })
+            .collect();
+        if w.iter().filter(|i| **i == 2).count() == 1
+            && w.iter().filter(|i| **i == 3).count() == 1
+            && w.iter().position(|i| *i == 2) < w.iter().position(|i| *i == 3)
+        {
+            expected.insert(w);
+        }
+    }
+    assert_eq!(r.status, OptimizerStatus::OptimalProven);
+    assert!(r.enumeration_complete);
+    assert_eq!(words(&r), expected);
+    assert_eq!(r.candidates.len(), 24);
+    for c in &r.candidates {
+        assert_eq!(
+            (
+                c.existing_base_hundredths,
+                c.added_base_hundredths,
+                c.total_base_hundredths
+            ),
+            (270, 80, 350)
+        );
+        assert_eq!(c.assessment.intended_base.exact_hundredths, Some(350));
+        assert_eq!(
+            assess_manual_program(&ProfileRegistry::adult(), &c.assessment.request).unwrap(),
+            c.assessment
+        );
+        assert!(!c.validation.applied_rules.is_empty());
+        for (i, p) in c.provenance.iter().enumerate() {
+            if let CompletionProvenance::Original {
+                original_index, id, ..
+            } = p
+            {
+                assert_eq!(id, &req.original[*original_index].id);
+                assert_eq!(
+                    c.assessment.request.entries[i],
+                    req.original[*original_index].entry
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn boundaries_absolute_positions_and_rebinding_are_zero_based() {
+    let mut req = request();
+    req.insertion.boundaries = vec![1];
+    req.insertion.absolute_positions = vec![("axel".into(), 0), ("sit".into(), 3)];
+    req.original[1]
+        .entry
+        .intended_recognition
+        .as_mut()
+        .unwrap()
+        .planned_element = Some(1);
+    req.original[1].entry.scenario = Some(ManualElementScenario {
+        recognition: req.original[1].entry.intended_recognition.clone().unwrap(),
+        annotations: vec![],
+        final_goe: None,
+        fall: None,
+        execution: None,
+    });
+    let r = result(&req);
+    assert_eq!(r.candidates.len(), 4);
+    for c in &r.candidates {
+        assert_eq!(
+            c.assessment.request.entries[3]
+                .scenario
+                .as_ref()
+                .unwrap()
+                .recognition
+                .planned_element,
+            Some(3)
+        );
+        assert_eq!(
+            c.assessment.request.entries[3]
+                .intended_recognition
+                .as_ref()
+                .unwrap()
+                .planned_element,
+            Some(3)
+        );
+        for (ordinal, p) in c.provenance[1..3].iter().enumerate() {
+            assert!(
+                matches!(p, CompletionProvenance::Inserted { boundary: 1, ordinal: o, .. } if *o == ordinal)
+            );
+        }
+    }
+    req.insertion.boundaries.clear();
+    assert_eq!(result(&req).status, OptimizerStatus::InfeasibleProven);
+}
+
+#[test]
+fn exclusions_only_filter_additions_and_global_conflicts_name_originals() {
+    let mut req = request();
+    req.exclusions = vec![
+        PersonalExclusion::JumpKind(JumpKind::Axel),
+        PersonalExclusion::SpinKind(RegularSpinKind::Sit),
+        PersonalExclusion::FlyingEntry,
+    ];
+    assert_eq!(result(&req).candidates.len(), 24);
+    req.global_exclusions = vec![PersonalExclusion::JumpKind(JumpKind::Axel)];
+    assert!(
+        matches!(complete_program(&ProfileRegistry::adult(), &req), Err(ProgramCompletionError::GlobalExclusionConflict(ids)) if ids == vec!["axel"])
+    );
+}
+
+#[test]
+fn draft_missing_spin_is_repairable_but_illegal_and_unknown_originals_are_distinct() {
+    let mut req = request();
+    req.original.pop();
+    req.insertion.boundaries = vec![0, 1];
+    req.variants = vec![sit()];
+    req.min_additions = 1;
+    req.max_additions = 1;
+    assert_eq!(result(&req).status, OptimizerStatus::OptimalProven);
+    req.original[0].entry.planned = PlannedElement::Jump(JumpElement::Solo(ListedJump {
+        kind: Some(JumpKind::Axel),
+        rotations: Some(2),
+    }));
+    assert!(matches!(
+        complete_program(&ProfileRegistry::adult(), &req),
+        Err(ProgramCompletionError::ImmutableViolation(_))
+    ));
+    req.original[0].entry.planned = PlannedElement::Jump(JumpElement::Solo(ListedJump {
+        kind: None,
+        rotations: Some(1),
+    }));
+    req.original[0].entry.intended_recognition = None;
+    assert!(matches!(
+        complete_program(&ProfileRegistry::adult(), &req),
+        Err(ProgramCompletionError::IndeterminateOriginal(_))
+    ));
+}
+
+#[test]
+fn repetitions_include_compound_components_and_spin_caps_include_originals() {
+    let mut req = request();
+    let mut combo = jump(JumpKind::ToeLoop);
+    combo.element = PlannedElement::Jump(JumpElement::Combination(vec![
+        JumpPart::Jump(ListedJump {
+            kind: Some(JumpKind::ToeLoop),
+            rotations: Some(1),
+        }),
+        JumpPart::Jump(ListedJump {
+            kind: Some(JumpKind::Loop),
+            rotations: Some(1),
+        }),
+    ]));
+    req.variants = vec![combo, jump(JumpKind::ToeLoop), sit()];
+    let mut toe = entry("toe", jump(JumpKind::ToeLoop));
+    toe.locked = false;
+    req.original.insert(1, toe);
+    req.insertion.boundaries = vec![0, 1, 2, 3];
+    req.min_additions = 1;
+    req.max_additions = 1;
+    let r = result(&req);
+    assert!(r.candidates.iter().all(|c| c.added_base_hundredths == 90));
+    req.min_additions = 2;
+    req.max_additions = 2;
+    assert_eq!(result(&req).status, OptimizerStatus::InfeasibleProven);
+    req.global_exclusions = vec![PersonalExclusion::JumpKind(JumpKind::Loop)];
+    req.min_additions = 1;
+    req.max_additions = 1;
+    assert!(result(&req)
+        .candidates
+        .iter()
+        .all(|c| c.added_base_hundredths == 40));
+}
+
+#[test]
+fn order_dependent_first_attempt_feature_is_validated_across_original_and_insert() {
+    let mut req = request();
+    req.original[1] = entry(
+        "sit",
+        spin(
+            RegularSpinKind::Sit,
+            SpinEntry::NonFlying,
+            false,
+            Level::Basic,
+            vec![feature(
+                SpinFeature::IncreaseOfSpeed,
+                FeatureAttemptOutcome::Unsuccessful,
+            )],
+        ),
+    );
+    req.variants = vec![spin(
+        RegularSpinKind::Camel,
+        SpinEntry::NonFlying,
+        false,
+        Level::One,
+        vec![feature(
+            SpinFeature::IncreaseOfSpeed,
+            FeatureAttemptOutcome::Successful,
+        )],
+    )];
+    req.min_additions = 1;
+    req.max_additions = 1;
+    req.insertion.boundaries = vec![0, 1];
+    assert_eq!(result(&req).status, OptimizerStatus::OptimalProven);
+    req.insertion.boundaries = vec![2];
+    assert_eq!(result(&req).status, OptimizerStatus::InfeasibleProven);
+}
+
+#[test]
+fn budgets_caps_unsupported_domains_and_visible_solution_identity() {
+    let mut req = request();
+    req.time_limit = Some(Duration::ZERO);
+    let r = result(&req);
+    assert_eq!(r.status, OptimizerStatus::Incomplete);
+    assert!(!r.enumeration_complete);
+    req.time_limit = None;
+    req.max_solutions = 1;
+    let r = result(&req);
+    assert_eq!(r.status, OptimizerStatus::OptimalProven);
+    assert!(!r.enumeration_complete);
+    req.max_solutions = 1000;
+    req.max_proposals = 1;
+    assert!(!result(&req).enumeration_complete);
+    req.variants[0].recognition_assumed = false;
+    assert!(matches!(
+        complete_program(&ProfileRegistry::adult(), &req),
+        Err(ProgramCompletionError::Optimization(
+            ProgramOptimizationError::UnsupportedVariant(0)
+        ))
+    ));
+    let mut req = request();
+    req.variants = vec![jump(JumpKind::Axel)];
+    req.min_additions = 1;
+    req.max_additions = 1;
+    let r = result(&req);
+    // Two indistinguishable Axels yield two visible words, not three anchor assignments.
+    assert_eq!(r.candidates.len(), 2);
+    assert!(r.enumeration_complete);
+}
+
+#[test]
+fn gold_and_masters_required_roles_ties_and_impossible_restrictions() {
+    for category in [AdultCategory::Gold, AdultCategory::Masters] {
+        let mut req = request();
+        req.profile = adult_profile(category).id;
+        req.policy = adult_program_policy(category);
+        req.original = vec![entry("axel", jump(JumpKind::Axel))];
+        req.variants = vec![
+            spin(
+                RegularSpinKind::Combination,
+                SpinEntry::NonFlying,
+                true,
+                Level::Basic,
+                vec![],
+            ),
+            spin(
+                RegularSpinKind::Camel,
+                SpinEntry::Flying,
+                false,
+                Level::Basic,
+                vec![],
+            ),
+            chsp(),
+        ];
+        req.insertion.boundaries = vec![0, 1];
+        req.min_additions = 3;
+        req.max_additions = 3;
+        let r = result(&req);
+        assert_eq!(r.status, OptimizerStatus::OptimalProven);
+        assert!(r.enumeration_complete);
+        assert_eq!(r.candidates.len(), 24);
+        req.exclusions.push(PersonalExclusion::FlyingEntry);
+        assert_eq!(result(&req).status, OptimizerStatus::InfeasibleProven);
+    }
+}
+
+#[test]
+fn malformed_anchor_contracts_are_rejected_before_search() {
+    let mut req = request();
+    req.original[1].id = "axel".into();
+    assert!(matches!(
+        complete_program(&ProfileRegistry::adult(), &req),
+        Err(ProgramCompletionError::InvalidRequest(_))
+    ));
+    let mut req = request();
+    req.insertion.boundaries = vec![3];
+    assert!(matches!(
+        complete_program(&ProfileRegistry::adult(), &req),
+        Err(ProgramCompletionError::InvalidRequest(_))
+    ));
+    let mut req = request();
+    req.insertion.absolute_positions = vec![("sit".into(), 0), ("axel".into(), 1)];
+    assert!(matches!(
+        complete_program(&ProfileRegistry::adult(), &req),
+        Err(ProgramCompletionError::InvalidRequest(_))
+    ));
+    let mut req = request();
+    req.global_exclusions = vec![PersonalExclusion::Variant(0)];
+    assert!(matches!(
+        complete_program(&ProfileRegistry::adult(), &req),
+        Err(ProgramCompletionError::InvalidRequest(_))
+    ));
+}
+
+#[test]
+fn different_original_recognition_evidence_remains_distinct_in_visible_ties() {
+    let mut req = request();
+    req.variants = vec![jump(JumpKind::Axel)];
+    req.min_additions = 1;
+    req.max_additions = 1;
+    // The original has a caller-supplied target reference, unlike the inserted Axel.
+    req.original[0]
+        .entry
+        .intended_recognition
+        .as_mut()
+        .unwrap()
+        .planned_element = Some(0);
+    let r = result(&req);
+    assert_eq!(r.candidates.len(), 3);
+    assert!(r.enumeration_complete);
+}
+
+#[test]
+fn generated_domain_audit_is_preserved_and_bound_to_supplied_variants() {
+    let mut req = request();
+    let generator = CandidateGenerationRequest {
+        season: req.season,
+        profile: req.profile.clone(),
+        scoring_table: req.scoring_table,
+        discipline: ProfileDiscipline::Single,
+        segment: ProgramSegment::FreeSkating,
+        jump_kinds: vec![JumpKind::ToeLoop, JumpKind::Salchow],
+        rotations: vec![1],
+        solo_jumps: true,
+        direct_combinations: false,
+        axel_sequences: false,
+        confirmed_sequence_transitions: vec![],
+        max_compound_length: 2,
+        base_spins: vec![],
+        spin_plans: vec![],
+        movement_plans: vec![],
+        manual_variants: vec![],
+        exclusions: vec![],
+        excluded_spin_positions: vec![],
+        excluded_spin_entries: vec![],
+        skill_limits: PersonalSkillLimits::default(),
+        recognition_assumed: true,
+        max_candidates: 1,
+        max_expansions: 100,
+    };
+    let domain = generate_program_candidates(&ProfileRegistry::adult(), &generator).unwrap();
+    assert_eq!(
+        domain.audit.completeness,
+        CandidateDomainCompleteness::IncompleteCandidateCap
+    );
+    req.variants = domain.variants.clone();
+    req.generated_domain = Some(domain);
+    let r = result(&req);
+    assert_eq!(r.status, OptimizerStatus::OptimalProven);
+    assert!(r.enumeration_complete); // Only over supplied finite variants.
+    assert_eq!(
+        r.domain_completeness,
+        Some(CandidateDomainCompleteness::IncompleteCandidateCap)
+    );
+    assert!(!r.assumptions.is_empty());
+    assert!(!r.unmodeled_variants.is_empty());
+    assert!(!r.supported_rules.is_empty());
+    assert_eq!(
+        r.request.generated_domain.unwrap().audit.completeness,
+        CandidateDomainCompleteness::IncompleteCandidateCap
+    );
+    req.variants = vec![jump(JumpKind::Salchow)];
+    assert!(matches!(
+        complete_program(&ProfileRegistry::adult(), &req),
+        Err(ProgramCompletionError::InvalidRequest(_))
+    ));
+}
+
+fn fixed_call_case(call: PanelCall, target: CallTarget, original_bv: u32) {
+    let mut req = request();
+    let recognition = req.original[0].entry.intended_recognition.as_mut().unwrap();
+    recognition.details = Some(
+        RecognitionDetails::new(
+            vec![ComponentCode::try_from("1A").unwrap()],
+            None,
+            Some(vec![RecordedCall { target, call }]),
+        )
+        .unwrap(),
+    );
+    let r = result(&req);
+    assert_eq!(r.status, OptimizerStatus::OptimalProven);
+    assert!(r.enumeration_complete);
+    assert_eq!(r.candidates.len(), 24);
+    assert_eq!(
+        r.original_assessment.intended_base.exact_hundredths,
+        Some(i64::from(original_bv + 160))
+    );
+    for c in &r.candidates {
+        assert_eq!(c.existing_base_hundredths, original_bv + 160);
+        assert_eq!(c.added_base_hundredths, 80);
+        assert_eq!(c.total_base_hundredths, original_bv + 240);
+        assert_eq!(
+            c.assessment.intended_base.exact_hundredths,
+            Some(i64::from(original_bv + 240))
+        );
+        for (index, p) in c.provenance.iter().enumerate() {
+            if matches!(
+                p,
+                CompletionProvenance::Original {
+                    original_index: 0,
+                    ..
+                }
+            ) {
+                assert_eq!(c.per_element[index].hundredths, original_bv as u16);
+                assert_eq!(c.assessment.request.entries[index], req.original[0].entry);
+                assert_eq!(
+                    c.assessment.elements[index].intended_base,
+                    Ok(BaseValueOutcome::Value(c.per_element[index].clone()))
+                );
+                assert_eq!(
+                    r.original_assessment.elements[0].intended_base,
+                    Ok(BaseValueOutcome::Value(c.per_element[index].clone()))
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn fixed_underrotated_axel_preserves_recognition_and_reduced_objective() {
+    // Literal SOV fixture: 1A< = .88, SSp1 = 1.60, additions = .80.
+    fixed_call_case(PanelCall::UnderRotated, CallTarget::Component(0), 88);
+}
+
+#[test]
+fn fixed_repetition_call_preserves_recognition_and_reduced_objective() {
+    // Supplied solo +REP uses the existing 80% BV path, not an inferred call.
+    fixed_call_case(PanelCall::Repetition, CallTarget::Element, 88);
+}

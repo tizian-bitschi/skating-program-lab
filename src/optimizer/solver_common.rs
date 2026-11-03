@@ -59,6 +59,76 @@ pub(super) fn ordered_slots(
     (solver, slots, objective)
 }
 
+/// Channel immutable original entries to ordered positions in the shared model.
+pub(super) fn anchor_slots(
+    solver: &mut Solver,
+    slots: &[pumpkin_solver::core::variables::DomainId],
+    universe: &[usize],
+    anchors: &super::programs::AnchoredPlacement,
+) {
+    use pumpkin_solver::core::predicate;
+    let positions: Vec<_> = (0..anchors.count)
+        .map(|_| solver.new_bounded_integer(0, slots.len() as i32 - 1))
+        .collect();
+    for (i, &position) in positions.iter().enumerate() {
+        let code = universe
+            .iter()
+            .position(|v| *v == anchors.first_anchor + i)
+            .unwrap() as i32
+            + 1;
+        for (s, &slot) in slots.iter().enumerate() {
+            let tag = solver.new_constraint_tag();
+            solver.add_clause(
+                vec![predicate!(position != s as i32), predicate!(slot == code)],
+                tag,
+            );
+            let tag = solver.new_constraint_tag();
+            solver.add_clause(
+                vec![predicate!(slot != code), predicate!(position == s as i32)],
+                tag,
+            );
+        }
+    }
+    for pair in positions.windows(2) {
+        for s in 0..slots.len() {
+            let tag = solver.new_constraint_tag();
+            solver.add_clause(
+                vec![
+                    predicate!(pair[0] != s as i32),
+                    predicate!(pair[1] >= s as i32 + 1),
+                ],
+                tag,
+            );
+        }
+    }
+    for &(anchor, index) in &anchors.absolute {
+        let tag = solver.new_constraint_tag();
+        solver.add_clause(vec![predicate!(positions[anchor] == index as i32)], tag);
+    }
+    for boundary in 0..=anchors.count {
+        if anchors.boundaries.contains(&boundary) {
+            continue;
+        }
+        for (s, &slot) in slots.iter().enumerate() {
+            // Forbid additions in this gap, retaining empty suffix slots and originals.
+            let mut clause = vec![predicate!(slot == 0)];
+            for (code, variant) in universe.iter().enumerate() {
+                if *variant >= anchors.first_anchor {
+                    clause.push(predicate!(slot == code as i32 + 1));
+                }
+            }
+            if boundary > 0 {
+                clause.push(predicate!(positions[boundary - 1] >= s as i32));
+            }
+            if boundary < anchors.count {
+                clause.push(predicate!(positions[boundary] <= s as i32));
+            }
+            let tag = solver.new_constraint_tag();
+            solver.add_clause(clause, tag);
+        }
+    }
+}
+
 pub(super) struct Deadline(pub(super) Option<Instant>);
 impl TerminationCondition for Deadline {
     fn should_stop(&mut self) -> bool {

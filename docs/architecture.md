@@ -46,4 +46,9 @@ conflicting overrides and unsupported mechanisms never fall back to Adult rules.
 
 The additive `program_validation` module checks bounded ordered mixed-program evidence using shared jump/spin validation. `optimizer/programs.rs` consumes that validator and catalog scoring; the Pumpkin ordered-slot/value helper is shared with the jump optimizer. See [mixed-program contract](specs/bounded-program-optimizer.md).
 
+`optimizer/completion.rs` preserves caller-identified manual originals and maps
+them into the same ordered-slot model with anchored positions and insertion-gap
+constraints. It reconstructs provenance and reuses manual assessment for returned
+completions; see [ADR 0003](adr/0003-immutable-program-completion.md).
+
 The versioned `AdultDefinition` in `profiles.rs` is the single built-in policy-data contract for jump, spin and mixed-program adapters. Family sources are explicit. Validators record source-bound `AppliedRule` entries while checking evidence; the optimizer distinguishes this trace from its available-rule inventory.

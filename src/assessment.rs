@@ -25,6 +25,38 @@ pub struct ManualProgramEntry {
     pub scenario: Option<ManualElementScenario>,
 }
 
+impl ManualProgramEntry {
+    pub(crate) fn recognitions(&self) -> impl Iterator<Item = &PanelRecognition> {
+        let evidence_panel = match &self.evidence {
+            ElementPlanEvidence::Spin { spin, .. } => spin.panel.as_ref(),
+            _ => None,
+        };
+        self.intended_recognition
+            .iter()
+            .chain(self.scenario.iter().map(|s| &s.recognition))
+            .chain(evidence_panel)
+    }
+
+    /// Rebind supplied plan references together; absent references remain absent.
+    #[cfg(feature = "optimizer")]
+    pub(crate) fn reindex_recognition(&mut self, index: usize) {
+        let evidence_panel = match &mut self.evidence {
+            ElementPlanEvidence::Spin { spin, .. } => spin.panel.as_mut(),
+            _ => None,
+        };
+        for panel in self
+            .intended_recognition
+            .iter_mut()
+            .chain(self.scenario.iter_mut().map(|s| &mut s.recognition))
+            .chain(evidence_panel)
+        {
+            if panel.planned_element.is_some() {
+                panel.planned_element = Some(index);
+            }
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ManualElementScenario {
     /// Supplied panel assumption. The current plan index is optional; observation
@@ -135,16 +167,7 @@ pub fn assess_manual_program(
         return Err(invalid("second-half boundary exceeds program length"));
     }
     for (index, entry) in request.entries.iter().enumerate() {
-        let evidence_panel = match &entry.evidence {
-            ElementPlanEvidence::Spin { spin, .. } => spin.panel.as_ref(),
-            _ => None,
-        };
-        for panel in entry
-            .intended_recognition
-            .iter()
-            .chain(entry.scenario.iter().map(|s| &s.recognition))
-            .chain(evidence_panel)
-        {
+        for panel in entry.recognitions() {
             if panel.ruleset != profile.scoring.recognition_ruleset
                 || panel.planned_element.is_some_and(|i| i != index)
                 || panel.observed_element.is_some()
