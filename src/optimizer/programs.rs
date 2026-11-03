@@ -116,96 +116,47 @@ fn score(
     if !variant.recognition_assumed {
         return Err(unsupported());
     }
-    let mut calls = vec![];
-    let mut target_level = None;
-    let codes = match (&variant.element, &variant.evidence) {
+    // Keep the optimizer's finite clean subset separate from structural encoding.
+    match (&variant.element, &variant.evidence) {
         (
             PlannedElement::Jump(jump),
             ElementPlanEvidence::Jump {
                 direct_transitions_assumed,
             },
-        ) => {
-            match jump {
-                JumpElement::Solo(j) => {
-                    vec![super::jumps::jump_code(j).map_err(|_| unsupported())?]
+        ) => match jump {
+            JumpElement::Solo(j) => {
+                super::jumps::jump_code(j).map_err(|_| unsupported())?;
+            }
+            JumpElement::Combination(parts) | JumpElement::Sequence(parts) => {
+                if !(2..=3).contains(&parts.len())
+                    || (matches!(jump, JumpElement::Sequence(_)) && !direct_transitions_assumed)
+                {
+                    return Err(unsupported());
                 }
-                JumpElement::Combination(parts) | JumpElement::Sequence(parts) => {
-                    let sequence = matches!(jump, JumpElement::Sequence(_));
-                    if sequence && !direct_transitions_assumed {
+                for part in parts {
+                    let JumpPart::Jump(j) = part else {
                         return Err(unsupported());
-                    }
-                    let mut codes = vec![];
-                    for part in parts {
-                        codes.push(match part {
-                            JumpPart::Jump(j) => {
-                                super::jumps::jump_code(j).map_err(|_| unsupported())?
-                            }
-                            // Euler consequences remain unresolved for this clean subset.
-                            _ => return Err(unsupported()),
-                        });
-                    }
-                    if !(2..=3).contains(&codes.len()) {
-                        return Err(unsupported());
-                    }
-                    if sequence {
-                        calls.push(RecordedCall {
-                            target: CallTarget::BetweenComponents(codes.len()),
-                            call: PanelCall::Sequence,
-                        });
-                    }
-                    codes
+                    };
+                    super::jumps::jump_code(j).map_err(|_| unsupported())?;
                 }
             }
+        },
+        (PlannedElement::RegularSpin(_), ElementPlanEvidence::Spin { spin, .. })
+            if spin.panel.is_some() =>
+        {
+            return Err(unsupported())
         }
-        (PlannedElement::RegularSpin(_), ElementPlanEvidence::Spin { spin, .. }) => {
-            let a = spin.abbreviation.ok_or_else(unsupported)?;
-            if spin.panel.is_some() {
-                return Err(unsupported());
-            }
-            let name = match a.kind {
-                RegularSpinKind::Camel => "CSp",
-                RegularSpinKind::Sit => "SSp",
-                RegularSpinKind::Upright => "USp",
-                RegularSpinKind::Layback => "LSp",
-                RegularSpinKind::Combination => "CoSp",
-            };
-            let code = format!(
-                "{}{}{name}",
-                if a.entry == SpinEntry::Flying {
-                    "F"
-                } else {
-                    ""
-                },
-                if a.change_foot { "C" } else { "" }
-            );
-            target_level = spin.planned_level;
-            if target_level.is_none() {
-                return Err(unsupported());
-            }
-            vec![ComponentCode::try_from(code.as_str()).map_err(|_| unsupported())?]
-        }
-        (PlannedElement::StepSequence, ElementPlanEvidence::Step { level, .. }) => {
-            target_level = Some(*level);
-            vec![ComponentCode::try_from("StSq").unwrap()]
-        }
-        (
-            PlannedElement::ChoreographicSequence { .. },
-            ElementPlanEvidence::ChoreographicSequence { .. },
-        ) => vec![ComponentCode::try_from("ChSq1").unwrap()],
-        (PlannedElement::ChoreographicSpin, ElementPlanEvidence::ChoreographicSpin { .. }) => {
-            vec![ComponentCode::try_from("ChSp1").unwrap()]
-        }
-        _ => return Err(unsupported()),
-    };
+        _ => {}
+    }
+    let details = crate::plan_recognition::intended_details(&variant.element, &variant.evidence)
+        .ok_or_else(unsupported)?;
     let panel = PanelRecognition {
         ruleset,
         source: None,
         planned_element: None,
         observed_element: None,
         outcome: RecognitionOutcome::Recognized,
-        details: Some(
-            RecognitionDetails::new(codes, target_level, Some(calls)).map_err(|_| unsupported())?,
-        ),
+        details: Some(details),
     };
     match lookup_base_value(request.scoring_table, &panel, &[]).map_err(E::Scoring)? {
         BaseValueOutcome::Value(v) => Ok(v),

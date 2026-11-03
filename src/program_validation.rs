@@ -302,12 +302,23 @@ pub fn validate_supported_program(
                         .filter(|s| matches!(s, SpinStep::ChangeFoot))
                         .count())
                 ];
+                let mut previous_target = None;
                 for attempt in spin.feature_attempts.iter().flatten() {
                     checks.apply(
                         "program-feature-qualification",
                         Some(index),
                         &feature_source,
                     );
+                    let valid_target = crate::spin_validation::feature_target_validity(
+                        plan,
+                        attempt,
+                        previous_target,
+                    );
+                    previous_target = Some(attempt.position_step);
+                    if valid_target != Some(true) {
+                        checks.add(FindingKind::Unknown, "program-feature-qualification", Some(index), "Invalid, unordered or missing position-step evidence prevents feature credit.", &feature_source);
+                        continue;
+                    }
                     // Variation categories and entrance/exit nature need richer evidence.
                     let supported = matches!(
                         attempt.feature,

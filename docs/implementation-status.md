@@ -1,5 +1,15 @@
 # Implementation status
 
+## Manual program assessment (#64)
+
+`assess_manual_program` accepts one profile-selected ordered program with typed
+plan evidence and explicit intended-recognition assumptions. It returns sourced
+conditional BV, independent optional supplied-recognition/GOE scenarios and the
+unchanged mixed-program validation report. Missing GOE never becomes zero; partial
+aggregates identify unresolved indices. Draft completion diagnostics remain
+separate from established violations. Coverage stays partial. Legacy functions
+are unchanged. See the [contract](specs/manual-program-assessment-proposal.md).
+
 The library provides partial coverage. These tests cover selected cases, not every domain rule. See [rule sources](rule-sources.md) for editions and open questions.
 
 The [foundation milestone audit](milestone-44.md) maps the five workstreams of

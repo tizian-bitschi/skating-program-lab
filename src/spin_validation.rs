@@ -96,6 +96,35 @@ pub struct SpinFeatureAttempt {
     pub outcome: FeatureAttemptOutcome,
 }
 
+/// None is missing structure; false is a contradicted target or attempt order.
+pub(crate) fn feature_target_validity(
+    spin: &RegularSpin,
+    attempt: &SpinFeatureAttempt,
+    previous: Option<usize>,
+) -> Option<bool> {
+    if previous.is_some_and(|p| p > attempt.position_step) {
+        return Some(false);
+    }
+    spin.steps.as_ref().map(|steps| {
+        matches!(
+            steps.get(attempt.position_step),
+            Some(SpinStep::Position { .. })
+        )
+    })
+}
+
+/// Input contradictions differ from category eligibility and program-count rules.
+pub(crate) fn contradicts_spin_evidence(finding: &Finding) -> bool {
+    matches!(
+        finding.rule_id,
+        "spin-evidence-target"
+            | "spin-evidence-entry"
+            | "spin-evidence-foot-change"
+            | "spin-wind-up-target"
+            | "spin-feature-target"
+    )
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct RegularSpinEvidence {
     pub abbreviation: Option<SpinAbbreviation>,
@@ -695,14 +724,7 @@ impl SpinValidator {
         let mut previous = None;
         for attempt in attempts {
             self.apply("spin-feature-target", Some(index), &input_source());
-            if previous.is_some_and(|p| p > attempt.position_step)
-                || spin.steps.as_ref().is_some_and(|s| {
-                    !matches!(
-                        s.get(attempt.position_step),
-                        Some(SpinStep::Position { .. })
-                    )
-                })
-            {
+            if feature_target_validity(spin, attempt, previous) == Some(false) {
                 self.add(
                     FindingKind::Violation,
                     "spin-feature-target",
@@ -711,7 +733,7 @@ impl SpinValidator {
                     "Feature attempts need valid position-step targets in program order.",
                     &input_source(),
                 );
-            } else if spin.steps.is_none() {
+            } else if feature_target_validity(spin, attempt, previous).is_none() {
                 self.add(
                     FindingKind::Unknown,
                     "spin-feature-target",

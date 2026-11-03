@@ -69,23 +69,11 @@ pub enum JumpOptimizerError {
 }
 
 pub(super) fn jump_code(jump: &ListedJump) -> Result<ComponentCode, JumpOptimizerError> {
-    let suffix = match jump.kind {
-        Some(JumpKind::ToeLoop) => "T",
-        Some(JumpKind::Salchow) => "S",
-        Some(JumpKind::Loop) => "Lo",
-        Some(JumpKind::Flip) => "F",
-        Some(JumpKind::Lutz) => "Lz",
-        Some(JumpKind::Axel) => "A",
-        None => return Err(JumpOptimizerError::UnsupportedVariant),
-    };
-    let rotations = jump
-        .rotations
-        .filter(|n| (1..=2).contains(n))
-        .ok_or(JumpOptimizerError::UnsupportedVariant)?;
-    ComponentCode::try_from(format!("{rotations}{suffix}").as_str())
-        .map_err(|_| JumpOptimizerError::UnsupportedVariant)
+    if !jump.rotations.is_some_and(|n| (1..=2).contains(&n)) {
+        return Err(JumpOptimizerError::UnsupportedVariant);
+    }
+    crate::plan_recognition::jump_component(jump).ok_or(JumpOptimizerError::UnsupportedVariant)
 }
-
 fn parts(element: &JumpElement) -> Result<Vec<&ListedJump>, JumpOptimizerError> {
     match element {
         JumpElement::Solo(jump) => Ok(vec![jump]),
