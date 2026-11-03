@@ -9,6 +9,8 @@ pub use execution::*;
 
 mod plan;
 pub use plan::*;
+mod assessment;
+pub use assessment::*;
 mod program_validation;
 pub use program_validation::*;
 

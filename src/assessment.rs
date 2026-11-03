@@ -1,0 +1,433 @@
+//! Ordered manual-plan orchestration. No result establishes official compliance.
+use crate::*;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SubmissionState {
+    Draft,
+    Complete,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AssessmentStatus {
+    ConfirmedViolation,
+    NoViolationInCoveredRules,
+    Indeterminate,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ManualProgramEntry {
+    pub planned: PlannedElement,
+    pub evidence: ElementPlanEvidence,
+    /// Explicit intended recognition assumption, never inferred from execution.
+    pub intended_recognition: Option<PanelRecognition>,
+    pub scenario: Option<ManualElementScenario>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ManualElementScenario {
+    pub recognition: PanelRecognition,
+    pub annotations: Vec<ScoringAnnotation>,
+    /// None requests BV only; it is never a final grade of zero.
+    pub final_goe: Option<i8>,
+    pub fall: Option<bool>,
+    pub execution: Option<ElementExecutionEvidence>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ManualProgramRequest {
+    pub profile: ProfileId,
+    pub scoring_table: ScoringTableId,
+    pub policy: ProgramPolicy,
+    pub submission: SubmissionState,
+    pub entries: Vec<ManualProgramEntry>,
+    pub request_hypothetical_total: bool,
+    /// First element assumed to be in the second half; not timing evidence.
+    pub second_half_boundary: Option<usize>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum AssessmentValueError {
+    MissingRecognition,
+    PlanRecognitionMismatch,
+    /// Indices into the unchanged shared validation report's findings.
+    UnresolvedPlanEvidence(Vec<usize>),
+    BaseValue(BaseValueError),
+}
+
+/// A subtotal is not an exact total when unresolved_indices is nonempty.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AssessmentAggregate {
+    pub resolved_hundredths: i64,
+    pub unresolved_indices: Vec<usize>,
+    pub exact_hundredths: Option<i64>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ManualElementAssessment {
+    pub element_index: usize,
+    pub intended_base: Result<BaseValueOutcome, AssessmentValueError>,
+    pub scenario_base: Option<Result<BaseValueOutcome, BaseValueError>>,
+    /// Absent when no final GOE was supplied.
+    pub scenario_score: Option<Result<ElementScore, ElementScoreError>>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ManualProgramAssessment {
+    /// Preserves plans, assumptions, calls and observations separately.
+    pub request: ManualProgramRequest,
+    pub elements: Vec<ManualElementAssessment>,
+    pub intended_base: AssessmentAggregate,
+    pub scenario_base: Option<AssessmentAggregate>,
+    pub goe_adjustment: Option<AssessmentAggregate>,
+    pub hypothetical_total: Option<AssessmentAggregate>,
+    /// Full credited element breakdown when a complete boundary scenario is requested.
+    pub planning_score: Option<Result<PlanningScore, ProgramScoreError>>,
+    pub validation: EvidenceValidationReport,
+    pub status: AssessmentStatus,
+    /// Finding indices; omissions remain visible even in an extendable draft.
+    pub completion_findings: Vec<usize>,
+}
+
+fn aggregate(values: impl Iterator<Item = Option<i64>>) -> AssessmentAggregate {
+    let mut resolved_hundredths = 0;
+    let mut unresolved_indices = vec![];
+    for (index, value) in values.enumerate() {
+        match value {
+            Some(n) => resolved_hundredths += n,
+            None => unresolved_indices.push(index),
+        }
+    }
+    AssessmentAggregate {
+        resolved_hundredths,
+        exact_hundredths: unresolved_indices.is_empty().then_some(resolved_hundredths),
+        unresolved_indices,
+    }
+}
+
+fn base_number(value: &BaseValueOutcome) -> Option<i64> {
+    match value {
+        BaseValueOutcome::Value(v) => Some(i64::from(v.hundredths)),
+        // These outcomes are retained, but never invented as numeric plan values.
+        BaseValueOutcome::Ignored | BaseValueOutcome::NoValue => None,
+    }
+}
+
+fn intended_matches(entry: &ManualProgramEntry, panel: &PanelRecognition) -> bool {
+    let Some(details) = &panel.details else {
+        return false;
+    };
+    let codes: Vec<_> = details
+        .components()
+        .iter()
+        .map(ComponentCode::as_str)
+        .collect();
+    let jump_matches = |jump: &ListedJump, code: &str| {
+        let suffix = match jump.kind {
+            Some(JumpKind::ToeLoop) => "T",
+            Some(JumpKind::Salchow) => "S",
+            Some(JumpKind::Loop) => "Lo",
+            Some(JumpKind::Flip) => "F",
+            Some(JumpKind::Lutz) => "Lz",
+            Some(JumpKind::Axel) => "A",
+            None => return false,
+        };
+        jump.rotations
+            .is_some_and(|n| code == format!("{n}{suffix}"))
+    };
+    match (&entry.planned, &entry.evidence) {
+        (PlannedElement::Jump(JumpElement::Solo(j)), _) => {
+            codes.len() == 1 && jump_matches(j, codes[0])
+        }
+        (
+            PlannedElement::Jump(JumpElement::Combination(parts) | JumpElement::Sequence(parts)),
+            _,
+        ) => {
+            let sequence_call = details
+                .calls()
+                .is_some_and(|calls| calls.iter().any(|c| c.call == PanelCall::Sequence));
+            sequence_call
+                == matches!(
+                    entry.planned,
+                    PlannedElement::Jump(JumpElement::Sequence(_))
+                )
+                && parts.len() == codes.len()
+                && parts.iter().zip(codes).all(|(p, c)| match p {
+                    JumpPart::Jump(j) => jump_matches(j, c),
+                    JumpPart::Euler => c == "Eu",
+                    _ => false,
+                })
+        }
+        (PlannedElement::RegularSpin(_), ElementPlanEvidence::Spin { spin, .. }) => {
+            let Some(a) = spin.abbreviation else {
+                return false;
+            };
+            let kind = match a.kind {
+                RegularSpinKind::Camel => "CSp",
+                RegularSpinKind::Sit => "SSp",
+                RegularSpinKind::Upright => "USp",
+                RegularSpinKind::Layback => "LSp",
+                RegularSpinKind::Combination => "CoSp",
+            };
+            let code = format!(
+                "{}{}{kind}",
+                if a.entry == SpinEntry::Flying {
+                    "F"
+                } else {
+                    ""
+                },
+                if a.change_foot { "C" } else { "" }
+            );
+            codes == [code.as_str()]
+                && spin.planned_level.is_some()
+                && details.level() == spin.planned_level
+        }
+        (PlannedElement::StepSequence, ElementPlanEvidence::Step { level, .. }) => {
+            codes == ["StSq"] && details.level() == Some(*level)
+        }
+        (PlannedElement::ChoreographicSequence { .. }, _) => codes == ["ChSq1"],
+        (PlannedElement::ChoreographicSpin, _) => codes == ["ChSp1"],
+        _ => false,
+    }
+}
+
+/// Assess one ordered program using existing validation and scoring. No official
+/// timing, deductions, automatic recognition or full-legality claim is provided.
+pub fn assess_manual_program(
+    registry: &ProfileRegistry,
+    request: &ManualProgramRequest,
+) -> Result<ManualProgramAssessment, ProfileSelectionError> {
+    let profile = registry.resolve(&request.profile, request.scoring_table)?;
+    let invalid = |reason: &str| ProfileSelectionError {
+        profile: request.profile.clone(),
+        kind: ProfileErrorKind::Invalid,
+        reason: reason.into(),
+    };
+    if request
+        .second_half_boundary
+        .is_some_and(|b| b > request.entries.len())
+    {
+        return Err(invalid("second-half boundary exceeds program length"));
+    }
+    for (index, entry) in request.entries.iter().enumerate() {
+        for panel in entry
+            .intended_recognition
+            .iter()
+            .chain(entry.scenario.iter().map(|s| &s.recognition))
+        {
+            if panel.ruleset != profile.scoring.recognition_ruleset
+                || panel.planned_element.is_some_and(|i| i != index)
+            {
+                return Err(invalid(
+                    "recognition ruleset or planned-element index mismatch",
+                ));
+            }
+        }
+        if entry
+            .scenario
+            .as_ref()
+            .is_some_and(|s| !s.annotations.is_empty())
+        {
+            return Err(invalid(
+                "use the explicit planning boundary instead of recorded timing credit",
+            ));
+        }
+    }
+    let program = ProfileProgram {
+        profile: request.profile.clone(),
+        scoring_table: request.scoring_table,
+        elements: request.entries.iter().map(|e| e.planned.clone()).collect(),
+    };
+    let evidence: Vec<_> = request.entries.iter().map(|e| e.evidence.clone()).collect();
+    let validation = validate_supported_program(registry, &program, &evidence, &request.policy)?;
+    let completion_findings: Vec<_> = validation
+        .validation
+        .findings
+        .iter()
+        .enumerate()
+        .filter(|(_, f)| {
+            f.element_index.is_none()
+                && (f.rule_id == "spin-required-role"
+                    || f.rule_id == "program-required-choreographic-spin"
+                    || f.rule_id == profile.binding(ProfileRule::Axel).id
+                    || f.rule_id == profile.binding(ProfileRule::Eligibility).id)
+        })
+        .map(|(i, _)| i)
+        .collect();
+    let status = if validation
+        .validation
+        .findings
+        .iter()
+        .enumerate()
+        .any(|(i, f)| {
+            f.kind == FindingKind::Violation
+                && !(request.submission == SubmissionState::Draft
+                    && completion_findings.contains(&i))
+        }) {
+        AssessmentStatus::ConfirmedViolation
+    } else if validation
+        .validation
+        .findings
+        .iter()
+        .any(|f| f.kind != FindingKind::Violation)
+        || !completion_findings.is_empty()
+    {
+        AssessmentStatus::Indeterminate
+    } else {
+        AssessmentStatus::NoViolationInCoveredRules
+    };
+    let elements: Vec<_> = request
+        .entries
+        .iter()
+        .enumerate()
+        .map(|(index, entry)| {
+            let unresolved: Vec<_> = validation
+                .validation
+                .findings
+                .iter()
+                .enumerate()
+                .filter(|(_, f)| {
+                    f.element_index == Some(index)
+                        && f.rule_id != "spin-execution-recognition"
+                        && f.kind != FindingKind::Violation
+                })
+                .map(|(i, _)| i)
+                .collect();
+            let intended_base = match &entry.intended_recognition {
+                None => Err(AssessmentValueError::MissingRecognition),
+                Some(_) if !unresolved.is_empty() => {
+                    Err(AssessmentValueError::UnresolvedPlanEvidence(unresolved))
+                }
+                Some(panel) if !intended_matches(entry, panel) => {
+                    Err(AssessmentValueError::PlanRecognitionMismatch)
+                }
+                Some(panel) => lookup_base_value(request.scoring_table, panel, &[])
+                    .map_err(AssessmentValueError::BaseValue),
+            };
+            let scenario_base = entry
+                .scenario
+                .as_ref()
+                .map(|s| lookup_base_value(request.scoring_table, &s.recognition, &s.annotations));
+            let scenario_score = entry.scenario.as_ref().and_then(|s| {
+                s.final_goe.map(|goe| match &s.execution {
+                    Some(execution) => score_element_with_execution(
+                        request.scoring_table,
+                        &s.recognition,
+                        &s.annotations,
+                        goe,
+                        s.fall,
+                        execution,
+                    ),
+                    None => score_element(
+                        request.scoring_table,
+                        &s.recognition,
+                        &s.annotations,
+                        goe,
+                        s.fall,
+                    ),
+                })
+            });
+            ManualElementAssessment {
+                element_index: index,
+                intended_base,
+                scenario_base,
+                scenario_score,
+            }
+        })
+        .collect();
+    let intended_base = aggregate(
+        elements
+            .iter()
+            .map(|e| e.intended_base.as_ref().ok().and_then(base_number)),
+    );
+    let scenario_base = request
+        .entries
+        .iter()
+        .any(|e| e.scenario.is_some())
+        .then(|| {
+            aggregate(elements.iter().map(|e| {
+                e.scenario_base
+                    .as_ref()
+                    .and_then(|b| b.as_ref().ok())
+                    .and_then(base_number)
+            }))
+        });
+    let has_goe = request
+        .entries
+        .iter()
+        .any(|e| e.scenario.as_ref().is_some_and(|s| s.final_goe.is_some()));
+    let goe_adjustment = has_goe.then(|| {
+        aggregate(elements.iter().map(|e| {
+            e.scenario_score
+                .as_ref()
+                .and_then(|s| s.as_ref().ok())
+                .map(|s| i64::from(s.goe_hundredths))
+        }))
+    });
+    // Boundary credit needs a supported complete scenario. Missing GOE is never
+    // replaced with a zero grade, including inside the legacy adapter.
+    let planning_score = if has_goe
+        && request.request_hypothetical_total
+        && request.second_half_boundary.is_some()
+    {
+        let inputs: Option<Vec<_>> = request
+            .entries
+            .iter()
+            .map(|e| {
+                let s = e.scenario.as_ref()?;
+                Some(ProgramElement {
+                    recognition: s.recognition.clone(),
+                    annotations: vec![],
+                    goe: s.final_goe?,
+                    fall: s.fall,
+                    start_ms: None,
+                })
+            })
+            .collect();
+        inputs.map(|inputs| {
+            let execution: Vec<_> = request
+                .entries
+                .iter()
+                .map(|e| {
+                    e.scenario
+                        .as_ref()
+                        .and_then(|s| s.execution.clone())
+                        .unwrap_or_default()
+                })
+                .collect();
+            score_planning_scenario_with_execution(
+                profile.scoring.recognition_ruleset,
+                request.scoring_table,
+                &inputs,
+                request.second_half_boundary,
+                &execution,
+            )
+        })
+    } else {
+        None
+    };
+    let hypothetical_total = (has_goe && request.request_hypothetical_total).then(|| {
+        aggregate(elements.iter().enumerate().map(|(i, e)| {
+            let score = e.scenario_score.as_ref()?.as_ref().ok()?;
+            if request.second_half_boundary.is_some() {
+                planning_score.as_ref()?.as_ref().ok()?.elements[i]
+                    .as_ref()
+                    .ok()
+                    .map(|s| i64::from(s.score_hundredths))
+            } else {
+                Some(i64::from(score.score_hundredths))
+            }
+        }))
+    });
+    Ok(ManualProgramAssessment {
+        request: request.clone(),
+        elements,
+        intended_base,
+        scenario_base,
+        goe_adjustment,
+        hypothetical_total,
+        planning_score,
+        validation,
+        status,
+        completion_findings,
+    })
+}

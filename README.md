@@ -13,6 +13,11 @@ An open-source Rust library for planning technical figure skating programs. The 
 
 ## Documentation
 
+- Manual program entry point: `assess_manual_program` returns intended BV,
+  independent optional GOE scenarios and indexed validation for one ordered plan.
+  See the [assessment contract](docs/specs/manual-program-assessment-proposal.md)
+  for missing-GOE, draft/completion and partial-coverage semantics.
+
 - Product scope and stages: [requirements](docs/requirements.md).
 - Module boundaries and data flow: [architecture](docs/architecture.md). Current support and tests: [implementation status](docs/implementation-status.md).
 - Cross-workstream coverage, compatibility and remaining limits: [foundation milestone #44](docs/milestone-44.md).
