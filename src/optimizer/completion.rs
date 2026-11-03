@@ -80,6 +80,11 @@ pub struct ProgramCompletionResult {
     pub sources: Vec<SourceReference>,
     pub applied_rules: Vec<AppliedRule>,
     pub proof_scope: &'static str,
+    pub assumptions: &'static str,
+    pub unmodeled_variants: &'static str,
+    pub supported_rules: Vec<&'static str>,
+    /// Generator coverage is independent of proof over supplied variants. None denotes a manual finite domain.
+    pub domain_completeness: Option<CandidateDomainCompleteness>,
     pub candidates: Vec<CompletedProgramCandidate>,
 }
 
@@ -134,35 +139,11 @@ fn inserted_entry(v: &ProgramVariant, ruleset: RulesetId) -> ManualProgramEntry 
     }
 }
 
-fn reindex(entry: &mut ManualProgramEntry, index: usize) {
-    for panel in entry
-        .intended_recognition
-        .iter_mut()
-        .chain(entry.scenario.iter_mut().map(|s| &mut s.recognition))
-    {
-        if panel.planned_element.is_some() {
-            panel.planned_element = Some(index);
-        }
-    }
-    if let ElementPlanEvidence::Spin { spin, .. } = &mut entry.evidence {
-        if let Some(panel) = &mut spin.panel {
-            if panel.planned_element.is_some() {
-                panel.planned_element = Some(index);
-            }
-        }
-    }
-}
-
-/// Complete a finite, explicitly assumed plan; never establishes official recognition.
-pub fn complete_program(
-    registry: &ProfileRegistry,
+fn validate_request(
     request: &ProgramCompletionRequest,
-) -> Result<ProgramCompletionResult, ProgramCompletionError> {
+    profile: &RuleProfile,
+) -> Result<Vec<(usize, usize)>, ProgramCompletionError> {
     use ProgramCompletionError as E;
-    let start = Instant::now();
-    let profile = registry
-        .resolve(&request.profile, request.scoring_table)
-        .map_err(E::Profile)?;
     let n = request.original.len();
     if request.season != profile.season
         || n > 10
@@ -231,6 +212,13 @@ pub fn complete_program(
     {
         return Err(E::InvalidRequest("addition exclusion index outside domain"));
     }
+    Ok(absolute)
+}
+
+fn check_global_conflicts(
+    request: &ProgramCompletionRequest,
+) -> Result<(), ProgramCompletionError> {
+    use ProgramCompletionError as E;
     let conflicts: Vec<_> = request
         .original
         .iter()
@@ -245,7 +233,16 @@ pub fn complete_program(
     if !conflicts.is_empty() {
         return Err(E::GlobalExclusionConflict(conflicts));
     }
-    let original_assessment = assess_manual_program(
+    Ok(())
+}
+
+fn prepare_originals(
+    registry: &ProfileRegistry,
+    request: &ProgramCompletionRequest,
+    profile: &RuleProfile,
+) -> Result<(ManualProgramAssessment, Vec<BaseValue>), ProgramCompletionError> {
+    use ProgramCompletionError as E;
+    let assessment = assess_manual_program(
         registry,
         &manual(
             request,
@@ -254,31 +251,36 @@ pub fn complete_program(
         ),
     )
     .map_err(E::Profile)?;
-    if original_assessment.status == AssessmentStatus::ConfirmedViolation {
-        return Err(E::ImmutableViolation(Box::new(original_assessment)));
+    if assessment.status == AssessmentStatus::ConfirmedViolation {
+        return Err(E::ImmutableViolation(Box::new(assessment)));
     }
-    // Missing program roles can be repaired. Missing element recognition/evidence cannot.
-    if original_assessment
+    let unresolved = assessment.validation.validation.findings.iter().any(|f| {
+        f.kind != FindingKind::Violation
+            && crate::program_validation::candidate_finding_scope(f, profile)
+                == crate::program_validation::CandidateFindingScope::Element
+    });
+    let values: Option<Vec<_>> = assessment
         .elements
         .iter()
-        .any(|e| !matches!(e.intended_base, Ok(BaseValueOutcome::Value(_))))
-    {
-        return Err(E::IndeterminateOriginal(Box::new(original_assessment)));
+        .map(|e| match &e.intended_base {
+            Ok(BaseValueOutcome::Value(value)) => Some(value.clone()),
+            _ => None,
+        })
+        .collect();
+    match values {
+        Some(values) if !unresolved => Ok((assessment, values)),
+        _ => Err(E::IndeterminateOriginal(Box::new(assessment))),
     }
-    for original in &request.original {
-        let v = variant(&original.entry);
-        if programs::prepare_variant(
-            registry,
-            &request.profile,
-            request.scoring_table,
-            &request.policy,
-            &v,
-        )
-        .is_err()
-        {
-            return Err(E::IndeterminateOriginal(Box::new(original_assessment)));
-        }
-    }
+}
+
+fn prepare_search(
+    request: &ProgramCompletionRequest,
+    profile: &RuleProfile,
+    original_values: Vec<BaseValue>,
+    absolute: Vec<(usize, usize)>,
+    start: Instant,
+) -> (ProgramOptimizationRequest, AnchoredPlacement) {
+    let n = request.original.len();
     // Exclusions select additions only. Original variants use separate solver identities.
     let mut variants = request.variants.clone();
     let mut exclusions = request.exclusions.clone();
@@ -325,7 +327,7 @@ pub fn complete_program(
         .collect();
     identities.extend(request.original.iter().map(|e| e.entry.clone()));
     for entry in &mut identities {
-        reindex(entry, 0);
+        entry.reindex_recognition(0);
     }
     let equivalence_keys = identities
         .iter()
@@ -337,68 +339,97 @@ pub fn complete_program(
         boundaries: request.insertion.boundaries.clone(),
         absolute,
         equivalence_keys,
+        original_values,
     };
+    (search_request, placement)
+}
+
+fn completed_candidate(
+    registry: &ProfileRegistry,
+    request: &ProgramCompletionRequest,
+    ruleset: RulesetId,
+    candidate: ProgramCandidate,
+) -> Result<CompletedProgramCandidate, ProgramCompletionError> {
+    use ProgramCompletionError as E;
+    let mut entries = vec![];
+    let mut provenance = vec![];
+    let mut boundary = 0;
+    let mut ordinal = 0;
+    let mut existing_base_hundredths = 0;
+    for (index, (&v, value)) in candidate
+        .variant_indices
+        .iter()
+        .zip(&candidate.per_element)
+        .enumerate()
+    {
+        let mut entry = if v >= request.variants.len() {
+            let original_index = v - request.variants.len();
+            let original = &request.original[original_index];
+            existing_base_hundredths += u32::from(value.hundredths);
+            provenance.push(CompletionProvenance::Original {
+                id: original.id.clone(),
+                original_index,
+                locked: original.locked,
+            });
+            boundary += 1;
+            ordinal = 0;
+            original.entry.clone()
+        } else {
+            provenance.push(CompletionProvenance::Inserted {
+                variant_index: v,
+                boundary,
+                ordinal,
+            });
+            ordinal += 1;
+            inserted_entry(&request.variants[v], ruleset)
+        };
+        entry.reindex_recognition(index);
+        entries.push(entry);
+    }
+    let assessment = assess_manual_program(
+        registry,
+        &manual(request, entries, SubmissionState::Complete),
+    )
+    .map_err(E::Profile)?;
+    if assessment.intended_base.exact_hundredths != Some(i64::from(candidate.base_hundredths))
+        || assessment.status == AssessmentStatus::ConfirmedViolation
+    {
+        return Err(E::InconsistentAssessment);
+    }
+    Ok(CompletedProgramCandidate {
+        program: candidate.program,
+        evidence: candidate.evidence,
+        provenance,
+        per_element: candidate.per_element,
+        existing_base_hundredths,
+        added_base_hundredths: candidate.base_hundredths - existing_base_hundredths,
+        total_base_hundredths: candidate.base_hundredths,
+        assessment,
+        validation: candidate.validation,
+    })
+}
+
+/// Complete a finite, explicitly assumed plan; never establishes official recognition.
+pub fn complete_program(
+    registry: &ProfileRegistry,
+    request: &ProgramCompletionRequest,
+) -> Result<ProgramCompletionResult, ProgramCompletionError> {
+    use ProgramCompletionError as E;
+    let start = Instant::now();
+    let profile = registry
+        .resolve(&request.profile, request.scoring_table)
+        .map_err(E::Profile)?;
+    let absolute = validate_request(request, profile)?;
+    check_global_conflicts(request)?;
+    let (original_assessment, values) = prepare_originals(registry, request, profile)?;
+    let (search_request, placement) = prepare_search(request, profile, values, absolute, start);
     let search = programs::optimize_anchored(registry, &search_request, false, Some(&placement))
         .map_err(E::Optimization)?;
-    let mut candidates = vec![];
-    for candidate in search.candidates {
-        let mut entries = vec![];
-        let mut provenance = vec![];
-        let mut boundary = 0;
-        let mut ordinal = 0;
-        let mut existing_base_hundredths = 0;
-        for (index, (&v, value)) in candidate
-            .variant_indices
-            .iter()
-            .zip(&candidate.per_element)
-            .enumerate()
-        {
-            let mut entry = if v >= placement.first_anchor {
-                let original_index = v - placement.first_anchor;
-                let original = &request.original[original_index];
-                existing_base_hundredths += u32::from(value.hundredths);
-                provenance.push(CompletionProvenance::Original {
-                    id: original.id.clone(),
-                    original_index,
-                    locked: original.locked,
-                });
-                boundary += 1;
-                ordinal = 0;
-                original.entry.clone()
-            } else {
-                provenance.push(CompletionProvenance::Inserted {
-                    variant_index: v,
-                    boundary,
-                    ordinal,
-                });
-                ordinal += 1;
-                inserted_entry(&request.variants[v], profile.scoring.recognition_ruleset)
-            };
-            reindex(&mut entry, index);
-            entries.push(entry);
-        }
-        let assessment = assess_manual_program(
-            registry,
-            &manual(request, entries, SubmissionState::Complete),
-        )
-        .map_err(E::Profile)?;
-        if assessment.intended_base.exact_hundredths != Some(i64::from(candidate.base_hundredths))
-            || assessment.status == AssessmentStatus::ConfirmedViolation
-        {
-            return Err(E::InconsistentAssessment);
-        }
-        candidates.push(CompletedProgramCandidate {
-            program: candidate.program,
-            evidence: candidate.evidence,
-            provenance,
-            per_element: candidate.per_element,
-            existing_base_hundredths,
-            added_base_hundredths: candidate.base_hundredths - existing_base_hundredths,
-            total_base_hundredths: candidate.base_hundredths,
-            assessment,
-            validation: candidate.validation,
-        });
-    }
+    let candidates = search
+        .candidates
+        .into_iter()
+        .map(|c| completed_candidate(registry, request, profile.scoring.recognition_ruleset, c))
+        .collect::<Result<Vec<_>, _>>()?;
     Ok(ProgramCompletionResult {
         request: request.clone(),
         original_assessment,
@@ -409,6 +440,13 @@ pub fn complete_program(
         sources: search.sources,
         applied_rules: search.applied_rules,
         proof_scope: search.proof_scope,
+        assumptions: search.assumptions,
+        unmodeled_variants: search.unmodeled_variants,
+        supported_rules: search.supported_rules,
+        domain_completeness: request
+            .generated_domain
+            .as_ref()
+            .map(|d| d.audit.completeness.clone()),
         candidates,
     })
 }

@@ -260,9 +260,25 @@ fn boundaries_absolute_positions_and_rebinding_are_zero_based() {
         .as_mut()
         .unwrap()
         .planned_element = Some(1);
+    req.original[1].entry.scenario = Some(ManualElementScenario {
+        recognition: req.original[1].entry.intended_recognition.clone().unwrap(),
+        annotations: vec![],
+        final_goe: None,
+        fall: None,
+        execution: None,
+    });
     let r = result(&req);
     assert_eq!(r.candidates.len(), 4);
     for c in &r.candidates {
+        assert_eq!(
+            c.assessment.request.entries[3]
+                .scenario
+                .as_ref()
+                .unwrap()
+                .recognition
+                .planned_element,
+            Some(3)
+        );
         assert_eq!(
             c.assessment.request.entries[3]
                 .intended_recognition
@@ -546,6 +562,13 @@ fn generated_domain_audit_is_preserved_and_bound_to_supplied_variants() {
     assert_eq!(r.status, OptimizerStatus::OptimalProven);
     assert!(r.enumeration_complete); // Only over supplied finite variants.
     assert_eq!(
+        r.domain_completeness,
+        Some(CandidateDomainCompleteness::IncompleteCandidateCap)
+    );
+    assert!(!r.assumptions.is_empty());
+    assert!(!r.unmodeled_variants.is_empty());
+    assert!(!r.supported_rules.is_empty());
+    assert_eq!(
         r.request.generated_domain.unwrap().audit.completeness,
         CandidateDomainCompleteness::IncompleteCandidateCap
     );
@@ -554,4 +577,66 @@ fn generated_domain_audit_is_preserved_and_bound_to_supplied_variants() {
         complete_program(&ProfileRegistry::adult(), &req),
         Err(ProgramCompletionError::InvalidRequest(_))
     ));
+}
+
+fn fixed_call_case(call: PanelCall, target: CallTarget, original_bv: u32) {
+    let mut req = request();
+    let recognition = req.original[0].entry.intended_recognition.as_mut().unwrap();
+    recognition.details = Some(
+        RecognitionDetails::new(
+            vec![ComponentCode::try_from("1A").unwrap()],
+            None,
+            Some(vec![RecordedCall { target, call }]),
+        )
+        .unwrap(),
+    );
+    let r = result(&req);
+    assert_eq!(r.status, OptimizerStatus::OptimalProven);
+    assert!(r.enumeration_complete);
+    assert_eq!(r.candidates.len(), 24);
+    assert_eq!(
+        r.original_assessment.intended_base.exact_hundredths,
+        Some(i64::from(original_bv + 160))
+    );
+    for c in &r.candidates {
+        assert_eq!(c.existing_base_hundredths, original_bv + 160);
+        assert_eq!(c.added_base_hundredths, 80);
+        assert_eq!(c.total_base_hundredths, original_bv + 240);
+        assert_eq!(
+            c.assessment.intended_base.exact_hundredths,
+            Some(i64::from(original_bv + 240))
+        );
+        for (index, p) in c.provenance.iter().enumerate() {
+            if matches!(
+                p,
+                CompletionProvenance::Original {
+                    original_index: 0,
+                    ..
+                }
+            ) {
+                assert_eq!(c.per_element[index].hundredths, original_bv as u16);
+                assert_eq!(c.assessment.request.entries[index], req.original[0].entry);
+                assert_eq!(
+                    c.assessment.elements[index].intended_base,
+                    Ok(BaseValueOutcome::Value(c.per_element[index].clone()))
+                );
+                assert_eq!(
+                    r.original_assessment.elements[0].intended_base,
+                    Ok(BaseValueOutcome::Value(c.per_element[index].clone()))
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn fixed_underrotated_axel_preserves_recognition_and_reduced_objective() {
+    // Literal SOV fixture: 1A< = .88, SSp1 = 1.60, additions = .80.
+    fixed_call_case(PanelCall::UnderRotated, CallTarget::Component(0), 88);
+}
+
+#[test]
+fn fixed_repetition_call_preserves_recognition_and_reduced_objective() {
+    // Supplied solo +REP uses the existing 80% BV path, not an inferred call.
+    fixed_call_case(PanelCall::Repetition, CallTarget::Element, 88);
 }

@@ -40,6 +40,20 @@ domain (24 optimal words, 3.50 BV), checks first-attempt feature order, compound
 repetitions, family caps, global exclusions, absolute positions, draft repair,
 unknown/illegal originals, Gold/Masters required roles, interruption and caps.
 
+The external review found that reconstructing clean recognition for originals
+lost supplied BV-changing calls. Fixed original coefficients now come directly
+from the validated manual assessment, including the scorer's source references.
+Candidate preparation and completed scoring consume those same coefficients;
+additions continue through the supported clean-variant scorer. Regression
+fixtures preserve supplied 1A< and solo +REP at .88 BV, producing 3.28 total BV
+with SSp1 and two .40 additions. No call is inferred from repetition rules.
+
+Completion results expose `assumptions`, `unmodeled_variants`, `supported_rules`
+and optional `domain_completeness` directly. A capped generator can coexist with
+exhaustive enumeration over its supplied variants; this never proves coverage
+of the generator's full declared domain. Recognition reference traversal and
+rebinding belong to the shared manual-entry domain implementation.
+
 The additive interface and prerequisite validation work were approved on
 2026-11-03. `optimize_program(registry, request)` handles the four current Adult
 profiles and custom profiles using supported mechanisms and an explicit
