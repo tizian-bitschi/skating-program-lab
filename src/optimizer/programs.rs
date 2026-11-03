@@ -106,9 +106,9 @@ pub enum ProgramOptimizationError {
 }
 
 /// Construct only the declared clean recognition subset, using the shared scorer.
-fn score(
+pub(super) fn score(
     variant: &ProgramVariant,
-    request: &ProgramOptimizationRequest,
+    table: ScoringTableId,
     ruleset: RulesetId,
 ) -> Result<BaseValue, ProgramOptimizationError> {
     use ProgramOptimizationError as E;
@@ -158,13 +158,17 @@ fn score(
         outcome: RecognitionOutcome::Recognized,
         details: Some(details),
     };
-    match lookup_base_value(request.scoring_table, &panel, &[]).map_err(E::Scoring)? {
+    match lookup_base_value(table, &panel, &[]).map_err(E::Scoring)? {
         BaseValueOutcome::Value(v) => Ok(v),
         _ => Err(unsupported()),
     }
 }
 
-fn excluded(variant: &ProgramVariant, exclusion: &PersonalExclusion, index: usize) -> bool {
+pub(super) fn excluded(
+    variant: &ProgramVariant,
+    exclusion: &PersonalExclusion,
+    index: usize,
+) -> bool {
     let jumps: Vec<_> = match &variant.element {
         PlannedElement::Jump(JumpElement::Solo(j)) => vec![j],
         PlannedElement::Jump(JumpElement::Combination(parts) | JumpElement::Sequence(parts)) => {
@@ -196,6 +200,81 @@ fn excluded(variant: &ProgramVariant, exclusion: &PersonalExclusion, index: usiz
         }
         PersonalExclusion::Unsupported(_) => false,
     }
+}
+
+/// Normalize only set-valued evidence; position/attempt order remains significant.
+pub(super) fn normalize_variant(mut variant: ProgramVariant) -> ProgramVariant {
+    if let ElementPlanEvidence::Step {
+        qualified_features: Some(features),
+        ..
+    } = &mut variant.evidence
+    {
+        features.sort_unstable();
+        features.dedup();
+    }
+    if matches!(
+        variant.element,
+        PlannedElement::Jump(JumpElement::Solo(_) | JumpElement::Combination(_))
+    ) {
+        if let ElementPlanEvidence::Jump {
+            direct_transitions_assumed,
+        } = &mut variant.evidence
+        {
+            *direct_transitions_assumed = false;
+        }
+    }
+    variant
+}
+
+pub(super) struct PreparedVariant {
+    pub value: BaseValue,
+    pub sources: Vec<SourceReference>,
+    pub local_findings: Vec<Finding>,
+}
+
+/// Shared preflight for generation and optimizer input. Whole-program obligations
+/// remain in the full validator; callers decide how to handle local violations.
+pub(super) fn prepare_variant(
+    registry: &ProfileRegistry,
+    profile_id: &ProfileId,
+    table: ScoringTableId,
+    policy: &ProgramPolicy,
+    variant: &ProgramVariant,
+) -> Result<PreparedVariant, ProgramOptimizationError> {
+    let profile = registry
+        .resolve(profile_id, table)
+        .map_err(ProgramOptimizationError::Profile)?;
+    let value = score(variant, table, profile.scoring.recognition_ruleset)?;
+    let program = ProfileProgram {
+        profile: profile_id.clone(),
+        scoring_table: table,
+        elements: vec![variant.element.clone()],
+    };
+    let report = validate_supported_program(
+        registry,
+        &program,
+        std::slice::from_ref(&variant.evidence),
+        policy,
+    )
+    .map_err(ProgramOptimizationError::Profile)?;
+    let local_findings = report
+        .validation
+        .findings
+        .into_iter()
+        .filter(|f| {
+            crate::program_validation::candidate_finding_scope(f, profile)
+                == crate::program_validation::CandidateFindingScope::Element
+        })
+        .collect();
+    let mut sources = report.sources;
+    if !sources.contains(&value.source) {
+        sources.push(value.source.clone());
+    }
+    Ok(PreparedVariant {
+        value,
+        sources,
+        local_findings,
+    })
 }
 
 fn checked(
@@ -245,7 +324,7 @@ fn checked(
     }
     let per_element = indices
         .iter()
-        .map(|i| score(&request.variants[*i], request, ruleset))
+        .map(|i| score(&request.variants[*i], request.scoring_table, ruleset))
         .collect::<Result<Vec<_>, _>>()?;
     for (index, value) in per_element.iter().enumerate() {
         crate::validation::record_rule(
@@ -332,34 +411,29 @@ fn optimize(
         if request.variants[..i].contains(variant) {
             return Err(E::InvalidRequest("duplicate candidate variants"));
         }
-        let value = score(variant, request, ruleset).map_err(|_| E::UnsupportedVariant(i))?;
-        let single = ProfileProgram {
-            profile: request.profile.clone(),
-            scoring_table: request.scoring_table,
-            elements: vec![variant.element.clone()],
-        };
-        let report = validate_supported_program(
+        let prepared = prepare_variant(
             registry,
-            &single,
-            std::slice::from_ref(&variant.evidence),
+            &request.profile,
+            request.scoring_table,
             &request.policy,
+            variant,
         )
-        .map_err(E::Profile)?;
-        let unresolved: Vec<_> = report
-            .validation
-            .findings
-            .iter()
-            .filter(|f| {
-                f.kind != FindingKind::Violation && f.rule_id != "spin-execution-recognition"
-            })
-            .cloned()
+        .map_err(|e| match e {
+            ProgramOptimizationError::Profile(_) => e,
+            _ => E::UnsupportedVariant(i),
+        })?;
+        let unresolved: Vec<_> = prepared
+            .local_findings
+            .into_iter()
+            .filter(|f| f.kind != FindingKind::Violation)
             .collect();
         if !unresolved.is_empty() {
             return Err(E::UnresolvedValidation(unresolved));
         }
-        for src in report.sources.iter().chain(std::iter::once(&value.source)) {
-            if !sources.contains(src) {
-                sources.push(src.clone());
+        let value = prepared.value;
+        for src in prepared.sources {
+            if !sources.contains(&src) {
+                sources.push(src);
             }
         }
         if request.exclusions.iter().any(|x| excluded(variant, x, i)) {

@@ -146,3 +146,90 @@ Spiral, Arabesque, Spread Eagle, Ina Bauer, Hydroblading and Unlisted Jump
 produce a Violation. Other free prose remains Unsupported instead of being
 silently treated as matching evidence. Plan None continues to represent missing
 legacy descriptions, so independently supplied typed evidence remains usable.
+
+## Finite candidate generation (#65)
+
+The additive API was explicitly approved on 2026-11-03.
+`generate_program_candidates(registry, request)` builds `ProgramVariant` values
+for the existing optimizer. Exact built-in Adult 2026/27 profiles are supported;
+custom profiles and other disciplines/segments reject without fallback.
+
+The request selects jump kinds/rotations, solos, direct combinations, Axel
+sequences and maximum compound length. All manual definitions are validated first and have output-capacity priority.
+Automatic order is solos, combinations, sequences, Basic spins, explicit spin
+templates and movement templates. Jumps use ascending rotations and T/S/Lo/F/Lz/A order. Continuations in
+combinations are T/Lo; sequence continuations are Axel. Two-jump definitions
+precede triples. This deliberately bounded grammar excludes Euler and other
+transitions. Shared profile validation removes prohibited elements, overlong
+compounds and repetitions. Masters' Axel requirement and missing spin/ChSp roles
+are deferred to the whole-program validator.
+
+`base_spins` selects abbreviations and constructs explicit eight-revolution
+position holds, with both feet represented when requested. Combination spins use
+Camel/Sit/Upright on each selected foot. These are Basic-level scenarios;
+availability of higher SOV rows grants no level. `spin_plans` supplies explicit
+positions, revolutions, level and supported qualified-feature evidence for richer
+scenarios. Layback posture and difficult-variation prerequisites remain unmodeled
+and receive omission reasons. `movement_plans` supplies existing typed step/ChSq/
+ChSp evidence; the generator constructs their intended element definitions.
+Unsupported or insufficient evidence never becomes a feasible default.
+
+Manual variants remain available and use the same eligibility/scoring/evidence
+checks; invalid manual definitions return an indexed error. Jump selections scope
+the automatic jump grammar; semantic personal exclusions and skill limits apply
+to all definitions, including every manual compound component. Variant-index
+exclusions have no stable pre-generation meaning and reject. Empty selections
+are a supported empty domain. Zero/oversized bounds and unmodeled rotation
+requests reject. No timeout establishes completeness.
+
+The audit retains exact profile/table, sources from policy and evaluated scoring/
+validation, families, exclusions, full omitted definitions with reasons,
+recognition/qualification assumptions, expansion counts and bounds. At most 1,000
+output candidates and 100,000 attempted automatic definitions are permitted. Explicit
+input templates/manual definitions total at most 1,000. A normalized semantic plan/evidence key deduplicates definitions: unordered
+step feature sets are sorted/deduplicated and irrelevant direct-step flags on
+solos/combinations are cleared. Ordered positions and feature attempts remain
+significant. Distinct evidence scenarios remain distinct alternatives.
+
+`CompleteDeclaredDomain` means exhaustion only of this finite grammar and these
+explicit templates after documented eligibility/evidence omissions. It never
+means all physical alternatives. `IncompleteCandidateCap` and
+`IncompleteExpansionCap` prevent domain-wide optimality claims even when the
+optimizer proves its smaller supplied universe optimal. The optimizer does not
+consume this metadata automatically: callers must retain and present both scopes.
+
+`tests/candidate_generation.rs` contains literal independent solo/compound
+oracles, profile/filter/evidence/bounds/manual fixtures, movement-family checks
+and direct optimizer integration retaining all four ordered equal-value ties.
+
+### External review corrections
+
+The first external review returned REQUEST_CHANGES. Automatic Axel sequences now
+require `confirmed_sequence_transitions` to contain the exact ordered jump tuple;
+`axel_sequences` alone supplies no direct-step evidence. Unconfirmed tuples are
+omitted with the unsupported scoring-contract reason. This input is an explicit
+hypothetical direct-step qualification, not a newly inferred physical transition.
+
+`excluded_spin_positions` checks every position in regular spins, including both
+feet of Combination spins. `excluded_spin_entries` covers both Flying and
+NonFlying. Both apply to automatic/templates/manual candidates and remain in the
+audit alongside semantic exclusions and explicit skill limits.
+
+Manual definitions are all validated before automatic expansion, irrespective
+of either cap. They consume output capacity first, but not the automatic
+expansion budget. Every manual definition is checked even after output capacity
+is exhausted; invalid input returns its original index. Valid manual definitions
+omitted by the output cap retain a full omission entry. The audit separates
+`manual_definitions_checked` from `attempted_definitions` (automatic only).
+
+`prepare_variant` centrally performs scoring, local validation and source
+collection for generator and optimizer. The shared validator classifies findings
+as element-local, whole-program obligation or execution assumption, using policy
+bindings and shared rule constants. No diagnostic text controls eligibility.
+The generator omits local violations/unknowns; the optimizer retains its existing
+whole-program solver semantics and rejects unresolved local input. Full programs
+still pass the common validator including all deferred obligations.
+
+Regression coverage includes exact sequence confirmation, automatic/manual
+Combination-position and both-entry exclusions, capped invalid/manual priority,
+normalized equivalent step sets and diagnostic-prose-independent classification.

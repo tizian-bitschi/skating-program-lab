@@ -96,3 +96,20 @@ new versioned scoring policies use explicit policy citations.
 ## Bounded mixed-program scenarios (issue 49)
 
 `optimize_program` and `validate_supported_program` add supported mixed-element planning with explicit recognition/qualification assumptions and partial coverage. See the [supported contract and limitations](specs/bounded-program-optimizer.md). Difficult variation categories, Euler consequences, automatic recognition, Pair rules and full compliance remain outside the model.
+
+## Candidate generation (#65)
+
+`generate_program_candidates` provides a bounded deterministic supported domain
+for the existing mixed optimizer. Built-in profiles share one generator and the
+existing validators/scorer. Automatic jump and Basic-spin definitions, explicit
+qualified spin/movement templates, semantic personal filters, manual subsets,
+source audit and separate domain-cap metadata are covered by
+`tests/candidate_generation.rs`. See the [generation contract](specs/bounded-program-optimizer.md#finite-candidate-generation-65).
+Unsupported posture/features and physical transitions remain omitted with reasons;
+full-program rules and recognition uncertainty remain unchanged. Candidate-domain
+completeness is distinct from optimizer search/tie completeness.
+
+Review regressions additionally cover per-sequence explicit direct-step evidence,
+spin position/entry filters on automatic and manual combinations, manual-input
+validation independent of automatic caps, normalized unordered step feature
+sets, and typed finding scope shared by generator and optimizer preflight.

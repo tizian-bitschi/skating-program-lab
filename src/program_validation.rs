@@ -1,6 +1,8 @@
 //! Bounded mixed-program checks. Qualification is an explicit scenario assumption.
 use crate::*;
 
+const REQUIRED_CHOREOGRAPHIC_SPIN_RULE: &str = "program-required-choreographic-spin";
+
 pub(crate) const RULE_IDS: &[&str] = &[
     "program-choreographic-plan-consistency",
     "program-choreographic-sequence",
@@ -12,7 +14,7 @@ pub(crate) const RULE_IDS: &[&str] = &[
     "program-feature-per-foot",
     "program-feature-qualification",
     "program-flying-feature-entry",
-    "program-required-choreographic-spin",
+    REQUIRED_CHOREOGRAPHIC_SPIN_RULE,
     crate::validation::SEQUENCE_DIRECT_STEP_RULE,
     "program-spin-level-credit",
     "program-spin-level-four-feature",
@@ -267,7 +269,7 @@ pub fn validate_supported_program(
     }
     if policy.require_choreographic_spin {
         checks.apply(
-            "program-required-choreographic-spin",
+            REQUIRED_CHOREOGRAPHIC_SPIN_RULE,
             None,
             &policy.choreography_source,
         );
@@ -275,7 +277,7 @@ pub fn validate_supported_program(
     if policy.require_choreographic_spin && count(ProfileElementFamily::ChoreographicSpin) == 0 {
         checks.add(
             FindingKind::Violation,
-            "program-required-choreographic-spin",
+            REQUIRED_CHOREOGRAPHIC_SPIN_RULE,
             None,
             "The profile requires a choreographic spin.",
             &policy.choreography_source,
@@ -564,4 +566,64 @@ pub fn validate_supported_program(
         }
     }
     Ok(report)
+}
+
+/// Classification belongs to the shared validator, never to diagnostic prose.
+#[cfg(feature = "optimizer")]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum CandidateFindingScope {
+    Element,
+    ProgramObligation,
+    ExecutionAssumption,
+}
+
+#[cfg(feature = "optimizer")]
+pub(crate) fn candidate_finding_scope(
+    finding: &Finding,
+    profile: &RuleProfile,
+) -> CandidateFindingScope {
+    if finding.rule_id == crate::spin_validation::SPIN_EXECUTION_RULE {
+        CandidateFindingScope::ExecutionAssumption
+    } else if finding.element_index.is_none()
+        && (finding.rule_id == profile.binding(ProfileRule::Axel).id
+            || finding.rule_id == profile.binding(ProfileRule::Eligibility).id
+            || finding.rule_id == crate::spin_validation::SPIN_REQUIRED_ROLE_RULE
+            || finding.rule_id == REQUIRED_CHOREOGRAPHIC_SPIN_RULE)
+    {
+        CandidateFindingScope::ProgramObligation
+    } else {
+        CandidateFindingScope::Element
+    }
+}
+
+#[cfg(all(test, feature = "optimizer"))]
+mod candidate_scope_tests {
+    use super::*;
+    #[test]
+    fn required_family_classification_is_independent_of_diagnostic_prose() {
+        let profile = adult_profile(AdultCategory::Masters);
+        let mut finding = Finding {
+            kind: FindingKind::Violation,
+            rule_id: profile.binding(ProfileRule::Eligibility).id,
+            element_index: None,
+            component_index: None,
+            explanation: "changed diagnostic wording",
+            source: profile.sources[0].clone(),
+        };
+        assert_eq!(
+            candidate_finding_scope(&finding, &profile),
+            CandidateFindingScope::ProgramObligation
+        );
+        finding.element_index = Some(0);
+        assert_eq!(
+            candidate_finding_scope(&finding, &profile),
+            CandidateFindingScope::Element
+        );
+        finding.rule_id = "program-family-cap";
+        finding.element_index = None;
+        assert_eq!(
+            candidate_finding_scope(&finding, &profile),
+            CandidateFindingScope::Element
+        );
+    }
 }
