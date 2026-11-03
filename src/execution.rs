@@ -266,6 +266,18 @@ pub enum Level {
     Four,
 }
 
+impl Level {
+    pub(crate) fn number(self) -> u8 {
+        match self {
+            Self::Basic => 0,
+            Self::One => 1,
+            Self::Two => 2,
+            Self::Three => 3,
+            Self::Four => 4,
+        }
+    }
+}
+
 impl TryFrom<u8> for Level {
     type Error = u8;
 

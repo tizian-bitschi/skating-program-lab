@@ -101,7 +101,7 @@ fn request(
         max_elements: n,
         objective: OptimizerObjective::MaximizeUnfactoredBaseValueHundredths,
         equivalence: ProgramEquivalence::OrderedVariants,
-        max_search_nodes: 100_000,
+        max_proposals: 100_000,
         max_solutions: 1000,
         enumerate_equal_optima: true,
         time_limit: None,
@@ -363,7 +363,7 @@ fn finite_infeasibility_interruptions_caps_and_unsupported_inputs_are_conservati
     assert_eq!(r.status, OptimizerStatus::Incomplete);
     assert!(!r.enumeration_complete);
     req.time_limit = None;
-    req.max_search_nodes = 1;
+    req.max_proposals = 1;
     req.max_elements = 3;
     req.min_elements = 3;
     assert_eq!(result(&req).status, OptimizerStatus::Incomplete);
@@ -415,4 +415,124 @@ fn synthetic_profile_reuses_solver_and_explicit_shared_policies() {
         optimize_program(&registry, &req),
         Err(ProgramOptimizationError::Profile(_))
     ));
+}
+
+#[test]
+fn assumed_silver_axel_sequence_reaches_optimizer_scoring_and_shared_validation() {
+    let sequence = ProgramVariant {
+        element: PlannedElement::Jump(JumpElement::Sequence(vec![
+            JumpPart::Jump(ListedJump {
+                kind: Some(JumpKind::ToeLoop),
+                rotations: Some(1),
+            }),
+            JumpPart::Jump(ListedJump {
+                kind: Some(JumpKind::Axel),
+                rotations: Some(1),
+            }),
+        ])),
+        evidence: ElementPlanEvidence::Jump {
+            direct_transitions_assumed: true,
+        },
+        recognition_assumed: true,
+    };
+    let mut req = request(
+        AdultCategory::Silver,
+        vec![
+            sequence,
+            spin(
+                RegularSpinKind::Sit,
+                SpinEntry::NonFlying,
+                false,
+                Level::Basic,
+                vec![],
+            ),
+        ],
+        2,
+    );
+    req.must_have = vec![vec![0], vec![1]];
+    let r = result(&req);
+    assert_eq!(r.status, OptimizerStatus::OptimalProven);
+    assert!(r.enumeration_complete);
+    assert_eq!(ids(&r), BTreeSet::from([vec![0, 1], vec![1, 0]]));
+    assert_eq!(r.candidates[0].base_hundredths, 280); // 1T .40 + 1A 1.10 + SSpB 1.30.
+    for c in &r.candidates {
+        assert!(c
+            .validation
+            .validation
+            .findings
+            .iter()
+            .all(|f| f.rule_id == "spin-execution-recognition"));
+        assert!(c
+            .validation
+            .applied_rules
+            .iter()
+            .any(|r| r.rule_id == "program-sequence-direct-step"));
+    }
+    req.variants[0].evidence = ElementPlanEvidence::Jump {
+        direct_transitions_assumed: false,
+    };
+    assert!(matches!(
+        optimize_program(&ProfileRegistry::adult(), &req),
+        Err(ProgramOptimizationError::UnsupportedVariant(0))
+    ));
+}
+
+#[test]
+fn actual_rule_trace_is_source_bound_and_excludes_absent_element_checks() {
+    let r = result(&request(
+        AdultCategory::Bronze,
+        vec![jump(JumpKind::ToeLoop)],
+        1,
+    ));
+    assert!(r.supported_rules.contains(&"program-step-recognition"));
+    assert!(!r
+        .applied_rules
+        .iter()
+        .any(|r| r.rule_id == "program-step-recognition"
+            || r.rule_id == "program-choreographic-sequence"
+            || r.rule_id == "program-spin-level-credit"));
+    assert!(r
+        .applied_rules
+        .iter()
+        .any(|r| r.rule_id == "catalog-unfactored-base-value"
+            && r.element_index == Some(0)
+            && r.source.document == "ISU Communication 2786"));
+    for candidate in &r.candidates {
+        for applied in &candidate.validation.applied_rules {
+            assert!(r.applied_rules.contains(applied));
+            assert!(r.supported_rules.contains(&applied.rule_id));
+            assert!(r.sources.contains(&applied.source));
+        }
+    }
+}
+
+#[test]
+fn proposal_cap_stops_a_large_finite_domain_without_claiming_a_node_budget() {
+    let variants = [
+        JumpKind::ToeLoop,
+        JumpKind::Salchow,
+        JumpKind::Loop,
+        JumpKind::Flip,
+        JumpKind::Lutz,
+    ]
+    .into_iter()
+    .flat_map(|kind| {
+        [1, 2].map(move |n| {
+            let mut v = jump(kind);
+            if let PlannedElement::Jump(JumpElement::Solo(j)) = &mut v.element {
+                j.rotations = Some(n);
+            }
+            v
+        })
+    })
+    .collect();
+    // Ten slots and ten variants: 10^10 nonempty ordered assignments before rules.
+    // The first highest-BV repeated double-Lutz proposal is ineligible for Bronze.
+    let mut req = request(AdultCategory::Bronze, variants, 10);
+    req.max_proposals = 1;
+    let r = result(&req);
+    assert_eq!(r.examined_programs, 1);
+    assert_eq!(r.status, OptimizerStatus::Incomplete);
+    assert_eq!(r.termination_reason, JumpTerminationReason::SearchLimit);
+    assert!(!r.enumeration_complete);
 }

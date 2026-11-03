@@ -52,7 +52,8 @@ pub struct ProgramOptimizationRequest {
     pub max_elements: usize,
     pub objective: OptimizerObjective,
     pub equivalence: ProgramEquivalence,
-    pub max_search_nodes: usize,
+    /// Validator-checked solver proposals; does not count or bound internal solver nodes.
+    pub max_proposals: usize,
     pub max_solutions: usize,
     pub enumerate_equal_optima: bool,
     pub time_limit: Option<Duration>,
@@ -83,7 +84,9 @@ pub struct ProgramOptimizationResult {
     pub proof_scope: &'static str,
     pub assumptions: &'static str,
     pub sources: Vec<SourceReference>,
-    pub applied_rules: Vec<&'static str>,
+    pub supported_rules: Vec<&'static str>,
+    /// Union of source-bound checks actually evaluated for returned candidates.
+    pub applied_rules: Vec<AppliedRule>,
     pub status: OptimizerStatus,
     pub enumeration_complete: bool,
     pub termination_reason: JumpTerminationReason,
@@ -270,7 +273,7 @@ fn checked(
         .iter()
         .map(|i| request.variants[*i].evidence.clone())
         .collect();
-    let validation = validate_supported_program(registry, &program, &evidence, &request.policy)
+    let mut validation = validate_supported_program(registry, &program, &evidence, &request.policy)
         .map_err(ProgramOptimizationError::Profile)?;
     if validation
         .validation
@@ -293,6 +296,18 @@ fn checked(
         .iter()
         .map(|i| score(&request.variants[*i], request, ruleset))
         .collect::<Result<Vec<_>, _>>()?;
+    for (index, value) in per_element.iter().enumerate() {
+        crate::validation::record_rule(
+            &mut validation.applied_rules,
+            "catalog-unfactored-base-value",
+            Some(index),
+            None,
+            &value.source,
+        );
+        if !validation.sources.contains(&value.source) {
+            validation.sources.push(value.source.clone());
+        }
+    }
     let base_hundredths = per_element.iter().map(|v| u32::from(v.hundredths)).sum();
     Ok(Some(ProgramCandidate {
         program,
@@ -327,8 +342,8 @@ fn optimize(
         || request.max_elements > 10
         || request.min_elements > request.max_elements
         || request.max_solutions == 0
-        || request.max_search_nodes == 0
-        || request.max_search_nodes > 100_000
+        || request.max_proposals == 0
+        || request.max_proposals > 100_000
         || request.variants.len() > 1000
         || request
             .must_have
@@ -408,7 +423,7 @@ fn optimize(
         equivalence: "Identical ordered candidate variants including evidence; duplicate variants are rejected.",
         proof_scope: "Finite supplied recognized Single Free Skating scenarios and implemented applicable rules only; never full real-world ISU compliance or an official/global maximum.",
         assumptions: "Clean recognition is explicitly assumed for every variant; successful feature qualification is separately assumed where supplied. No execution or official second-half credit is established.",
-        sources, applied_rules: profile.bindings.iter().map(|b| profile.binding(b.rule).id).chain(["spin-count", "spin-required-role", "spin-distinct-abbreviation", "spin-minimum-revolutions", "program-family-cap", "program-required-choreographic-spin", "program-spin-level-credit", "program-step-recognition", "program-step-level-credit", "program-choreographic-spin", "program-choreographic-sequence"]).collect(),
+        sources, applied_rules: vec![], supported_rules: profile.bindings.iter().filter(|b| b.rule != ProfileRule::Scoring).map(|b| profile.binding(b.rule).id).chain(crate::spin_validation::RULE_IDS.iter().copied()).chain(crate::program_validation::RULE_IDS.iter().copied()).chain(["catalog-unfactored-base-value"]).collect(),
         status: OptimizerStatus::Incomplete, enumeration_complete: false, termination_reason: JumpTerminationReason::Interrupted, examined_programs: 0, candidates: vec![] };
     let (mut solver, slots, objective) =
         solver_common::ordered_slots(&values, request.max_elements, request.min_elements);
@@ -418,7 +433,7 @@ fn optimize(
         if end.is_some_and(|d| Instant::now() >= d) {
             return Ok(result);
         }
-        if result.examined_programs >= request.max_search_nodes {
+        if result.examined_programs >= request.max_proposals {
             result.termination_reason = JumpTerminationReason::SearchLimit;
             return Ok(result);
         }
@@ -468,6 +483,16 @@ fn optimize(
         if let Some(candidate) = checked(registry, request, &indices, ruleset)? {
             if candidate.base_hundredths != solution.get_integer_value(objective) as u32 {
                 return Err(E::InconsistentSolverResult);
+            }
+            for src in &candidate.validation.sources {
+                if !result.sources.contains(src) {
+                    result.sources.push(src.clone());
+                }
+            }
+            for rule in &candidate.validation.applied_rules {
+                if !result.applied_rules.contains(rule) {
+                    result.applied_rules.push(rule.clone());
+                }
             }
             result.candidates.push(candidate);
             if !enumerating {
@@ -532,7 +557,7 @@ mod tests {
             max_elements: 1,
             objective: OptimizerObjective::MaximizeUnfactoredBaseValueHundredths,
             equivalence: ProgramEquivalence::OrderedVariants,
-            max_search_nodes: 100,
+            max_proposals: 100,
             max_solutions: 10,
             enumerate_equal_optima: true,
             time_limit: None,

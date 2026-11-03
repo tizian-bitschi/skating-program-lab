@@ -1,6 +1,26 @@
 //! Bounded mixed-program checks. Qualification is an explicit scenario assumption.
 use crate::*;
 
+pub(crate) const RULE_IDS: &[&str] = &[
+    "program-choreographic-plan-consistency",
+    "program-choreographic-sequence",
+    "program-choreographic-spin",
+    "program-eight-position",
+    "program-eight-revolutions",
+    "program-family-cap",
+    "program-feature-once-per-program",
+    "program-feature-per-foot",
+    "program-feature-qualification",
+    "program-flying-feature-entry",
+    "program-required-choreographic-spin",
+    "program-sequence-direct-step",
+    "program-spin-level-credit",
+    "program-spin-level-four-feature",
+    "program-step-feature-dependency",
+    "program-step-level-credit",
+    "program-step-recognition",
+];
+
 /// Additional family rules are explicit for custom profiles, never inferred by name.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ProgramPolicy {
@@ -12,28 +32,9 @@ pub struct ProgramPolicy {
     pub max_step_level: Level,
     pub step_movement_required: bool,
     pub permitted_step_features: Vec<u8>,
-}
-
-pub fn adult_program_policy(category: AdultCategory) -> ProgramPolicy {
-    let advanced = matches!(category, AdultCategory::Gold | AdultCategory::Masters);
-    ProgramPolicy {
-        spins: adult_regular_spin_policy(category),
-        max_steps: usize::from(advanced),
-        max_choreographic_sequences: usize::from(!advanced),
-        max_choreographic_spins: usize::from(advanced),
-        require_choreographic_spin: advanced,
-        max_step_level: if category == AdultCategory::Gold {
-            Level::Two
-        } else {
-            Level::Four
-        },
-        step_movement_required: category == AdultCategory::Gold,
-        permitted_step_features: if category == AdultCategory::Gold {
-            vec![1, 2]
-        } else {
-            vec![1, 2, 3, 4, 5]
-        },
-    }
+    pub step_source: SourceReference,
+    pub choreography_source: SourceReference,
+    pub feature_source: SourceReference,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -85,20 +86,51 @@ fn source(location: &str) -> SourceReference {
     }
 }
 
-fn finding(
-    kind: FindingKind,
-    id: &'static str,
-    index: Option<usize>,
-    text: &'static str,
-    source: &SourceReference,
-) -> Finding {
-    Finding {
-        kind,
-        rule_id: id,
-        element_index: index,
-        component_index: None,
-        explanation: text,
-        source: source.clone(),
+struct MixedChecks<'a> {
+    findings: &'a mut Vec<Finding>,
+    applied_rules: &'a mut Vec<AppliedRule>,
+}
+impl MixedChecks<'_> {
+    fn apply(&mut self, id: &'static str, index: Option<usize>, source: &SourceReference) {
+        crate::validation::record_rule(self.applied_rules, id, index, None, source);
+    }
+    fn add(
+        &mut self,
+        kind: FindingKind,
+        id: &'static str,
+        index: Option<usize>,
+        text: &'static str,
+        source: &SourceReference,
+    ) {
+        self.apply(id, index, source);
+        self.findings.push(Finding {
+            kind,
+            rule_id: id,
+            element_index: index,
+            component_index: None,
+            explanation: text,
+            source: source.clone(),
+        });
+    }
+}
+
+impl SkatingMovement {
+    /// Exact supported vocabulary for legacy movement descriptions; no prose inference.
+    fn from_description(description: &str) -> Option<Self> {
+        let key: String = description
+            .chars()
+            .filter(|c| c.is_ascii_alphanumeric())
+            .flat_map(char::to_lowercase)
+            .collect();
+        Some(match key.as_str() {
+            "spiral" => Self::Spiral,
+            "arabesque" => Self::Arabesque,
+            "spreadeagle" => Self::SpreadEagle,
+            "inabauer" => Self::InaBauer,
+            "hydroblading" => Self::Hydroblading,
+            "unlistedjump" => Self::UnlistedJump,
+            _ => return None,
+        })
     }
 }
 
@@ -125,6 +157,19 @@ pub fn validate_supported_program(
         if *profile == adult_profile(category) && *policy != adult_program_policy(category) {
             return Err(invalid("built-in profile policies cannot be overridden; register an explicit custom profile"));
         }
+    }
+    if [
+        &policy.step_source,
+        &policy.choreography_source,
+        &policy.feature_source,
+    ]
+    .iter()
+    .any(|s| {
+        s.document.trim().is_empty() || s.version.trim().is_empty() || s.location.trim().is_empty()
+    }) {
+        return Err(invalid(
+            "program policy needs complete source bindings for each family",
+        ));
     }
     if evidence.len() != program.elements.len()
         || policy.spins.profile != profile.id
@@ -161,22 +206,37 @@ pub fn validate_supported_program(
             }
         }
     }
-    let mut report = validate_profile_program_with_evidence(
+    let assumed_direct_sequences: Vec<_> = evidence
+        .iter()
+        .enumerate()
+        .filter_map(|(i, e)| {
+            matches!(
+                e,
+                ElementPlanEvidence::Jump {
+                    direct_transitions_assumed: true
+                }
+            )
+            .then_some(i)
+        })
+        .collect();
+    let mut report = crate::spin_validation::validate_profile_program_with_assumptions(
         registry,
         program,
         &spin_evidence,
         Some(&policy.spins),
+        &assumed_direct_sequences,
     )?;
     // Only this dedicated evaluator supersedes the old feature-credit placeholder.
     report
         .validation
         .findings
         .retain(|f| f.rule_id != "spin-feature-credit");
-    let mut add = |kind, id, index, text, src: &SourceReference| {
-        report
-            .validation
-            .findings
-            .push(finding(kind, id, index, text, src))
+    report
+        .applied_rules
+        .retain(|r| r.rule_id != "spin-feature-credit");
+    let mut checks = MixedChecks {
+        findings: &mut report.validation.findings,
+        applied_rules: &mut report.applied_rules,
     };
     let count = |family| {
         program
@@ -196,27 +256,39 @@ pub fn validate_supported_program(
             policy.max_choreographic_spins,
         ),
     ] {
+        let family_source = if family == ProfileElementFamily::StepSequence {
+            &policy.step_source
+        } else {
+            &policy.choreography_source
+        };
+        checks.apply("program-family-cap", None, family_source);
         if count(family) > cap {
-            add(
+            checks.add(
                 FindingKind::Violation,
                 "program-family-cap",
                 None,
                 "The family count exceeds the selected program policy.",
-                &policy.spins.source,
+                family_source,
             );
         }
     }
+    if policy.require_choreographic_spin {
+        checks.apply(
+            "program-required-choreographic-spin",
+            None,
+            &policy.choreography_source,
+        );
+    }
     if policy.require_choreographic_spin && count(ProfileElementFamily::ChoreographicSpin) == 0 {
-        add(
+        checks.add(
             FindingKind::Violation,
             "program-required-choreographic-spin",
             None,
             "The profile requires a choreographic spin.",
-            &policy.spins.source,
+            &policy.choreography_source,
         );
     }
-    let feature_source =
-        source("pp. 2, 4-5, Single spin feature credit, reuse, quotas and level 4");
+    let feature_source = policy.feature_source.clone();
     let mut consumed = Vec::new();
     for (index, (element, data)) in program.elements.iter().zip(evidence).enumerate() {
         match data {
@@ -227,6 +299,7 @@ pub fn validate_supported_program(
                 let PlannedElement::RegularSpin(plan) = element else {
                     unreachable!()
                 };
+                checks.apply("program-spin-level-credit", Some(index), &feature_source);
                 let mut credit = 0;
                 let mut level_four_feature = false;
                 let mut per_foot = vec![
@@ -237,6 +310,11 @@ pub fn validate_supported_program(
                         .count())
                 ];
                 for attempt in spin.feature_attempts.iter().flatten() {
+                    checks.apply(
+                        "program-feature-qualification",
+                        Some(index),
+                        &feature_source,
+                    );
                     // Variation categories and entrance/exit nature need richer evidence.
                     let supported = matches!(
                         attempt.feature,
@@ -253,10 +331,16 @@ pub fn validate_supported_program(
                         .steps
                         .as_ref()
                         .and_then(|s| s.get(attempt.position_step));
+                    if attempt.feature == SpinFeature::DifficultFlyingEntry {
+                        checks.apply("program-flying-feature-entry", Some(index), &feature_source);
+                    }
+                    if attempt.feature == SpinFeature::EightRevolutions {
+                        checks.apply("program-eight-position", Some(index), &feature_source);
+                    }
                     if attempt.feature == SpinFeature::DifficultFlyingEntry
                         && plan.entry != Some(SpinEntry::Flying)
                     {
-                        add(
+                        checks.add(
                             FindingKind::Unknown,
                             "program-flying-feature-entry",
                             Some(index),
@@ -274,13 +358,18 @@ pub fn validate_supported_program(
                             })
                         )
                     {
-                        add(FindingKind::Unsupported, "program-eight-position", Some(index), "This bounded eight-revolution subset supports plain camel only; difficult variation and Layback evidence remain unmodeled.", &feature_source);
+                        checks.add(FindingKind::Unsupported, "program-eight-position", Some(index), "This bounded eight-revolution subset supports plain camel only; difficult variation and Layback evidence remain unmodeled.", &feature_source);
                         continue;
                     }
                     if !supported {
-                        add(FindingKind::Unsupported, "program-feature-qualification", Some(index), "This feature needs unmodeled variation, foot-change or entrance/exit evidence.", &feature_source);
+                        checks.add(FindingKind::Unsupported, "program-feature-qualification", Some(index), "This feature needs unmodeled variation, foot-change or entrance/exit evidence.", &feature_source);
                         continue;
                     }
+                    checks.apply(
+                        "program-feature-once-per-program",
+                        Some(index),
+                        &feature_source,
+                    );
                     let first_success = attempt.feature == SpinFeature::EightRevolutions;
                     let available = !consumed.contains(&attempt.feature);
                     if !first_success || attempt.outcome == FeatureAttemptOutcome::Successful {
@@ -289,7 +378,7 @@ pub fn validate_supported_program(
                     if attempt.outcome == FeatureAttemptOutcome::Unknown
                         || !local_feature_qualification_assumed
                     {
-                        add(FindingKind::Unknown, "program-feature-qualification", Some(index), "Feature outcome or explicit local qualification assumption is missing.", &feature_source);
+                        checks.add(FindingKind::Unknown, "program-feature-qualification", Some(index), "Feature outcome or explicit local qualification assumption is missing.", &feature_source);
                     } else if attempt.outcome == FeatureAttemptOutcome::Successful && available {
                         let steps = plan.steps.as_deref().unwrap_or(&[]);
                         let foot = steps
@@ -297,11 +386,17 @@ pub fn validate_supported_program(
                             .take(attempt.position_step)
                             .filter(|s| matches!(s, SpinStep::ChangeFoot))
                             .count();
+                        if attempt.feature == SpinFeature::EightRevolutions {
+                            checks.apply("program-eight-revolutions", Some(index), &feature_source);
+                        }
                         if attempt.feature == SpinFeature::EightRevolutions
                             && !matches!(steps.get(attempt.position_step), Some(SpinStep::Position { revolutions: Some(n), .. }) if *n >= 8)
                         {
-                            add(FindingKind::Unknown, "program-eight-revolutions", Some(index), "Eight uninterrupted revolutions are not established at the feature target.", &feature_source);
+                            checks.add(FindingKind::Unknown, "program-eight-revolutions", Some(index), "Eight uninterrupted revolutions are not established at the feature target.", &feature_source);
                             continue;
+                        }
+                        if per_foot.len() > 1 {
+                            checks.apply("program-feature-per-foot", Some(index), &feature_source);
                         }
                         if per_foot.len() > 1 && per_foot[foot] >= 2 {
                             continue;
@@ -318,11 +413,17 @@ pub fn validate_supported_program(
                         );
                     }
                 }
-                if spin
-                    .planned_level
-                    .is_some_and(|l| level(l) > credit || (l == Level::Four && !level_four_feature))
-                {
-                    add(FindingKind::Unknown, "program-spin-level-credit", Some(index), "The target level lacks eligible unused feature credit or a required level-four feature.", &feature_source);
+                if spin.planned_level == Some(Level::Four) {
+                    checks.apply(
+                        "program-spin-level-four-feature",
+                        Some(index),
+                        &feature_source,
+                    );
+                }
+                if spin.planned_level.is_some_and(|l| {
+                    l.number() > credit || (l == Level::Four && !level_four_feature)
+                }) {
+                    checks.add(FindingKind::Unknown, "program-spin-level-credit", Some(index), "The target level lacks eligible unused feature credit or a required level-four feature.", &feature_source);
                 }
             }
             ElementPlanEvidence::Step {
@@ -333,19 +434,31 @@ pub fn validate_supported_program(
                 qualified_features,
                 qualification_assumed,
             } => {
+                for id in [
+                    "program-step-recognition",
+                    "program-step-feature-dependency",
+                    "program-step-level-credit",
+                ] {
+                    checks.apply(id, Some(index), &policy.step_source);
+                }
                 if clean_difficult_turns.is_none_or(|n| n < 2)
                     || *full_ice_coverage != Some(true)
                     || (policy.step_movement_required && movement.is_none())
                 {
-                    add(FindingKind::Unknown, "program-step-recognition", Some(index), "Basic step recognition needs two clean difficult turns, ice coverage and the profile movement requirement.", &policy.spins.source);
+                    checks.add(FindingKind::Unknown, "program-step-recognition", Some(index), "Basic step recognition needs two clean difficult turns, ice coverage and the profile movement requirement.", &policy.step_source);
                 }
                 let mut features = qualified_features.clone().unwrap_or_default();
+                checks.apply(
+                    "program-step-feature-dependency",
+                    Some(index),
+                    &source("pp. 2, 5, step features"),
+                );
                 features.sort_unstable();
                 features.dedup();
                 if features.iter().any(|n| !(1..=5).contains(n))
                     || (features.contains(&5) && !features.contains(&4))
                 {
-                    add(
+                    checks.add(
                         FindingKind::Unknown,
                         "program-step-feature-dependency",
                         Some(index),
@@ -356,47 +469,87 @@ pub fn validate_supported_program(
                 features.retain(|n| policy.permitted_step_features.contains(n));
                 if !qualification_assumed
                     || qualified_features.is_none()
-                    || level(*target) > level(policy.max_step_level)
-                    || level(*target) as usize > features.len()
+                    || target.number() > policy.max_step_level.number()
+                    || target.number() as usize > features.len()
                     || (*target != Level::Basic && !features.contains(&1))
                 {
-                    add(FindingKind::Unknown, "program-step-level-credit", Some(index), "The assumed step level lacks supported qualified features or exceeds the profile cap.", &policy.spins.source);
+                    checks.add(FindingKind::Unknown, "program-step-level-credit", Some(index), "The assumed step level lacks supported qualified features or exceeds the profile cap.", &policy.step_source);
                 }
             }
             ElementPlanEvidence::ChoreographicSequence {
                 movements,
                 clearly_visible,
             } => {
+                checks.apply(
+                    "program-choreographic-sequence",
+                    Some(index),
+                    &policy.choreography_source,
+                );
+                checks.apply(
+                    "program-choreographic-sequence",
+                    Some(index),
+                    &source("p. 6, choreographic sequence recognition"),
+                );
+                if let PlannedElement::ChoreographicSequence {
+                    movements: Some(plan),
+                } = element
+                {
+                    let input = SourceReference {
+                        document: "Skating Program Lab input contract".into(),
+                        version: "issue-49".into(),
+                        location:
+                            "typed ChSq evidence supplements ordered legacy movement descriptions"
+                                .into(),
+                    };
+                    checks.apply(
+                        "program-choreographic-plan-consistency",
+                        Some(index),
+                        &input,
+                    );
+                    match plan.iter().map(|m| SkatingMovement::from_description(m)).collect::<Option<Vec<_>>>() {
+                        None => checks.add(FindingKind::Unsupported,"program-choreographic-plan-consistency",Some(index),"A legacy movement description is outside the supported exact vocabulary; it cannot be silently reconciled.",&input),
+                        Some(parsed) if movements.as_ref().is_some_and(|m| *m != parsed) => checks.add(FindingKind::Violation,"program-choreographic-plan-consistency",Some(index),"Typed ChSq movement evidence contradicts the explicitly ordered plan movements.",&input),
+                        _ => {},
+                    }
+                }
                 if *clearly_visible != Some(true)
                     || movements
                         .as_ref()
                         .is_none_or(|m| !m.iter().any(|a| m.iter().any(|b| a != b)))
                 {
-                    add(FindingKind::Unknown, "program-choreographic-sequence", Some(index), "Recognition needs two different supported movements and a clearly visible sequence.", &source("p. 6, choreographic sequence; Adult pp. 10-11"));
+                    checks.add(FindingKind::Unknown, "program-choreographic-sequence", Some(index), "Recognition needs two different supported movements and a clearly visible sequence.", &source("p. 6, choreographic sequence recognition"));
                 }
             }
             ElementPlanEvidence::ChoreographicSpin {
                 consecutive_revolutions_per_foot,
             } => {
+                let qa = SourceReference {
+                    document: "ISU Technical Committee Q&A 1".into(),
+                    version: "2026-04-21".into(),
+                    location: "p. 1, Choreospins Q1, same foot".into(),
+                };
+                checks.apply("program-choreographic-spin", Some(index), &qa);
                 if consecutive_revolutions_per_foot
                     .as_ref()
                     .is_none_or(|feet| !feet.iter().any(|n| *n >= 3))
                 {
-                    let qa = SourceReference {
-                        document: "ISU Technical Committee Q&A 1".into(),
-                        version: "2026-04-21".into(),
-                        location: "p. 1, Choreospins Q1, same foot".into(),
-                    };
-                    add(FindingKind::Unknown, "program-choreographic-spin", Some(index), "Recognition needs three consecutive revolutions on the same foot; split holds cannot be added.", &qa);
+                    checks.add(FindingKind::Unknown, "program-choreographic-spin", Some(index), "Recognition needs three consecutive revolutions on the same foot; split holds cannot be added.", &qa);
                 }
             }
             ElementPlanEvidence::Jump {
                 direct_transitions_assumed,
             } => {
+                if matches!(element, PlannedElement::Jump(JumpElement::Sequence(_))) {
+                    checks.apply(
+                        "program-sequence-direct-step",
+                        Some(index),
+                        &source("p. 3, jump sequences; Adult pp. 8-10"),
+                    );
+                }
                 if matches!(element, PlannedElement::Jump(JumpElement::Sequence(_)))
                     && !direct_transitions_assumed
                 {
-                    add(FindingKind::Unknown, "program-sequence-direct-step", Some(index), "A planned sequence needs an explicit direct Axel-step assumption; recognition is not inferred.", &source("p. 3, jump sequences; Adult pp. 8-10"));
+                    checks.add(FindingKind::Unknown, "program-sequence-direct-step", Some(index), "A planned sequence needs an explicit direct Axel-step assumption; recognition is not inferred.", &source("p. 3, jump sequences; Adult pp. 8-10"));
                 }
             }
         }
@@ -415,21 +568,11 @@ pub fn validate_supported_program(
         .findings
         .iter()
         .map(|f| &f.source)
-        .chain(std::iter::once(&feature_source))
+        .chain(report.applied_rules.iter().map(|r| &r.source))
     {
         if !report.sources.contains(src) {
             report.sources.push(src.clone());
         }
     }
     Ok(report)
-}
-
-pub(crate) fn level(l: Level) -> u8 {
-    match l {
-        Level::Basic => 0,
-        Level::One => 1,
-        Level::Two => 2,
-        Level::Three => 3,
-        Level::Four => 4,
-    }
 }

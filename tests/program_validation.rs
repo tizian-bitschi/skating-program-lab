@@ -290,3 +290,127 @@ fn missing_qualification_or_unmodeled_variations_never_prove_level_credit() {
         |f| f.kind == FindingKind::Unsupported && f.rule_id == "program-feature-qualification"
     ));
 }
+
+#[test]
+fn sequence_assumptions_resolve_only_the_supported_direct_step_uncertainty() {
+    let element = PlannedElement::Jump(JumpElement::Sequence(vec![
+        JumpPart::Jump(ListedJump {
+            kind: Some(JumpKind::ToeLoop),
+            rotations: Some(1),
+        }),
+        JumpPart::Jump(ListedJump {
+            kind: Some(JumpKind::Axel),
+            rotations: Some(1),
+        }),
+    ]));
+    let missing = validate(
+        AdultCategory::Silver,
+        vec![(
+            element.clone(),
+            ElementPlanEvidence::Jump {
+                direct_transitions_assumed: false,
+            },
+        )],
+    );
+    assert!(missing.validation.findings.iter().any(|f| f.explanation
+        == "The plan does not establish the direct step into the Axel or panel recognition."));
+    let supplied = validate(
+        AdultCategory::Silver,
+        vec![(
+            element.clone(),
+            ElementPlanEvidence::Jump {
+                direct_transitions_assumed: true,
+            },
+        )],
+    );
+    assert!(!supplied.validation.findings.iter().any(|f| f.explanation
+        == "The plan does not establish the direct step into the Axel or panel recognition."));
+    let PlannedElement::Jump(JumpElement::Sequence(mut parts)) = element else {
+        unreachable!()
+    };
+    parts.insert(1, JumpPart::UnspecifiedTransition);
+    let unresolved = validate(
+        AdultCategory::Silver,
+        vec![(
+            PlannedElement::Jump(JumpElement::Sequence(parts)),
+            ElementPlanEvidence::Jump {
+                direct_transitions_assumed: true,
+            },
+        )],
+    );
+    assert!(unresolved
+        .validation
+        .findings
+        .iter()
+        .any(|f| f.kind == FindingKind::Unknown
+            && f.explanation == "The transition and its recognition are not established."));
+}
+
+#[test]
+fn typed_choreography_evidence_supplements_but_cannot_contradict_the_plan() {
+    let entry = |descriptions: Vec<&str>| {
+        (
+            PlannedElement::ChoreographicSequence {
+                movements: Some(descriptions.into_iter().map(str::to_owned).collect()),
+            },
+            ElementPlanEvidence::ChoreographicSequence {
+                movements: Some(vec![SkatingMovement::Spiral, SkatingMovement::InaBauer]),
+                clearly_visible: Some(true),
+            },
+        )
+    };
+    let correct = validate(
+        AdultCategory::Bronze,
+        vec![entry(vec!["Spiral", "Ina Bauer"])],
+    );
+    assert!(!has(
+        &correct,
+        "program-choreographic-plan-consistency",
+        Some(0)
+    ));
+    assert!(correct
+        .applied_rules
+        .iter()
+        .any(|r| r.rule_id == "program-choreographic-plan-consistency"));
+    let conflict = validate(
+        AdultCategory::Bronze,
+        vec![entry(vec!["Spiral", "Spread Eagle"])],
+    );
+    assert!(conflict
+        .validation
+        .findings
+        .iter()
+        .any(|f| f.rule_id == "program-choreographic-plan-consistency"
+            && f.kind == FindingKind::Violation));
+    assert!(has(
+        &validate(AdultCategory::Bronze, vec![entry(vec![])]),
+        "program-choreographic-plan-consistency",
+        Some(0)
+    ));
+    let unsupported = validate(
+        AdultCategory::Bronze,
+        vec![entry(vec!["free-form movement prose"])],
+    );
+    assert!(unsupported
+        .validation
+        .findings
+        .iter()
+        .any(|f| f.rule_id == "program-choreographic-plan-consistency"
+            && f.kind == FindingKind::Unsupported));
+}
+
+#[test]
+fn successful_step_checks_retain_family_specific_sources_and_indices() {
+    let r = validate(
+        AdultCategory::Gold,
+        vec![step(Level::Two, Some(SkatingMovement::Spiral), vec![1, 2])],
+    );
+    for id in ["program-step-recognition", "program-step-level-credit"] {
+        let application = r.applied_rules.iter().find(|r| r.rule_id == id).unwrap();
+        assert_eq!(application.element_index, Some(0));
+        assert!(application.source.location.contains("step sequence"));
+        assert!(!application.source.location.contains("spins and level cap"));
+        assert!(r.sources.contains(&application.source));
+        assert!(!r.validation.findings.iter().any(|f| f.rule_id == id));
+    }
+}

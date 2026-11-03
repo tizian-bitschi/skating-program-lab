@@ -108,3 +108,41 @@ movement/feature restrictions, ChSq distinct movements and same-foot ChSp holds.
 Legacy source, scoring, jump optimizer and no-timestamp tests remain required.
 
 Native Windows debug measurement on 2026-11-03: the five mixed optimizer fixtures, including all 120 ordered ties for a five-element Gold domain, completed in 4.95 seconds (compilation excluded). This is a tiny-domain observation, not a bound for larger requests.
+
+## External review corrections
+
+The first review returned REQUEST_CHANGES. The direct-sequence assumption now
+enters the existing jump validator at its sequence check; missing assumptions
+and unspecified transitions remain Unknown. A Silver `1T + 1A` scenario plus
+SSpB reaches the optimizer, shared validator and scorer with an independently
+expected 2.80 objective and both ordered ties.
+
+`AdultDefinition` in `profiles.rs` centrally owns the fixed 2026/27 Adult jump,
+spin and mixed-family policy data. Existing constructors project this definition
+into their compatible interfaces. `ProgramPolicy` binds separate step,
+choreography and feature sources; evaluators remain in their domain modules.
+Level conversion belongs to the shared `Level` type.
+
+`EvidenceValidationReport.applied_rules` records successful and failed checks
+at evaluator sites, with source references and element/component indices.
+`ProgramOptimizationResult.supported_rules` is the available-check inventory;
+its `applied_rules` is the union of checks actually executed for returned
+candidates, including catalog scoring. Each candidate retains its own trace.
+An available rule is not a claim that it ran on every program. Absent step or
+choreographic elements do not acquire per-element recognition traces.
+
+`max_proposals` names the actual budget: completed solver proposals checked by
+the validator. It does not bound Pumpkin's internal nodes or preempt a single
+solver call. Without `time_limit` there is no wall-clock bound for one solver
+call. A regression uses ten candidates in ten slots (10^10 nonempty assignments)
+and stops after one rejected proposal as Incomplete. An optional time limit is
+shared with solver search and enumeration; bounded preparation/validation is
+not individually preemptible.
+
+Typed ChSq movements supplement legacy plan descriptions. When both are given,
+they must describe the same ordered list. Supported exact descriptions are
+Spiral, Arabesque, Spread Eagle, Ina Bauer, Hydroblading and Unlisted Jump
+(case and separators are normalized). Conflicting or explicitly empty plans
+produce a Violation. Other free prose remains Unsupported instead of being
+silently treated as matching evidence. Plan None continues to represent missing
+legacy descriptions, so independently supplied typed evidence remains usable.
