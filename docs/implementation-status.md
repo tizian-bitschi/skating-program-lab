@@ -1,5 +1,17 @@
 # Implementation status
 
+## Rule coverage (#67)
+
+`assess_program_legality` adds stage-aware rule coverage without changing existing
+public report types. It reuses mixed-program validation and the shared manual
+assessment obligation classification. Coverage preserves selected event overrides
+and includes unevaluated Adult timing, performance and variation mechanisms.
+First-success ambiguity and plain-upright feature prerequisites now block definite
+feature credit in every mixed-program consumer. See the
+[per-profile source matrix](specs/legality-coverage-proposal.md) and
+`tests/legality.rs`. Recognition assumptions and unresolved Euler consequences
+remain explicit; no covered pass establishes full ISU legality.
+
 ## Locked program completion (#66)
 
 `complete_program` preserves caller-identified original entries and inserts finite
