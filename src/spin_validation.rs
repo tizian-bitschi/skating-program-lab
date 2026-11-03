@@ -56,6 +56,14 @@ impl RegularSpinKind {
     }
 }
 
+pub(crate) fn position_type_rule(kind: RegularSpinKind) -> &'static str {
+    if kind.basic_position().is_some() {
+        "spin-position-type"
+    } else {
+        "spin-combination-positions"
+    }
+}
+
 /// An intended abbreviation, without a level or panel marks.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SpinAbbreviation {
@@ -164,6 +172,73 @@ impl SpinRequirement {
             && self.entry.is_none_or(|v| v == spin.entry)
             && self.change_foot.is_none_or(|v| v == spin.change_foot)
     }
+}
+
+/// Minimum distinct permitted abbreviations satisfying the remaining role groups.
+/// One insertion may satisfy several compatible requirements.
+pub(crate) fn required_spin_insertions(
+    policy: &RegularSpinPolicy,
+    evidence: &[ElementPlanEvidence],
+    available: usize,
+) -> Option<usize> {
+    let known: Vec<_> = evidence
+        .iter()
+        .filter_map(|e| match e {
+            ElementPlanEvidence::Spin { spin, .. } => spin.abbreviation,
+            _ => None,
+        })
+        .collect();
+    let missing: Vec<_> = policy
+        .required
+        .iter()
+        .filter(|group| !known.iter().any(|a| group.iter().any(|r| r.matches(*a))))
+        .collect();
+    let mut candidates = vec![];
+    for kind in [
+        RegularSpinKind::Camel,
+        RegularSpinKind::Sit,
+        RegularSpinKind::Upright,
+        RegularSpinKind::Layback,
+        RegularSpinKind::Combination,
+    ] {
+        for entry in [SpinEntry::NonFlying, SpinEntry::Flying] {
+            for change_foot in [false, true] {
+                let a = SpinAbbreviation {
+                    kind,
+                    entry,
+                    change_foot,
+                };
+                if !known.contains(&a) && policy.allowed.iter().any(|r| r.matches(a)) {
+                    candidates.push(a);
+                }
+            }
+        }
+    }
+    fn minimum(
+        groups: &[&Vec<SpinRequirement>],
+        candidates: &[SpinAbbreviation],
+        available: usize,
+    ) -> Option<usize> {
+        let Some(first) = groups.first() else {
+            return Some(0);
+        };
+        if available == 0 {
+            return None;
+        }
+        candidates
+            .iter()
+            .filter(|a| first.iter().any(|r| r.matches(**a)))
+            .filter_map(|a| {
+                let remaining: Vec<_> = groups
+                    .iter()
+                    .copied()
+                    .filter(|group| !group.iter().any(|r| r.matches(*a)))
+                    .collect();
+                minimum(&remaining, candidates, available - 1).map(|n| n + 1)
+            })
+            .min()
+    }
+    minimum(&missing, &candidates, available)
 }
 
 /// Explicit policy paired with an exact profile identity. It contains no SOV values.
@@ -871,15 +946,7 @@ impl SpinValidator {
                 self.add(FindingKind::Unknown, "spin-layback-position", Some(index), None,
                     "Upright is only the basic-position class; specific Layback posture is not represented by this plan and remains unknown.", &rules.source);
             }
-            self.apply(
-                if a.kind.basic_position().is_some() {
-                    "spin-position-type"
-                } else {
-                    "spin-combination-positions"
-                },
-                Some(index),
-                &rules.source,
-            );
+            self.apply(position_type_rule(a.kind), Some(index), &rules.source);
             if let Some(expected) = a.kind.basic_position() {
                 if !positions.contains(&expected) {
                     self.add(FindingKind::Unknown, "spin-position-type", Some(index), None,

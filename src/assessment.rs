@@ -194,20 +194,13 @@ pub fn assess_manual_program(
     };
     let evidence: Vec<_> = request.entries.iter().map(|e| e.evidence.clone()).collect();
     let validation = validate_supported_program(registry, &program, &evidence, &request.policy)?;
-    let completion_findings: Vec<_> = validation
-        .validation
-        .findings
-        .iter()
-        .enumerate()
-        .filter(|(_, f)| {
-            f.element_index.is_none()
-                && (f.rule_id == "spin-required-role"
-                    || f.rule_id == "program-required-choreographic-spin"
-                    || f.rule_id == profile.binding(ProfileRule::Axel).id
-                    || f.rule_id == profile.binding(ProfileRule::Eligibility).id)
-        })
-        .map(|(i, _)| i)
-        .collect();
+    let completion_findings = crate::program_validation::completion_findings(
+        &validation,
+        profile,
+        &program,
+        &request.policy,
+        &evidence,
+    );
     let status = if validation
         .validation
         .findings

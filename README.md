@@ -4,6 +4,11 @@ An open-source Rust library for planning technical figure skating programs. The 
 
 ## Current capabilities
 
+- **Legality coverage:** `assess_program_legality` reports individual evaluated,
+  conditional, missing, unsupported and nonapplicable rules, with source editions
+  and event replacements. Draft omissions are indexed separately from final
+  violations. See the [profile matrix and coverage contract](docs/specs/legality-coverage-proposal.md).
+
 - **Locked completion:** `complete_program` inserts finite supported additions
   around immutable original entries, with explicit insertion boundaries, full
   ordered validation, provenance, BV subtotals and bounded equal-optimum proof.

@@ -13,6 +13,7 @@ The core is intended for native and eventual WebAssembly use. Correctness and tr
 | `src/lib.rs` | Public re-exports, ruleset and table identities, source references. |
 | `src/plan.rs` | Ordered `Program` and intended elements; incomplete plans are representable. |
 | `src/assessment.rs` | Additive manual-program entry point; combines existing validation and scoring while preserving intended and supplied-recognition stages, optional GOE and incomplete aggregates. |
+| `src/legality.rs` | Additive stage-aware coverage report built from shared plan validation, explicit profile policies and unevaluated-rule inventory. |
 | `src/execution.rs` | Observations and supplied panel recognition, calls and notation. |
 | `src/spin_validation.rs` | Additive indexed spin evidence, explicit source-bound spin policies and partial family coverage. |
 | `src/validation.rs` | `validate_program` returns findings and partial coverage for a plan. |

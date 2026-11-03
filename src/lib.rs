@@ -14,6 +14,8 @@ mod assessment;
 pub use assessment::*;
 mod program_validation;
 pub use program_validation::*;
+mod legality;
+pub use legality::*;
 
 /// A skating season, identified by its starting and ending years.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
