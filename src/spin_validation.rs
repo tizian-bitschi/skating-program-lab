@@ -122,7 +122,6 @@ pub(crate) fn contradicts_spin_evidence(finding: &Finding) -> bool {
             | "spin-evidence-foot-change"
             | "spin-wind-up-target"
             | "spin-feature-target"
-            | "spin-panel-target"
     )
 }
 

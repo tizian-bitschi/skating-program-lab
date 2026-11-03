@@ -624,3 +624,48 @@ fn supplied_plan_indices_must_follow_reordering_in_both_stages() {
         assert!(assess_manual_program(&ProfileRegistry::adult(), &r).is_ok());
     }
 }
+
+#[test]
+fn independent_spin_panel_findings_do_not_change_intended_bv() {
+    for index in [Some(3), None] {
+        for code in ["CSp", "SSp"] {
+            let mut r = fixture(AdultCategory::Bronze);
+            let before = assess(&r);
+            let mut panel = recognition(&[code], Some(Level::Basic));
+            panel.planned_element = index;
+            if let ElementPlanEvidence::Spin { spin, .. } = &mut r.entries[3].evidence {
+                spin.panel = Some(panel);
+            }
+            let after = assess(&r);
+            assert_eq!(
+                after.elements[3].intended_base,
+                before.elements[3].intended_base
+            );
+            assert_eq!(after.intended_base.exact_hundredths, Some(670));
+            let Ok(BaseValueOutcome::Value(value)) = &after.elements[3].intended_base else {
+                panic!()
+            };
+            assert_eq!(value.hundredths, 130);
+            assert_eq!(value.notation, "CSpB");
+            assert!(after
+                .validation
+                .validation
+                .findings
+                .iter()
+                .any(|f| f.rule_id == "spin-panel-reconciliation"
+                    && f.kind == FindingKind::Unsupported
+                    && f.element_index == Some(3)));
+            assert_eq!(
+                after
+                    .validation
+                    .validation
+                    .findings
+                    .iter()
+                    .any(|f| f.rule_id == "spin-panel-target"
+                        && f.kind == FindingKind::Violation
+                        && f.element_index == Some(3)),
+                index.is_none()
+            );
+        }
+    }
+}

@@ -45,6 +45,11 @@ violations remain separate: an identifiable prohibited Axel can retain numerical
 Assessment and optimizer adapters share the internal `plan_recognition` structural
 encoder; numerical values and qualification remain in existing scoring/validation.
 
+Optional spin-panel reconciliation and panel-target diagnostics remain in the
+validation report and affect its status, but never qualify or invalidate intended
+BV. Supplied invalid references are rejected at the assessment input boundary;
+the legacy spin validator's missing explicit panel-index diagnostic remains visible.
+
 ## Result
 
 - Echo the selected profile/table, submission state and scenario assumptions.

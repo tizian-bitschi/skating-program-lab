@@ -219,7 +219,12 @@ pub fn assess_manual_program(
                 .enumerate()
                 .filter(|(_, f)| {
                     f.element_index == Some(index)
-                        && f.rule_id != "spin-execution-recognition"
+                        && !matches!(
+                            f.rule_id,
+                            "spin-execution-recognition"
+                                | "spin-panel-reconciliation"
+                                | "spin-panel-target"
+                        )
                         && (f.kind != FindingKind::Violation
                             || crate::spin_validation::contradicts_spin_evidence(f))
                 })
