@@ -21,12 +21,15 @@ fn request(c: AdultCategory) -> CandidateGenerationRequest {
         solo_jumps: true,
         direct_combinations: false,
         axel_sequences: false,
+        confirmed_sequence_transitions: vec![],
         max_compound_length: 3,
         base_spins: vec![],
         spin_plans: vec![],
         movement_plans: vec![],
         manual_variants: vec![],
         exclusions: vec![],
+        excluded_spin_positions: vec![],
+        excluded_spin_entries: vec![],
         skill_limits: PersonalSkillLimits::default(),
         recognition_assumed: true,
         max_candidates: 1000,
@@ -145,6 +148,16 @@ fn component_filters_cover_combinations_and_sequences() {
     let mut q = request(AdultCategory::Masters);
     q.direct_combinations = true;
     q.axel_sequences = true;
+    q.confirmed_sequence_transitions = vec![vec![
+        ListedJump {
+            kind: Some(JumpKind::Salchow),
+            rotations: Some(1),
+        },
+        ListedJump {
+            kind: Some(JumpKind::Axel),
+            rotations: Some(1),
+        },
+    ]];
     q.exclusions = vec![
         PersonalExclusion::JumpKind(JumpKind::ToeLoop),
         PersonalExclusion::JumpKind(JumpKind::Lutz),
@@ -391,4 +404,124 @@ fn manual_unknown_transitions_and_skill_limits_do_not_establish_feasibility() {
         generate_program_candidates(&ProfileRegistry::adult(), &q),
         Err(CandidateGenerationError::InvalidRequest(_))
     ));
+}
+
+#[test]
+fn sequence_generation_requires_exact_transition_confirmation() {
+    let mut q = request(AdultCategory::Silver);
+    q.jump_kinds = vec![JumpKind::Salchow, JumpKind::ToeLoop, JumpKind::Axel];
+    q.rotations = vec![1];
+    q.solo_jumps = false;
+    q.axel_sequences = true;
+    q.max_compound_length = 2;
+    let r = generate(&q);
+    assert!(r.variants.is_empty());
+    assert!(!r.audit.omissions.is_empty());
+    q.confirmed_sequence_transitions = vec![vec![
+        ListedJump {
+            kind: Some(JumpKind::Salchow),
+            rotations: Some(1),
+        },
+        ListedJump {
+            kind: Some(JumpKind::Axel),
+            rotations: Some(1),
+        },
+    ]];
+    assert_eq!(codes(&generate(&q)), ["1S+1A+SEQ"]);
+}
+
+#[test]
+fn position_and_entry_filters_cover_automatic_and_manual_combination_spins() {
+    let mut q = request(AdultCategory::Gold);
+    q.jump_kinds.clear();
+    q.base_spins = vec![
+        SpinAbbreviation {
+            kind: RegularSpinKind::Combination,
+            entry: SpinEntry::NonFlying,
+            change_foot: true,
+        },
+        abbreviation(RegularSpinKind::Sit, SpinEntry::Flying),
+    ];
+    let variants = generate(&q).variants;
+    assert_eq!(variants.len(), 2);
+    q.manual_variants = variants;
+    q.excluded_spin_positions = vec![SpinPosition::Camel];
+    let r = generate(&q);
+    assert_eq!(r.variants.len(), 1);
+    assert_eq!(r.audit.excluded_spin_positions, [SpinPosition::Camel]);
+    assert!(
+        matches!(&r.variants[0].element, PlannedElement::RegularSpin(s) if s.entry == Some(SpinEntry::Flying))
+    );
+    q.excluded_spin_positions.clear();
+    q.excluded_spin_entries = vec![SpinEntry::NonFlying];
+    assert_eq!(generate(&q).variants.len(), 1);
+    q.excluded_spin_entries = vec![SpinEntry::Flying];
+    let r = generate(&q);
+    assert_eq!(r.variants.len(), 1);
+    assert!(
+        matches!(&r.variants[0].element, PlannedElement::RegularSpin(s) if s.entry == Some(SpinEntry::NonFlying))
+    );
+}
+
+#[test]
+fn manual_inputs_are_validated_and_prioritized_independently_of_caps() {
+    let mut q = request(AdultCategory::Bronze);
+    q.jump_kinds = vec![JumpKind::ToeLoop, JumpKind::Salchow];
+    q.rotations = vec![1];
+    let mut manual = generate(&q).variants[1].clone();
+    q.manual_variants = vec![manual.clone()];
+    q.max_candidates = 1;
+    q.max_expansions = 1;
+    let r = generate(&q);
+    assert_eq!(codes(&r), ["1S"]);
+    assert_eq!(r.audit.manual_definitions_checked, 1);
+    assert_ne!(
+        r.audit.completeness,
+        CandidateDomainCompleteness::CompleteDeclaredDomain
+    );
+    manual.recognition_assumed = false;
+    q.manual_variants.push(manual);
+    assert!(matches!(
+        generate_program_candidates(&ProfileRegistry::adult(), &q),
+        Err(CandidateGenerationError::InvalidManualVariant { index: 1, .. })
+    ));
+    q.manual_variants = generate(&request(AdultCategory::Bronze)).variants[..2].to_vec();
+    let r = generate(&q);
+    assert_eq!(r.audit.manual_definitions_checked, 2);
+    assert!(r
+        .audit
+        .omissions
+        .iter()
+        .any(|o| o.reason == "manual variant omitted by candidate cap"));
+}
+
+#[test]
+fn equivalent_step_feature_sets_deduplicate_before_consuming_capacity() {
+    let mut q = request(AdultCategory::Masters);
+    q.jump_kinds.clear();
+    q.max_candidates = 1;
+    let step = |features| ElementPlanEvidence::Step {
+        level: Level::Two,
+        clean_difficult_turns: Some(2),
+        full_ice_coverage: Some(true),
+        movement: Some(SkatingMovement::Spiral),
+        qualified_features: Some(features),
+        qualification_assumed: true,
+    };
+    q.movement_plans = vec![step(vec![1, 2]), step(vec![2, 1, 1])];
+    let r = generate(&q);
+    assert_eq!(r.variants.len(), 1);
+    assert_eq!(
+        r.audit.completeness,
+        CandidateDomainCompleteness::CompleteDeclaredDomain
+    );
+    assert!(
+        matches!(&r.variants[0].evidence, ElementPlanEvidence::Step { qualified_features: Some(f), .. } if f == &[1, 2])
+    );
+    q.manual_variants = vec![ProgramVariant {
+        element: PlannedElement::StepSequence,
+        evidence: step(vec![2, 1]),
+        recognition_assumed: true,
+    }];
+    assert_eq!(generate(&q).variants.len(), 1);
 }

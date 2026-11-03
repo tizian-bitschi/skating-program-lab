@@ -29,6 +29,8 @@ pub struct CandidateGenerationRequest {
     pub solo_jumps: bool,
     pub direct_combinations: bool,
     pub axel_sequences: bool,
+    /// Exact ordered jump tuples whose direct steps into Axels are explicitly assumed.
+    pub confirmed_sequence_transitions: Vec<Vec<ListedJump>>,
     pub max_compound_length: usize,
     /// Generate explicit eight-revolution Basic plans for selected abbreviations.
     /// Layback is audited as unsupported because its posture is unmodeled.
@@ -38,11 +40,14 @@ pub struct CandidateGenerationRequest {
     pub movement_plans: Vec<ElementPlanEvidence>,
     pub manual_variants: Vec<ProgramVariant>,
     pub exclusions: Vec<PersonalExclusion>,
+    pub excluded_spin_positions: Vec<SpinPosition>,
+    pub excluded_spin_entries: Vec<SpinEntry>,
     pub skill_limits: PersonalSkillLimits,
     /// Explicit hypothetical clean recognition for generated plans.
     pub recognition_assumed: bool,
     pub max_candidates: usize,
-    /// Counts attempted definitions, including filtered/duplicate/unsupported ones.
+    /// Counts automatic definitions, including filtered/duplicate/unsupported ones.
+    /// Manual definitions are all checked separately before automatic expansion.
     pub max_expansions: usize,
 }
 
@@ -66,9 +71,13 @@ pub struct CandidateGenerationAudit {
     pub sources: Vec<SourceReference>,
     pub families: Vec<ProfileElementFamily>,
     pub exclusions: Vec<PersonalExclusion>,
+    pub excluded_spin_positions: Vec<SpinPosition>,
+    pub excluded_spin_entries: Vec<SpinEntry>,
+    pub skill_limits: PersonalSkillLimits,
     pub omissions: Vec<CandidateOmission>,
     pub completeness: CandidateDomainCompleteness,
     pub attempted_definitions: usize,
+    pub manual_definitions_checked: usize,
     pub max_candidates: usize,
     pub max_expansions: usize,
     pub assumptions: &'static str,
@@ -96,7 +105,6 @@ struct Generator<'a> {
     registry: &'a ProfileRegistry,
     request: &'a CandidateGenerationRequest,
     policy: ProgramPolicy,
-    ruleset: RulesetId,
     result: CandidateGenerationResult,
 }
 impl Generator<'_> {
@@ -106,11 +114,18 @@ impl Generator<'_> {
         variant: ProgramVariant,
         manual: Option<usize>,
     ) -> Result<bool, CandidateGenerationError> {
-        if self.result.audit.attempted_definitions == self.request.max_expansions {
+        let variant = super::programs::normalize_variant(variant);
+        if manual.is_none()
+            && self.result.audit.attempted_definitions == self.request.max_expansions
+        {
             self.result.audit.completeness = CandidateDomainCompleteness::IncompleteExpansionCap;
             return Ok(false);
         }
-        self.result.audit.attempted_definitions += 1;
+        if manual.is_some() {
+            self.result.audit.manual_definitions_checked += 1;
+        } else {
+            self.result.audit.attempted_definitions += 1;
+        }
         let reason = self.check(&variant)?;
         if let Some(reason) = reason {
             if let Some(index) = manual {
@@ -128,6 +143,7 @@ impl Generator<'_> {
             .iter()
             .any(|x| super::programs::excluded(&variant, x, usize::MAX))
             || exceeds_skill(&variant, &self.request.skill_limits)
+            || spin_filtered(&variant, self.request)
         {
             self.result.audit.omissions.push(CandidateOmission {
                 variant,
@@ -140,7 +156,16 @@ impl Generator<'_> {
         }
         if self.result.variants.len() == self.request.max_candidates {
             self.result.audit.completeness = CandidateDomainCompleteness::IncompleteCandidateCap;
-            return Ok(false);
+            self.result.audit.omissions.push(CandidateOmission {
+                variant,
+                reason: if manual.is_some() {
+                    "manual variant omitted by candidate cap"
+                } else {
+                    "automatic variant omitted by candidate cap"
+                }
+                .into(),
+            });
+            return Ok(manual.is_some());
         }
         if let Some(family) = ProfileElementFamily::of(&variant.element) {
             if !self.result.audit.families.contains(&family) {
@@ -155,54 +180,34 @@ impl Generator<'_> {
         &mut self,
         variant: &ProgramVariant,
     ) -> Result<Option<String>, CandidateGenerationError> {
-        let value = match super::programs::score(variant, self.request.scoring_table, self.ruleset)
-        {
-            Ok(v) => v,
+        let prepared = match super::programs::prepare_variant(
+            self.registry,
+            &self.request.profile,
+            self.request.scoring_table,
+            &self.policy,
+            variant,
+        ) {
+            Ok(prepared) => prepared,
+            Err(ProgramOptimizationError::Profile(e)) => {
+                return Err(CandidateGenerationError::Profile(e))
+            }
             Err(e) => {
                 return Ok(Some(format!(
                     "unsupported recognition/scoring contract: {e:?}"
                 )))
             }
         };
-        let program = ProfileProgram {
-            profile: self.request.profile.clone(),
-            scoring_table: self.request.scoring_table,
-            elements: vec![variant.element.clone()],
-        };
-        let report = validate_supported_program(
-            self.registry,
-            &program,
-            std::slice::from_ref(&variant.evidence),
-            &self.policy,
-        )
-        .map_err(CandidateGenerationError::Profile)?;
-        for source in report.sources.iter().chain(std::iter::once(&value.source)) {
-            if !self.result.audit.sources.contains(source) {
-                self.result.audit.sources.push(source.clone());
+        for source in prepared.sources {
+            if !self.result.audit.sources.contains(&source) {
+                self.result.audit.sources.push(source);
             }
         }
-        // Missing required roles/Axel are whole-program constraints, not element eligibility.
-        let findings: Vec<_> = report
-            .validation
-            .findings
-            .iter()
-            .filter(|f| {
-                !matches!(
-                    f.rule_id,
-                    "spin-execution-recognition"
-                        | "spin-required-role"
-                        | "program-required-choreographic-spin"
-                ) && !(f.element_index.is_none()
-                    && (f.rule_id == "isu-adult-2026-27-masters-axel-required"
-                        || f.explanation
-                            == "A required element family or variant is missing or unspecified."))
-            })
-            .collect();
-        if findings.is_empty() {
+        if prepared.local_findings.is_empty() {
             Ok(None)
         } else {
             Ok(Some(
-                findings
+                prepared
+                    .local_findings
                     .iter()
                     .map(|f| format!("{}: {}", f.rule_id, f.explanation))
                     .collect::<Vec<_>>()
@@ -210,6 +215,14 @@ impl Generator<'_> {
             ))
         }
     }
+}
+
+fn spin_filtered(variant: &ProgramVariant, request: &CandidateGenerationRequest) -> bool {
+    let PlannedElement::RegularSpin(spin) = &variant.element else {
+        return false;
+    };
+    spin.entry.is_some_and(|entry| request.excluded_spin_entries.contains(&entry))
+        || spin.steps.iter().flatten().any(|step| matches!(step, SpinStep::Position { position: Some(p), .. } if request.excluded_spin_positions.contains(p)))
 }
 
 fn exceeds_skill(v: &ProgramVariant, limits: &PersonalSkillLimits) -> bool {
@@ -226,7 +239,11 @@ fn exceeds_skill(v: &ProgramVariant, limits: &PersonalSkillLimits) -> bool {
     }
 }
 
-fn jump_variant(jumps: &[ListedJump], sequence: bool, recognition_assumed: bool) -> ProgramVariant {
+fn jump_variant(
+    jumps: &[ListedJump],
+    sequence: bool,
+    request: &CandidateGenerationRequest,
+) -> ProgramVariant {
     let parts = || jumps.iter().cloned().map(JumpPart::Jump).collect();
     ProgramVariant {
         element: PlannedElement::Jump(if jumps.len() == 1 {
@@ -237,9 +254,13 @@ fn jump_variant(jumps: &[ListedJump], sequence: bool, recognition_assumed: bool)
             JumpElement::Combination(parts())
         }),
         evidence: ElementPlanEvidence::Jump {
-            direct_transitions_assumed: sequence,
+            direct_transitions_assumed: sequence
+                && request
+                    .confirmed_sequence_transitions
+                    .iter()
+                    .any(|confirmed| confirmed == jumps),
         },
-        recognition_assumed,
+        recognition_assumed: request.recognition_assumed,
     }
 }
 
@@ -279,6 +300,13 @@ pub fn generate_program_candidates(
         || request.jump_kinds.len() > 6
         || request.rotations.len() > 2
         || request.exclusions.len() > 1000
+        || request.excluded_spin_positions.len() > 3
+        || request.excluded_spin_entries.len() > 2
+        || request.confirmed_sequence_transitions.len() > 1000
+        || request
+            .confirmed_sequence_transitions
+            .iter()
+            .any(|j| !(2..=3).contains(&j.len()))
         || !(2..=3).contains(&request.max_compound_length)
         || request.rotations.iter().any(|n| !(1..=2).contains(n))
         || request.skill_limits.max_jump_rotations == Some(0)
@@ -320,7 +348,6 @@ pub fn generate_program_candidates(
         registry,
         request,
         policy: adult_program_policy(category),
-        ruleset: profile.scoring.recognition_ruleset,
         result: CandidateGenerationResult {
             variants: vec![],
             audit: CandidateGenerationAudit {
@@ -329,9 +356,13 @@ pub fn generate_program_candidates(
                 sources: profile.sources.clone(),
                 families: vec![],
                 exclusions: request.exclusions.clone(),
+                excluded_spin_positions: request.excluded_spin_positions.clone(),
+                excluded_spin_entries: request.excluded_spin_entries.clone(),
+                skill_limits: request.skill_limits.clone(),
                 omissions: vec![],
                 completeness: CandidateDomainCompleteness::CompleteDeclaredDomain,
                 attempted_definitions: 0,
+                manual_definitions_checked: 0,
                 max_candidates: request.max_candidates,
                 max_expansions: request.max_expansions,
                 assumptions: ASSUMPTIONS,
@@ -339,6 +370,11 @@ pub fn generate_program_candidates(
             },
         },
     };
+    for (index, variant) in request.manual_variants.iter().enumerate() {
+        if !g.offer(variant.clone(), Some(index))? {
+            return Ok(g.result);
+        }
+    }
     let mut jumps = vec![];
     for n in 1..=2 {
         for kind in [
@@ -359,10 +395,7 @@ pub fn generate_program_candidates(
     }
     if request.solo_jumps {
         for j in &jumps {
-            if !g.offer(
-                jump_variant(std::slice::from_ref(j), false, request.recognition_assumed),
-                None,
-            )? {
+            if !g.offer(jump_variant(std::slice::from_ref(j), false, request), None)? {
                 return Ok(g.result);
             }
         }
@@ -390,11 +423,7 @@ pub fn generate_program_candidates(
                 for second in &continuations {
                     if length == 2 {
                         if !g.offer(
-                            jump_variant(
-                                &[first.clone(), (*second).clone()],
-                                sequence,
-                                request.recognition_assumed,
-                            ),
+                            jump_variant(&[first.clone(), (*second).clone()], sequence, request),
                             None,
                         )? {
                             return Ok(g.result);
@@ -405,7 +434,7 @@ pub fn generate_program_candidates(
                                 jump_variant(
                                     &[first.clone(), (*second).clone(), (*third).clone()],
                                     sequence,
-                                    request.recognition_assumed,
+                                    request,
                                 ),
                                 None,
                             )? {
@@ -496,11 +525,6 @@ pub fn generate_program_candidates(
             },
             None,
         )? {
-            return Ok(g.result);
-        }
-    }
-    for (index, variant) in request.manual_variants.iter().enumerate() {
-        if !g.offer(variant.clone(), Some(index))? {
             return Ok(g.result);
         }
     }

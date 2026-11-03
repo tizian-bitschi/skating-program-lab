@@ -1,6 +1,9 @@
 //! Additive planned-spin checks. Execution consequences remain conditional.
 use crate::*;
 
+pub(crate) const SPIN_REQUIRED_ROLE_RULE: &str = "spin-required-role";
+pub(crate) const SPIN_EXECUTION_RULE: &str = "spin-execution-recognition";
+
 pub(crate) const RULE_IDS: &[&str] = &[
     "spin-abbreviation",
     "spin-basic-position",
@@ -12,7 +15,7 @@ pub(crate) const RULE_IDS: &[&str] = &[
     "spin-evidence-entry",
     "spin-evidence-foot-change",
     "spin-evidence-target",
-    "spin-execution-recognition",
+    SPIN_EXECUTION_RULE,
     "spin-feature-credit",
     "spin-feature-evidence",
     "spin-feature-target",
@@ -29,7 +32,7 @@ pub(crate) const RULE_IDS: &[&str] = &[
     "spin-position-policy",
     "spin-position-type",
     "spin-recognition-minimum",
-    "spin-required-role",
+    SPIN_REQUIRED_ROLE_RULE,
     "spin-rotations",
     "spin-wind-up-target",
 ];
@@ -539,7 +542,7 @@ impl SpinValidator {
             }
         }
         for required in &policy.required {
-            self.apply("spin-required-role", None, &policy.source);
+            self.apply(SPIN_REQUIRED_ROLE_RULE, None, &policy.source);
             if !known.iter().any(|s| required.iter().any(|r| r.matches(*s))) {
                 self.add(
                     if unknown {
@@ -547,7 +550,7 @@ impl SpinValidator {
                     } else {
                         FindingKind::Violation
                     },
-                    "spin-required-role",
+                    SPIN_REQUIRED_ROLE_RULE,
                     None,
                     None,
                     "A required planned regular-spin role is missing or unspecified.",
@@ -565,7 +568,7 @@ impl SpinValidator {
         policy: &RegularSpinPolicy,
         recognition_ruleset: RulesetId,
     ) {
-        self.add(FindingKind::Unknown, "spin-execution-recognition", Some(index), None,
+        self.add(FindingKind::Unknown, SPIN_EXECUTION_RULE, Some(index), None,
             "Plan checks are conditional on execution; visible flying jump, uninterrupted positions, spin centres and final panel recognition are not established by a plan.", &input_source());
         self.check_abbreviation(index, spin, data, policy);
         self.check_wind_up_target(index, spin, data);

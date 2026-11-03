@@ -108,3 +108,8 @@ source audit and separate domain-cap metadata are covered by
 Unsupported posture/features and physical transitions remain omitted with reasons;
 full-program rules and recognition uncertainty remain unchanged. Candidate-domain
 completeness is distinct from optimizer search/tie completeness.
+
+Review regressions additionally cover per-sequence explicit direct-step evidence,
+spin position/entry filters on automatic and manual combinations, manual-input
+validation independent of automatic caps, normalized unordered step feature
+sets, and typed finding scope shared by generator and optimizer preflight.
