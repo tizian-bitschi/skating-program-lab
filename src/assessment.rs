@@ -19,12 +19,16 @@ pub struct ManualProgramEntry {
     pub planned: PlannedElement,
     pub evidence: ElementPlanEvidence,
     /// Explicit intended recognition assumption, never inferred from execution.
+    /// If supplied, planned_element must be this entry's current index;
+    /// observed_element must be None because this request has no observation list.
     pub intended_recognition: Option<PanelRecognition>,
     pub scenario: Option<ManualElementScenario>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ManualElementScenario {
+    /// Supplied panel assumption. The current plan index is optional; observation
+    /// references are rejected because this request has no indexed observations.
     pub recognition: PanelRecognition,
     pub annotations: Vec<ScoringAnnotation>,
     /// None requests BV only; it is never a final grade of zero.
@@ -112,84 +116,6 @@ fn base_number(value: &BaseValueOutcome) -> Option<i64> {
     }
 }
 
-fn intended_matches(entry: &ManualProgramEntry, panel: &PanelRecognition) -> bool {
-    let Some(details) = &panel.details else {
-        return false;
-    };
-    let codes: Vec<_> = details
-        .components()
-        .iter()
-        .map(ComponentCode::as_str)
-        .collect();
-    let jump_matches = |jump: &ListedJump, code: &str| {
-        let suffix = match jump.kind {
-            Some(JumpKind::ToeLoop) => "T",
-            Some(JumpKind::Salchow) => "S",
-            Some(JumpKind::Loop) => "Lo",
-            Some(JumpKind::Flip) => "F",
-            Some(JumpKind::Lutz) => "Lz",
-            Some(JumpKind::Axel) => "A",
-            None => return false,
-        };
-        jump.rotations
-            .is_some_and(|n| code == format!("{n}{suffix}"))
-    };
-    match (&entry.planned, &entry.evidence) {
-        (PlannedElement::Jump(JumpElement::Solo(j)), _) => {
-            codes.len() == 1 && jump_matches(j, codes[0])
-        }
-        (
-            PlannedElement::Jump(JumpElement::Combination(parts) | JumpElement::Sequence(parts)),
-            _,
-        ) => {
-            let sequence_call = details
-                .calls()
-                .is_some_and(|calls| calls.iter().any(|c| c.call == PanelCall::Sequence));
-            sequence_call
-                == matches!(
-                    entry.planned,
-                    PlannedElement::Jump(JumpElement::Sequence(_))
-                )
-                && parts.len() == codes.len()
-                && parts.iter().zip(codes).all(|(p, c)| match p {
-                    JumpPart::Jump(j) => jump_matches(j, c),
-                    JumpPart::Euler => c == "Eu",
-                    _ => false,
-                })
-        }
-        (PlannedElement::RegularSpin(_), ElementPlanEvidence::Spin { spin, .. }) => {
-            let Some(a) = spin.abbreviation else {
-                return false;
-            };
-            let kind = match a.kind {
-                RegularSpinKind::Camel => "CSp",
-                RegularSpinKind::Sit => "SSp",
-                RegularSpinKind::Upright => "USp",
-                RegularSpinKind::Layback => "LSp",
-                RegularSpinKind::Combination => "CoSp",
-            };
-            let code = format!(
-                "{}{}{kind}",
-                if a.entry == SpinEntry::Flying {
-                    "F"
-                } else {
-                    ""
-                },
-                if a.change_foot { "C" } else { "" }
-            );
-            codes == [code.as_str()]
-                && spin.planned_level.is_some()
-                && details.level() == spin.planned_level
-        }
-        (PlannedElement::StepSequence, ElementPlanEvidence::Step { level, .. }) => {
-            codes == ["StSq"] && details.level() == Some(*level)
-        }
-        (PlannedElement::ChoreographicSequence { .. }, _) => codes == ["ChSq1"],
-        (PlannedElement::ChoreographicSpin, _) => codes == ["ChSp1"],
-        _ => false,
-    }
-}
-
 /// Assess one ordered program using existing validation and scoring. No official
 /// timing, deductions, automatic recognition or full-legality claim is provided.
 pub fn assess_manual_program(
@@ -209,16 +135,22 @@ pub fn assess_manual_program(
         return Err(invalid("second-half boundary exceeds program length"));
     }
     for (index, entry) in request.entries.iter().enumerate() {
+        let evidence_panel = match &entry.evidence {
+            ElementPlanEvidence::Spin { spin, .. } => spin.panel.as_ref(),
+            _ => None,
+        };
         for panel in entry
             .intended_recognition
             .iter()
             .chain(entry.scenario.iter().map(|s| &s.recognition))
+            .chain(evidence_panel)
         {
             if panel.ruleset != profile.scoring.recognition_ruleset
                 || panel.planned_element.is_some_and(|i| i != index)
+                || panel.observed_element.is_some()
             {
                 return Err(invalid(
-                    "recognition ruleset or planned-element index mismatch",
+                    "recognition needs the selected ruleset, its current plan index, and no observation reference",
                 ));
             }
         }
@@ -288,7 +220,8 @@ pub fn assess_manual_program(
                 .filter(|(_, f)| {
                     f.element_index == Some(index)
                         && f.rule_id != "spin-execution-recognition"
-                        && f.kind != FindingKind::Violation
+                        && (f.kind != FindingKind::Violation
+                            || crate::spin_validation::contradicts_spin_evidence(f))
                 })
                 .map(|(i, _)| i)
                 .collect();
@@ -297,7 +230,13 @@ pub fn assess_manual_program(
                 Some(_) if !unresolved.is_empty() => {
                     Err(AssessmentValueError::UnresolvedPlanEvidence(unresolved))
                 }
-                Some(panel) if !intended_matches(entry, panel) => {
+                Some(panel)
+                    if !crate::plan_recognition::matches_intended(
+                        &entry.planned,
+                        &entry.evidence,
+                        panel,
+                    ) =>
+                {
                     Err(AssessmentValueError::PlanRecognitionMismatch)
                 }
                 Some(panel) => lookup_base_value(request.scoring_table, panel, &[])

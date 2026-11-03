@@ -132,13 +132,34 @@ fn bronze_and_silver_source_checked_bv_and_missing_goe() {
         );
         assert!(a.goe_adjustment.is_none());
         assert!(a.hypothetical_total.is_none());
-        for e in a.elements {
+        let mut expected_rows = vec![
+            (40, "1S", vec!["p. 2", "row 1S"]),
+            (60, "1Lz", vec!["p. 2", "row 1Lz"]),
+            (90, "1T+1Lo", vec!["p. 14, remark 4", "code 1T", "code 1Lo"]),
+            (130, "CSpB", vec!["p. 6", "value row 11, code CSpB"]),
+        ];
+        if category == AdultCategory::Silver {
+            expected_rows.push((130, "SSpB", vec!["p. 6", "value row 16, code SSpB"]));
+        }
+        expected_rows.push((350, "ChSq1", vec!["p. 14", "value row 11, code ChSq1"]));
+        assert_eq!(a.elements.len(), expected_rows.len());
+        for (e, (hundredths, notation, source_locations)) in
+            a.elements.into_iter().zip(expected_rows)
+        {
             let BaseValueOutcome::Value(v) = e.intended_base.unwrap() else {
                 panic!()
             };
             assert_eq!(v.source.document, "ISU Communication 2786");
             assert_eq!(v.source.version, "2026-06-02");
-            assert!(!v.source.location.is_empty());
+            assert_eq!(v.hundredths, hundredths);
+            assert_eq!(v.notation, notation);
+            for location in source_locations {
+                assert!(
+                    v.source.location.contains(location),
+                    "{}",
+                    v.source.location
+                );
+            }
         }
         assert_eq!(a.validation.validation.coverage, Coverage::Partial);
     }
@@ -234,11 +255,13 @@ fn invalid_identity_boundary_target_and_plan_association() {
 
 #[test]
 fn supplied_calls_falls_and_unsupported_outcomes_stay_separate() {
-    for (call, goe, fall) in [
-        (PanelCall::Quarter, -2, false),
-        (PanelCall::UnderRotated, -2, false),
-        (PanelCall::WrongEdge, -3, false),
-        (PanelCall::Quarter, -5, true),
+    // Communication 2786 p. 2: explicit 1Lzq, 1Lz<, 1Lze rows.
+    // Communication 2788 pp. 14, 16: final GOE limits, including falls.
+    for (call, goe, fall, base, adjustment, score, total) in [
+        (PanelCall::Quarter, -2, false, 60, -12, 48, 658),
+        (PanelCall::UnderRotated, -2, false, 48, -10, 38, 648),
+        (PanelCall::WrongEdge, -3, false, 48, -14, 34, 644),
+        (PanelCall::Quarter, -5, true, 60, -30, 30, 640),
     ] {
         let mut r = fixture(AdultCategory::Bronze);
         for e in &mut r.entries {
@@ -260,10 +283,37 @@ fn supplied_calls_falls_and_unsupported_outcomes_stay_separate() {
         s.fall = Some(fall);
         let a = assess(&r);
         assert_eq!(a.intended_base.exact_hundredths, Some(670));
-        assert!(
-            a.elements[1].scenario_score.as_ref().unwrap().is_ok(),
-            "{:?}",
-            a.elements[1]
+        let scored = a.elements[1]
+            .scenario_score
+            .as_ref()
+            .unwrap()
+            .as_ref()
+            .unwrap();
+        assert_eq!(scored.base.hundredths, base);
+        assert_eq!(scored.goe_hundredths, adjustment);
+        assert_eq!(scored.score_hundredths, score);
+        assert_eq!(scored.goe, goe);
+        assert_eq!(
+            a.hypothetical_total.as_ref().unwrap().exact_hundredths,
+            Some(total)
+        );
+        assert_eq!(
+            a.request.entries[1]
+                .scenario
+                .as_ref()
+                .unwrap()
+                .recognition
+                .details
+                .as_ref()
+                .unwrap()
+                .calls(),
+            Some(
+                [RecordedCall {
+                    target: CallTarget::Component(0),
+                    call
+                }]
+                .as_slice()
+            )
         );
         assert_eq!(
             a.request.entries[1].scenario.as_ref().unwrap().fall,
@@ -426,4 +476,151 @@ fn explicit_recognition_does_not_fill_missing_plan_qualification() {
         .findings
         .iter()
         .any(|f| f.rule_id == "program-spin-level-credit"));
+}
+
+#[test]
+fn invalid_feature_targets_cannot_qualify_exact_planned_levels() {
+    for target in [1, 99] {
+        let mut r = fixture(AdultCategory::Bronze);
+        if let ElementPlanEvidence::Spin { spin, .. } = &mut r.entries[3].evidence {
+            spin.planned_level = Some(Level::One);
+            spin.feature_attempts = Some(vec![SpinFeatureAttempt {
+                feature: SpinFeature::IncreaseOfSpeed,
+                position_step: target,
+                outcome: FeatureAttemptOutcome::Successful,
+            }]);
+        }
+        r.entries[3].intended_recognition = Some(recognition(&["CSp"], Some(Level::One)));
+        let a = assess(&r);
+        assert!(matches!(
+            a.elements[3].intended_base,
+            Err(AssessmentValueError::UnresolvedPlanEvidence(_))
+        ));
+        assert_eq!(a.intended_base.exact_hundredths, None);
+        assert!(a
+            .validation
+            .validation
+            .findings
+            .iter()
+            .any(|f| f.rule_id == "spin-feature-target"
+                && f.kind == FindingKind::Violation
+                && f.element_index == Some(3)));
+        assert!(a
+            .validation
+            .validation
+            .findings
+            .iter()
+            .any(|f| f.rule_id == "program-spin-level-credit" && f.element_index == Some(3)));
+    }
+    // A target must also be a Position step, not a ChangeFoot marker.
+    let mut r = fixture(AdultCategory::Silver);
+    if let PlannedElement::RegularSpin(spin) = &mut r.entries[3].planned {
+        spin.steps.as_mut().unwrap().push(SpinStep::ChangeFoot);
+    }
+    if let ElementPlanEvidence::Spin { spin, .. } = &mut r.entries[3].evidence {
+        spin.feature_attempts = Some(vec![SpinFeatureAttempt {
+            feature: SpinFeature::IncreaseOfSpeed,
+            position_step: 1,
+            outcome: FeatureAttemptOutcome::Successful,
+        }]);
+    }
+    assert_eq!(assess(&r).intended_base.exact_hundredths, None);
+}
+
+#[test]
+fn invalid_feature_evidence_does_not_consume_later_valid_credit() {
+    let mut r = fixture(AdultCategory::Silver);
+    for (i, target) in [(3, 99), (4, 0)] {
+        if let ElementPlanEvidence::Spin { spin, .. } = &mut r.entries[i].evidence {
+            spin.planned_level = Some(Level::One);
+            spin.feature_attempts = Some(vec![SpinFeatureAttempt {
+                feature: SpinFeature::IncreaseOfSpeed,
+                position_step: target,
+                outcome: FeatureAttemptOutcome::Successful,
+            }]);
+        }
+        r.entries[i].intended_recognition = Some(recognition(
+            &[if i == 3 { "CSp" } else { "SSp" }],
+            Some(Level::One),
+        ));
+    }
+    let a = assess(&r);
+    assert!(a.elements[3].intended_base.is_err());
+    assert!(a.elements[4].intended_base.is_ok());
+    assert!(!a
+        .validation
+        .validation
+        .findings
+        .iter()
+        .any(|f| f.rule_id == "program-spin-level-credit" && f.element_index == Some(4)));
+}
+
+#[test]
+fn observation_references_are_rejected_in_every_recognition_stage() {
+    for observed in [0, 999] {
+        let mut r = fixture(AdultCategory::Bronze);
+        r.entries[0]
+            .intended_recognition
+            .as_mut()
+            .unwrap()
+            .observed_element = Some(observed);
+        assert!(assess_manual_program(&ProfileRegistry::adult(), &r).is_err());
+        r = fixture(AdultCategory::Bronze);
+        add_goe(&mut r.entries[0], Some(0));
+        r.entries[0]
+            .scenario
+            .as_mut()
+            .unwrap()
+            .recognition
+            .observed_element = Some(observed);
+        assert!(assess_manual_program(&ProfileRegistry::adult(), &r).is_err());
+        r = fixture(AdultCategory::Bronze);
+        let mut panel = recognition(&["CSp"], Some(Level::Basic));
+        panel.planned_element = Some(3);
+        panel.observed_element = Some(observed);
+        if let ElementPlanEvidence::Spin { spin, .. } = &mut r.entries[3].evidence {
+            spin.panel = Some(panel);
+        }
+        assert!(assess_manual_program(&ProfileRegistry::adult(), &r).is_err());
+    }
+}
+
+#[test]
+fn supplied_plan_indices_must_follow_reordering_in_both_stages() {
+    for scenario in [false, true] {
+        let mut r = fixture(AdultCategory::Bronze);
+        if scenario {
+            add_goe(&mut r.entries[0], Some(0));
+            r.entries[0]
+                .scenario
+                .as_mut()
+                .unwrap()
+                .recognition
+                .planned_element = Some(0);
+        } else {
+            r.entries[0]
+                .intended_recognition
+                .as_mut()
+                .unwrap()
+                .planned_element = Some(0);
+        }
+        assert!(assess_manual_program(&ProfileRegistry::adult(), &r).is_ok());
+        r.entries.swap(0, 1);
+        assert!(assess_manual_program(&ProfileRegistry::adult(), &r).is_err());
+        if scenario {
+            r.entries[1]
+                .scenario
+                .as_mut()
+                .unwrap()
+                .recognition
+                .planned_element = Some(1);
+        } else {
+            r.entries[1]
+                .intended_recognition
+                .as_mut()
+                .unwrap()
+                .planned_element = Some(1);
+        }
+        assert!(assess_manual_program(&ProfileRegistry::adult(), &r).is_ok());
+    }
 }

@@ -30,6 +30,21 @@ Unknown rotations and unsupported spins remain representable. Missing recognitio
 never becomes a clean recognition. Reject identity, family and index mismatches
 without silently selecting another edition. Preserve input order in every output.
 
+All recognition stages, including an optional spin-evidence panel, reject
+`observed_element: Some(_)`: this request carries no indexed observation list.
+Intended and scenario recognition may omit `planned_element` because the containing
+entry supplies its association; any explicit index must equal that entry's current
+position. The shared spin validator retains its stricter explicit index requirement
+for a panel stored inside spin evidence. Reordering entries requires updating
+explicit references. Execution errors remain local component-indexed facts.
+
+Invalid feature targets and contradictory spin entry/foot-change evidence block
+qualified intended BV. Invalid or unordered feature targets receive no program-wide
+feature credit and consume none. Category prohibitions and program count/repetition
+violations remain separate: an identifiable prohibited Axel can retain numerical BV.
+Assessment and optimizer adapters share the internal `plan_recognition` structural
+encoder; numerical values and qualification remain in existing scoring/validation.
+
 ## Result
 
 - Echo the selected profile/table, submission state and scenario assumptions.

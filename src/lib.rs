@@ -8,6 +8,7 @@ mod execution;
 pub use execution::*;
 
 mod plan;
+mod plan_recognition;
 pub use plan::*;
 mod assessment;
 pub use assessment::*;
