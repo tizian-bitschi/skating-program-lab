@@ -9,6 +9,56 @@ use pumpkin_solver::{
 };
 use std::time::Instant;
 
+/// Ordered candidate slots with a suffix of empty slots and catalog value sum.
+pub(super) fn ordered_slots(
+    values: &[i32],
+    max_elements: usize,
+    min_elements: usize,
+) -> (
+    Solver,
+    Vec<pumpkin_solver::core::variables::DomainId>,
+    pumpkin_solver::core::variables::DomainId,
+) {
+    use pumpkin_solver::core::{predicate, variables::TransformableVariable};
+    let mut solver = Solver::default();
+    let max_value = *values.iter().max().unwrap();
+    let slots: Vec<_> = (0..max_elements)
+        .map(|_| solver.new_bounded_integer(0, values.len() as i32 - 1))
+        .collect();
+    let scores: Vec<_> = slots
+        .iter()
+        .map(|_| solver.new_bounded_integer(0, max_value))
+        .collect();
+    let objective = solver.new_bounded_integer(0, max_value * max_elements as i32);
+    let mut terms: Vec<_> = scores.iter().map(|score| score.scaled(1)).collect();
+    terms.push(objective.scaled(-1));
+    let tag = solver.new_constraint_tag();
+    solver
+        .add_constraint(pumpkin_solver::equals(terms, 0, tag))
+        .post();
+    for (&slot, &score) in slots.iter().zip(&scores) {
+        for (index, &value) in values.iter().enumerate() {
+            let tag = solver.new_constraint_tag();
+            solver.add_clause(
+                vec![predicate!(slot != index as i32), predicate!(score == value)],
+                tag,
+            );
+        }
+    }
+    for pair in slots.windows(2) {
+        let tag = solver.new_constraint_tag();
+        solver.add_clause(
+            vec![predicate!(pair[0] != 0), predicate!(pair[1] == 0)],
+            tag,
+        );
+    }
+    for &slot in slots.iter().take(min_elements) {
+        let tag = solver.new_constraint_tag();
+        solver.add_clause(vec![predicate!(slot != 0)], tag);
+    }
+    (solver, slots, objective)
+}
+
 pub(super) struct Deadline(pub(super) Option<Instant>);
 impl TerminationCondition for Deadline {
     fn should_stop(&mut self) -> bool {

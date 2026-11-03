@@ -19,6 +19,33 @@ pub enum FindingKind {
     Unknown,
     Unsupported,
 }
+/// One check actually evaluated, including successful checks with no finding.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AppliedRule {
+    pub rule_id: &'static str,
+    pub element_index: Option<usize>,
+    pub component_index: Option<usize>,
+    pub source: SourceReference,
+}
+
+pub(crate) fn record_rule(
+    trace: &mut Vec<AppliedRule>,
+    rule_id: &'static str,
+    element_index: Option<usize>,
+    component_index: Option<usize>,
+    source: &SourceReference,
+) {
+    let application = AppliedRule {
+        rule_id,
+        element_index,
+        component_index,
+        source: source.clone(),
+    };
+    if !trace.contains(&application) {
+        trace.push(application);
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Coverage {
     Partial,
@@ -126,6 +153,8 @@ struct Compound {
 }
 struct Validator<'a> {
     profile: &'a crate::RuleProfile,
+    applied_rules: Vec<AppliedRule>,
+    assumed_direct_sequences: &'a [usize],
     policy: &'a crate::JumpPolicy,
     findings: Vec<Finding>,
     occurrences: Vec<(JumpKind, u8)>,
@@ -138,9 +167,11 @@ struct Validator<'a> {
     axel_unknown: bool,
 }
 impl<'a> Validator<'a> {
-    fn new(profile: &'a crate::RuleProfile) -> Self {
+    fn new(profile: &'a crate::RuleProfile, assumed_direct_sequences: &'a [usize]) -> Self {
         Self {
             profile,
+            applied_rules: vec![],
+            assumed_direct_sequences,
             policy: &profile.jumps,
             findings: vec![],
             occurrences: vec![],
@@ -157,6 +188,16 @@ impl<'a> Validator<'a> {
         self.policy.bronze_diagnostics
             && self.profile.provenance == crate::ProfileProvenance::Official
     }
+    fn apply(&mut self, rule: Rule, index: Option<usize>, component: Option<usize>) {
+        let binding = self.profile.binding(rule);
+        record_rule(
+            &mut self.applied_rules,
+            binding.id,
+            index,
+            component,
+            &binding.source,
+        );
+    }
     fn add(
         &mut self,
         kind: FindingKind,
@@ -165,6 +206,7 @@ impl<'a> Validator<'a> {
         component_index: Option<usize>,
         explanation: &'static str,
     ) {
+        self.apply(rule, element_index, component_index);
         self.findings.push(Finding {
             kind,
             rule_id: self.profile.binding(rule).id,
@@ -175,6 +217,9 @@ impl<'a> Validator<'a> {
         });
     }
     fn jump(&mut self, jump: &ListedJump, index: usize, component: Option<usize>) {
+        self.apply(Rule::Input, Some(index), component);
+        self.apply(Rule::Eligibility, Some(index), component);
+        self.apply(Rule::Repetition, Some(index), component);
         if jump.kind.is_none() || jump.rotations.is_none() {
             self.add(
                 FindingKind::Unknown,
@@ -265,6 +310,8 @@ impl<'a> Validator<'a> {
         }
     }
     fn transition(&mut self, parts: &[JumpPart], index: usize, sequence: bool) {
+        self.apply(Rule::Transition, Some(index), None);
+        self.apply(Rule::Euler, Some(index), None);
         for (i, part) in parts.iter().enumerate() {
             match part {
                 JumpPart::Euler => {
@@ -340,6 +387,7 @@ impl<'a> Validator<'a> {
         }
     }
     fn compound(&mut self, parts: &[JumpPart], index: usize, sequence: bool) {
+        self.apply(Rule::Structure, Some(index), None);
         let listed: Vec<_> = parts
             .iter()
             .filter_map(|part| match part {
@@ -411,7 +459,7 @@ impl<'a> Validator<'a> {
                     None,
                     "A sequence requires an Axel-type second or third jump with a direct step.",
                 );
-            } else {
+            } else if !self.assumed_direct_sequences.contains(&index) {
                 self.add(FindingKind::Unknown, Rule::Structure, Some(index), None, "The plan does not establish the direct step into the Axel or panel recognition.");
             }
         }
@@ -422,6 +470,17 @@ impl<'a> Validator<'a> {
         }
     }
     fn program_checks(&mut self) {
+        for rule in [
+            Rule::Count,
+            Rule::CompoundCount,
+            Rule::Repetition,
+            Rule::Euler,
+        ] {
+            self.apply(rule, None, None);
+        }
+        if self.policy.require_axel {
+            self.apply(Rule::Axel, None, None);
+        }
         let sequences = self.compounds.iter().filter(|c| c.sequence).count();
         let combinations = self.compounds.len() - sequences;
         if combinations > self.policy.max_combinations
@@ -452,6 +511,9 @@ impl<'a> Validator<'a> {
                 None,
                 "An unspecified element may be a jump combination.",
             );
+        }
+        if self.policy.max_compound_length >= 3 {
+            self.apply(Rule::Structure, None, None);
         }
         if self.policy.max_compound_length >= 3
             && self.compounds.iter().filter(|c| c.length == 3).count()
@@ -567,7 +629,15 @@ pub(crate) fn validate_elements(
     elements: &[PlannedElement],
     profile: &crate::RuleProfile,
 ) -> ValidationResult {
-    let mut validator = Validator::new(profile);
+    validate_elements_traced(elements, profile, &[]).0
+}
+
+pub(crate) fn validate_elements_traced(
+    elements: &[PlannedElement],
+    profile: &crate::RuleProfile,
+    assumed_direct_sequences: &[usize],
+) -> (ValidationResult, Vec<AppliedRule>) {
+    let mut validator = Validator::new(profile, assumed_direct_sequences);
     for (index, element) in elements.iter().enumerate() {
         match element {
             PlannedElement::Unspecified => {
@@ -587,6 +657,7 @@ pub(crate) fn validate_elements(
         }
     }
     for (index, element) in elements.iter().enumerate() {
+        validator.apply(Rule::Eligibility, Some(index), None);
         if crate::ProfileElementFamily::of(element)
             .is_some_and(|family| !profile.families.allowed.contains(&family))
         {
@@ -600,6 +671,7 @@ pub(crate) fn validate_elements(
         }
     }
     for required in &profile.families.required {
+        validator.apply(Rule::Eligibility, None, None);
         if !elements
             .iter()
             .any(|e| crate::ProfileElementFamily::of(e) == Some(*required))
@@ -618,8 +690,11 @@ pub(crate) fn validate_elements(
         }
     }
     validator.program_checks();
-    ValidationResult {
-        coverage: Coverage::Partial,
-        findings: validator.findings,
-    }
+    (
+        ValidationResult {
+            coverage: Coverage::Partial,
+            findings: validator.findings,
+        },
+        validator.applied_rules,
+    )
 }

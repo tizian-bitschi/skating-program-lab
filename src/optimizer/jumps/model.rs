@@ -6,7 +6,7 @@ use pumpkin_solver::{
         optimisation::{linear_sat_unsat::LinearSatUnsat, OptimisationDirection},
         predicate,
         results::{OptimisationResult, ProblemSolution, SolutionReference},
-        variables::{DomainId, TransformableVariable},
+        variables::DomainId,
         DefaultBrancher,
     },
     Solver,
@@ -218,42 +218,11 @@ fn optimize_profile_inner(
         }
         return Ok(result);
     }
-    let mut solver = Solver::default();
-    let max_value = *values.iter().max().unwrap();
-    let slots: Vec<_> = (0..request.max_elements)
-        .map(|_| solver.new_bounded_integer(0, result.universe.len() as i32))
-        .collect();
-    let scores: Vec<_> = slots
-        .iter()
-        .map(|_| solver.new_bounded_integer(0, max_value))
-        .collect();
-    let objective = solver.new_bounded_integer(0, max_value * request.max_elements as i32);
-    let mut terms: Vec<_> = scores.iter().map(|score| score.scaled(1)).collect();
-    terms.push(objective.scaled(-1));
-    let tag = solver.new_constraint_tag();
-    solver
-        .add_constraint(pumpkin_solver::equals(terms, 0, tag))
-        .post();
-    for (&slot, &score) in slots.iter().zip(&scores) {
-        for (index, &value) in values.iter().enumerate() {
-            let tag = solver.new_constraint_tag();
-            solver.add_clause(
-                vec![predicate!(slot != index as i32), predicate!(score == value)],
-                tag,
-            );
-        }
-    }
-    for pair in slots.windows(2) {
-        let tag = solver.new_constraint_tag();
-        solver.add_clause(
-            vec![predicate!(pair[0] != 0), predicate!(pair[1] == 0)],
-            tag,
-        );
-    }
-    if request.require_nonempty {
-        let tag = solver.new_constraint_tag();
-        solver.add_clause(vec![predicate!(slots[0] != 0)], tag);
-    }
+    let (mut solver, slots, objective) = solver_common::ordered_slots(
+        &values,
+        request.max_elements,
+        usize::from(request.require_nonempty),
+    );
     let mut deadline = Deadline(end);
     loop {
         if result.examined_subsections >= request.max_search_nodes {

@@ -75,3 +75,7 @@ binding overrides. Optimizer sources contain each exact citation once, in stable
 order; distinct SOV row locations remain distinct. ProfileRule is shared by
 registry and validator. Scoring binding overrides are explicitly unsupported;
 new versioned scoring policies use explicit policy citations.
+
+## Bounded mixed-program scenarios (issue 49)
+
+`optimize_program` and `validate_supported_program` add supported mixed-element planning with explicit recognition/qualification assumptions and partial coverage. See the [supported contract and limitations](specs/bounded-program-optimizer.md). Difficult variation categories, Euler consequences, automatic recognition, Pair rules and full compliance remain outside the model.

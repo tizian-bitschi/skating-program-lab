@@ -9,6 +9,8 @@ pub use execution::*;
 
 mod plan;
 pub use plan::*;
+mod program_validation;
+pub use program_validation::*;
 
 /// A skating season, identified by its starting and ending years.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

@@ -613,28 +613,276 @@ pub fn score_profile_program(
     })
 }
 
+/// All built-in 2026/27 Adult policy data lives in this versioned definition.
+struct AdultDefinition {
+    name: &'static str,
+    label: &'static str,
+    page: &'static str,
+    max_jumps: usize,
+    compound_length: usize,
+    duration: u32,
+    require_axel: bool,
+    bronze: bool,
+    double_kinds: Vec<JumpKind>,
+    max_spins: usize,
+    min_spin: u16,
+    min_changed_spin: u16,
+    spin_level: Level,
+    allowed_spins: Vec<SpinRequirement>,
+    required_spins: Vec<Vec<SpinRequirement>>,
+    advanced: bool,
+    step_level: Level,
+    step_movement: bool,
+    step_features: Vec<u8>,
+}
+
+fn adult_definition(category: AdultCategory) -> AdultDefinition {
+    use RegularSpinKind::*;
+    use SpinEntry::*;
+    let one_position = |entry| {
+        [Camel, Sit, Upright, Layback]
+            .map(|kind| SpinRequirement {
+                kind: Some(kind),
+                entry,
+                change_foot: None,
+            })
+            .to_vec()
+    };
+    let role = |kind, entry, change_foot| SpinRequirement {
+        kind,
+        entry,
+        change_foot,
+    };
+    let (
+        name,
+        label,
+        page,
+        max_jumps,
+        compound_length,
+        duration,
+        require_axel,
+        bronze,
+        double_kinds,
+        max_spins,
+        min_spin,
+        min_changed_spin,
+        spin_level,
+        allowed_spins,
+        required_spins,
+        advanced,
+        step_level,
+        step_movement,
+        step_features,
+    ) = match category {
+        AdultCategory::Bronze => (
+            "bronze",
+            "Bronze",
+            "p. 11",
+            4,
+            2,
+            100,
+            false,
+            true,
+            vec![],
+            2,
+            3,
+            6,
+            Level::One,
+            one_position(Some(NonFlying)),
+            vec![],
+            false,
+            Level::Basic,
+            false,
+            vec![],
+        ),
+        AdultCategory::Silver => (
+            "silver",
+            "Silver",
+            "p. 10",
+            4,
+            3,
+            120,
+            false,
+            false,
+            vec![],
+            2,
+            4,
+            6,
+            Level::Two,
+            vec![role(None, None, None)],
+            vec![one_position(Some(NonFlying))],
+            false,
+            Level::Basic,
+            false,
+            vec![],
+        ),
+        AdultCategory::Gold => (
+            "gold",
+            "Gold",
+            "p. 9",
+            5,
+            3,
+            170,
+            false,
+            false,
+            vec![JumpKind::ToeLoop, JumpKind::Salchow, JumpKind::Loop],
+            3,
+            4,
+            8,
+            Level::Three,
+            vec![
+                role(Some(Combination), Some(NonFlying), Some(true)),
+                role(None, Some(Flying), None),
+            ],
+            vec![
+                vec![role(Some(Combination), Some(NonFlying), Some(true))],
+                vec![role(None, Some(Flying), None)],
+            ],
+            true,
+            Level::Two,
+            true,
+            vec![1, 2],
+        ),
+        AdultCategory::Masters => (
+            "masters",
+            "Masters",
+            "p. 8",
+            5,
+            3,
+            180,
+            true,
+            false,
+            vec![
+                JumpKind::ToeLoop,
+                JumpKind::Salchow,
+                JumpKind::Loop,
+                JumpKind::Flip,
+                JumpKind::Lutz,
+                JumpKind::Axel,
+            ],
+            3,
+            5,
+            8,
+            Level::Four,
+            vec![
+                role(Some(Combination), Some(NonFlying), None),
+                role(None, Some(Flying), Some(false)),
+            ],
+            vec![
+                vec![role(Some(Combination), Some(NonFlying), None)],
+                vec![role(None, Some(Flying), Some(false))],
+            ],
+            true,
+            Level::Four,
+            false,
+            vec![1, 2, 3, 4, 5],
+        ),
+    };
+    AdultDefinition {
+        name,
+        label,
+        page,
+        max_jumps,
+        compound_length,
+        duration,
+        require_axel,
+        bronze,
+        double_kinds,
+        max_spins,
+        min_spin,
+        min_changed_spin,
+        spin_level,
+        allowed_spins,
+        required_spins,
+        advanced,
+        step_level,
+        step_movement,
+        step_features,
+    }
+}
+
+fn adult_source(page: &str, family: &str) -> SourceReference {
+    SourceReference {
+        document: "International Adult Figure Skating Competitions Technical Announcement".into(),
+        version: "2026-07-16".into(),
+        location: format!("{page}, Free Skating, {family}; p. 4, precedence"),
+    }
+}
+
+pub fn adult_regular_spin_policy(category: AdultCategory) -> RegularSpinPolicy {
+    let d = adult_definition(category);
+    RegularSpinPolicy {
+        profile: adult_profile(category).id,
+        source: adult_source(d.page, "spins and level cap"),
+        max_spins: d.max_spins,
+        allowed: d.allowed_spins,
+        required: d.required_spins,
+        min_revolutions: d.min_spin,
+        min_change_foot_revolutions: d.min_changed_spin,
+        max_level: d.spin_level,
+        positions: Some(SpinPositionRules {
+            source: crate::spin_validation::handbook(
+                "pp. 14, 18, spin positions, final wind-up and combination no-value",
+            ),
+            min_basic_revolutions: 2,
+            min_spin_revolutions: 3,
+            min_combination_positions: 2,
+            full_value_positions: 3,
+            max_other_position_revolutions: 2,
+        }),
+        per_foot: Some(SpinFootRules {
+            source: crate::spin_validation::communication(
+                "p. 4, Free Skating change-foot revolutions and basic positions",
+            ),
+            min_revolutions: 3,
+            min_basic_revolutions: 2,
+        }),
+    }
+}
+
+pub fn adult_program_policy(category: AdultCategory) -> ProgramPolicy {
+    let d = adult_definition(category);
+    ProgramPolicy {
+        spins: adult_regular_spin_policy(category),
+        max_steps: usize::from(d.advanced),
+        max_choreographic_sequences: usize::from(!d.advanced),
+        max_choreographic_spins: usize::from(d.advanced),
+        require_choreographic_spin: d.advanced,
+        max_step_level: d.step_level,
+        step_movement_required: d.step_movement,
+        permitted_step_features: d.step_features,
+        step_source: adult_source(
+            d.page,
+            "step sequence eligibility, movement requirements and level cap",
+        ),
+        choreography_source: adult_source(
+            d.page,
+            "choreographic spin and sequence eligibility and counts",
+        ),
+        feature_source: crate::spin_validation::communication(
+            "pp. 2, 4-5, Single spin feature credit, reuse, quotas and level 4",
+        ),
+    }
+}
+
 /// The sole legacy category-to-profile adapter. New categories use registration.
 pub fn adult_profile(category: AdultCategory) -> RuleProfile {
-    let (name, page, cap, length, duration, axel, bronze) = match category {
-        AdultCategory::Bronze => ("bronze", "p. 11", 4, 2, 100, false, true),
-        AdultCategory::Silver => ("silver", "p. 10", 4, 3, 120, false, false),
-        AdultCategory::Gold => ("gold", "p. 9", 5, 3, 170, false, false),
-        AdultCategory::Masters => ("masters", "p. 8", 5, 3, 180, true, false),
-    };
+    let d = adult_definition(category);
+    let (name, page, cap, length, duration, axel, bronze) = (
+        d.name,
+        d.page,
+        d.max_jumps,
+        d.compound_length,
+        d.duration,
+        d.require_axel,
+        d.bronze,
+    );
     let source = |location: String| SourceReference {
         document: "International Adult Figure Skating Competitions Technical Announcement".into(),
         version: "2026-07-16".into(),
         location,
     };
-    let category_source = source(format!(
-        "{page}, {} Free Skating, jumps",
-        match category {
-            AdultCategory::Bronze => "Bronze",
-            AdultCategory::Silver => "Silver",
-            AdultCategory::Gold => "Gold",
-            AdultCategory::Masters => "Masters",
-        }
-    ));
+    let category_source = source(format!("{page}, {} Free Skating, jumps", d.label));
     let duration_source = source(page.into());
     let time_source = source(format!("p. 6, time deductions; {page}, required duration"));
     let fall_source = source("p. 11, Bronze fall deductions".into());
@@ -690,15 +938,7 @@ pub fn adult_profile(category: AdultCategory) -> RuleProfile {
     .map(|kind| JumpPermission {
         kind,
         min_rotations: 1,
-        max_rotations: match category {
-            AdultCategory::Masters => 2,
-            AdultCategory::Gold
-                if matches!(kind, JumpKind::ToeLoop | JumpKind::Salchow | JumpKind::Loop) =>
-            {
-                2
-            }
-            _ => 1,
-        },
+        max_rotations: if d.double_kinds.contains(&kind) { 2 } else { 1 },
     })
     .collect();
     RuleProfile {

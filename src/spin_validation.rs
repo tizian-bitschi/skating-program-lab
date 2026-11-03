@@ -1,6 +1,39 @@
 //! Additive planned-spin checks. Execution consequences remain conditional.
 use crate::*;
 
+pub(crate) const RULE_IDS: &[&str] = &[
+    "spin-abbreviation",
+    "spin-basic-position",
+    "spin-combination-positions",
+    "spin-count",
+    "spin-distinct-abbreviation",
+    "spin-eligibility",
+    "spin-entry",
+    "spin-evidence-entry",
+    "spin-evidence-foot-change",
+    "spin-evidence-target",
+    "spin-execution-recognition",
+    "spin-feature-credit",
+    "spin-feature-evidence",
+    "spin-feature-target",
+    "spin-layback-position",
+    "spin-level-cap",
+    "spin-minimum-revolutions",
+    "spin-multiple-foot-changes",
+    "spin-panel-reconciliation",
+    "spin-panel-target",
+    "spin-per-foot-policy",
+    "spin-per-foot-revolutions",
+    "spin-policy",
+    "spin-position-evidence",
+    "spin-position-policy",
+    "spin-position-type",
+    "spin-recognition-minimum",
+    "spin-required-role",
+    "spin-rotations",
+    "spin-wind-up-target",
+];
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RegularSpinKind {
     Camel,
@@ -136,101 +169,6 @@ pub struct SpinFootRules {
     pub min_basic_revolutions: u16,
 }
 
-pub fn adult_regular_spin_policy(category: AdultCategory) -> RegularSpinPolicy {
-    use RegularSpinKind::*;
-    use SpinEntry::*;
-    let one_position = |entry| {
-        [Camel, Sit, Upright, Layback].map(|kind| SpinRequirement {
-            kind: Some(kind),
-            entry,
-            change_foot: None,
-        })
-    };
-    let role = |kind, entry, change_foot| SpinRequirement {
-        kind,
-        entry,
-        change_foot,
-    };
-    let (page, max_spins, min, changed, level, allowed, required) = match category {
-        AdultCategory::Bronze => (
-            11,
-            2,
-            3,
-            6,
-            Level::One,
-            one_position(Some(NonFlying)).to_vec(),
-            vec![],
-        ),
-        AdultCategory::Silver => (
-            10,
-            2,
-            4,
-            6,
-            Level::Two,
-            vec![role(None, None, None)],
-            vec![one_position(Some(NonFlying)).to_vec()],
-        ),
-        AdultCategory::Gold => (
-            9,
-            3,
-            4,
-            8,
-            Level::Three,
-            vec![
-                role(Some(Combination), Some(NonFlying), Some(true)),
-                role(None, Some(Flying), None),
-            ],
-            vec![
-                vec![role(Some(Combination), Some(NonFlying), Some(true))],
-                vec![role(None, Some(Flying), None)],
-            ],
-        ),
-        AdultCategory::Masters => (
-            8,
-            3,
-            5,
-            8,
-            Level::Four,
-            vec![
-                role(Some(Combination), Some(NonFlying), None),
-                role(None, Some(Flying), Some(false)),
-            ],
-            vec![
-                vec![role(Some(Combination), Some(NonFlying), None)],
-                vec![role(None, Some(Flying), Some(false))],
-            ],
-        ),
-    };
-    RegularSpinPolicy {
-        profile: adult_profile(category).id,
-        source: SourceReference {
-            document: "International Adult Figure Skating Competitions Technical Announcement"
-                .into(),
-            version: "2026-07-16".into(),
-            location: format!("p. {page}, Free Skating, spins and level cap; p. 4, precedence"),
-        },
-        max_spins,
-        allowed,
-        required,
-        min_revolutions: min,
-        min_change_foot_revolutions: changed,
-        max_level: level,
-        positions: Some(SpinPositionRules {
-            source: handbook("pp. 14, 18, spin positions, final wind-up and combination no-value"),
-            min_basic_revolutions: 2,
-            min_spin_revolutions: 3,
-            min_combination_positions: 2,
-            full_value_positions: 3,
-            max_other_position_revolutions: 2,
-        }),
-        per_foot: Some(SpinFootRules {
-            source: communication("p. 4, Free Skating change-foot revolutions and basic positions"),
-            min_revolutions: 3,
-            min_basic_revolutions: 2,
-        }),
-    }
-}
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ValidationFamily {
     Jumps,
@@ -257,27 +195,19 @@ pub struct ValidationCoverage {
 pub struct EvidenceValidationReport {
     pub profile: ProfileId,
     pub sources: Vec<SourceReference>,
+    pub applied_rules: Vec<AppliedRule>,
     pub validation: ValidationResult,
     pub coverage: Vec<ValidationCoverage>,
 }
 
-fn level_number(level: Level) -> u8 {
-    match level {
-        Level::Basic => 0,
-        Level::One => 1,
-        Level::Two => 2,
-        Level::Three => 3,
-        Level::Four => 4,
-    }
-}
-fn communication(location: &str) -> SourceReference {
+pub(crate) fn communication(location: &str) -> SourceReference {
     SourceReference {
         document: "ISU Communication 2788".into(),
         version: "2026-05-19".into(),
         location: location.into(),
     }
 }
-fn handbook(location: &str) -> SourceReference {
+pub(crate) fn handbook(location: &str) -> SourceReference {
     SourceReference {
         document: "ISU Technical Panel Handbook, Single Skating".into(),
         version: "2026-07-15".into(),
@@ -325,6 +255,16 @@ pub fn validate_profile_program_with_evidence(
     evidence: &ProgramValidationEvidence,
     policy: Option<&RegularSpinPolicy>,
 ) -> Result<EvidenceValidationReport, ProfileSelectionError> {
+    validate_profile_program_with_assumptions(registry, program, evidence, policy, &[])
+}
+
+pub(crate) fn validate_profile_program_with_assumptions(
+    registry: &ProfileRegistry,
+    program: &ProfileProgram,
+    evidence: &ProgramValidationEvidence,
+    policy: Option<&RegularSpinPolicy>,
+    assumed_direct_sequences: &[usize],
+) -> Result<EvidenceValidationReport, ProfileSelectionError> {
     let profile = registry.resolve(&program.profile, program.scoring_table)?;
     let built_in = [
         AdultCategory::Bronze,
@@ -360,8 +300,14 @@ pub fn validate_profile_program_with_evidence(
                 reason: "spin rules need the selected profile identity, complete source bindings and positive coherent recognition thresholds".into() });
         }
     }
+    let (jump_validation, applied_rules) = crate::validation::validate_elements_traced(
+        &program.elements,
+        profile,
+        assumed_direct_sequences,
+    );
     let mut check = SpinValidator {
-        findings: crate::validation::validate_elements(&program.elements, profile).findings,
+        findings: jump_validation.findings,
+        applied_rules,
     };
     let indexed = check.index_evidence(&program.elements, evidence);
     if let Some(policy) = policy {
@@ -386,6 +332,7 @@ pub fn validate_profile_program_with_evidence(
         .findings
         .iter()
         .map(|f| &f.source)
+        .chain(check.applied_rules.iter().map(|r| &r.source))
         .chain(policy.map(|p| &p.source))
         .chain(policy.and_then(|p| p.positions.as_ref().map(|r| &r.source)))
         .chain(policy.and_then(|p| p.per_foot.as_ref().map(|r| &r.source)))
@@ -395,7 +342,7 @@ pub fn validate_profile_program_with_evidence(
         }
     }
     Ok(EvidenceValidationReport {
-        profile: profile.id.clone(), sources,
+        profile: profile.id.clone(), sources, applied_rules: check.applied_rules,
         validation: ValidationResult { coverage: Coverage::Partial, findings: check.findings },
         coverage: vec![
             ValidationCoverage { family: ValidationFamily::Jumps, coverage: FamilyCoverage::Partial,
@@ -412,8 +359,12 @@ pub fn validate_profile_program_with_evidence(
 
 struct SpinValidator {
     findings: Vec<Finding>,
+    applied_rules: Vec<AppliedRule>,
 }
 impl SpinValidator {
+    fn apply(&mut self, id: &'static str, index: Option<usize>, source: &SourceReference) {
+        crate::validation::record_rule(&mut self.applied_rules, id, index, None, source);
+    }
     fn add(
         &mut self,
         kind: FindingKind,
@@ -423,6 +374,13 @@ impl SpinValidator {
         explanation: &'static str,
         source: &SourceReference,
     ) {
+        crate::validation::record_rule(
+            &mut self.applied_rules,
+            rule_id,
+            element_index,
+            component_index,
+            source,
+        );
         self.findings.push(Finding {
             kind,
             rule_id,
@@ -440,6 +398,11 @@ impl SpinValidator {
         let mut indexed = vec![None; elements.len()];
         let mut seen = vec![false; elements.len()];
         for item in &evidence.spins {
+            self.apply(
+                "spin-evidence-target",
+                Some(item.element_index),
+                &input_source(),
+            );
             let index = item.element_index;
             if !matches!(elements.get(index), Some(PlannedElement::RegularSpin(_))) {
                 self.add(
@@ -474,6 +437,7 @@ impl SpinValidator {
         policy: &RegularSpinPolicy,
         recognition_ruleset: RulesetId,
     ) {
+        self.apply("spin-count", None, &policy.source);
         let mut known = vec![];
         let mut unknown = elements
             .iter()
@@ -517,6 +481,7 @@ impl SpinValidator {
                 let data = evidence[index];
                 let abbreviation = data.and_then(|d| d.abbreviation);
                 if let Some(abbreviation) = abbreviation {
+                    self.apply("spin-distinct-abbreviation", Some(index), &policy.source);
                     if known.contains(&abbreviation) {
                         self.add(FindingKind::Violation, "spin-distinct-abbreviation", Some(index), None,
                             "Planned spins must have different abbreviations; changing only the level does not change the abbreviation.", &policy.source);
@@ -529,6 +494,7 @@ impl SpinValidator {
             }
         }
         for required in &policy.required {
+            self.apply("spin-required-role", None, &policy.source);
             if !known.iter().any(|s| required.iter().any(|r| r.matches(*s))) {
                 self.add(
                     if unknown {
@@ -585,6 +551,14 @@ impl SpinValidator {
         policy: &RegularSpinPolicy,
     ) {
         let source = &policy.source;
+        for id in [
+            "spin-eligibility",
+            "spin-abbreviation",
+            "spin-entry",
+            "spin-level-cap",
+        ] {
+            self.apply(id, Some(index), source);
+        }
         if spin.entry.is_some_and(|entry| {
             !policy
                 .allowed
@@ -610,6 +584,7 @@ impl SpinValidator {
                 source,
             ),
             Some(a) => {
+                self.apply("spin-evidence-entry", Some(index), &input_source());
                 if !policy.allowed.iter().any(|r| r.matches(a)) {
                     self.add(FindingKind::Violation, "spin-eligibility", Some(index), None,
                         "The planned spin type, entry or foot-change role is prohibited by this profile.", source);
@@ -633,7 +608,7 @@ impl SpinValidator {
         match data.and_then(|d| d.planned_level) {
             None => self.add(FindingKind::Unknown, "spin-level-cap", Some(index), None,
                 "The target level is unspecified; no recognized level is inferred.", source),
-            Some(level) if level_number(level) > level_number(policy.max_level) => self.add(FindingKind::Unknown, "spin-level-cap", Some(index), None,
+            Some(level) if level.number() > policy.max_level.number() => self.add(FindingKind::Unknown, "spin-level-cap", Some(index), None,
                 "The target exceeds the profile level cap; additional features are ignored, not a prohibition of the spin.", source),
             _ => {}
         }
@@ -648,6 +623,7 @@ impl SpinValidator {
         let Some(target) = data.and_then(|d| d.final_upright_wind_up) else {
             return;
         };
+        self.apply("spin-wind-up-target", Some(index), &input_source());
         match &spin.steps {
             None => self.add(
                 FindingKind::Unknown,
@@ -686,6 +662,7 @@ impl SpinValidator {
         spin: &RegularSpin,
         data: Option<&RegularSpinEvidence>,
     ) {
+        self.apply("spin-feature-evidence", Some(index), &input_source());
         let Some(attempts) = data.and_then(|d| d.feature_attempts.as_deref()) else {
             self.add(FindingKind::Unknown, "spin-feature-evidence", Some(index), None,
                 "Typed feature attempts are unspecified; free-text descriptions are not confirmed features.", &input_source());
@@ -693,6 +670,7 @@ impl SpinValidator {
         };
         let mut previous = None;
         for attempt in attempts {
+            self.apply("spin-feature-target", Some(index), &input_source());
             if previous.is_some_and(|p| p > attempt.position_step)
                 || spin.steps.as_ref().is_some_and(|s| {
                     !matches!(
@@ -734,6 +712,7 @@ impl SpinValidator {
         recognition_ruleset: RulesetId,
     ) {
         if let Some(panel) = data.and_then(|d| d.panel.as_ref()) {
+            self.apply("spin-panel-target", Some(index), &input_source());
             if panel.planned_element != Some(index) || panel.ruleset != recognition_ruleset {
                 self.add(FindingKind::Violation, "spin-panel-target", Some(index), None,
                     "Supplied panel recognition must identify this plan element and the selected profile recognition ruleset.", &input_source());
@@ -750,6 +729,10 @@ impl SpinValidator {
         policy: &RegularSpinPolicy,
         summary: &SpinSummary,
     ) {
+        self.apply("spin-minimum-revolutions", Some(index), &policy.source);
+        if data.and_then(|d| d.abbreviation).is_some() {
+            self.apply("spin-evidence-foot-change", Some(index), &input_source());
+        }
         let changed = summary.feet.len() > 1;
         if data
             .and_then(|d| d.abbreviation)
@@ -795,6 +778,13 @@ impl SpinValidator {
             );
             return;
         };
+        for id in [
+            "spin-position-evidence",
+            "spin-recognition-minimum",
+            "spin-basic-position",
+        ] {
+            self.apply(id, Some(index), &rules.source);
+        }
         let mut positions = vec![];
         for (step_index, step) in steps.iter().enumerate() {
             if let SpinStep::Position {
@@ -836,6 +826,15 @@ impl SpinValidator {
                 self.add(FindingKind::Unknown, "spin-layback-position", Some(index), None,
                     "Upright is only the basic-position class; specific Layback posture is not represented by this plan and remains unknown.", &rules.source);
             }
+            self.apply(
+                if a.kind.basic_position().is_some() {
+                    "spin-position-type"
+                } else {
+                    "spin-combination-positions"
+                },
+                Some(index),
+                &rules.source,
+            );
             if let Some(expected) = a.kind.basic_position() {
                 if !positions.contains(&expected) {
                     self.add(FindingKind::Unknown, "spin-position-type", Some(index), None,
@@ -914,6 +913,7 @@ impl SpinValidator {
                 "Per-foot checks for multiple changes of foot are outside this mechanism; no prohibition is inferred.", &rules.source);
             return;
         }
+        self.apply("spin-per-foot-revolutions", Some(index), &rules.source);
         let expected = data
             .and_then(|d| d.abbreviation)
             .and_then(|a| a.kind.basic_position());
