@@ -2,7 +2,14 @@
 
 The additive public interface and bounded delivery were explicitly approved on
 2026-11-02. Existing plan/profile structs, jump entry points and scoring are
-unchanged. This PR implements the first slice of #48; it does not close the issue.
+unchanged. PR #60 implemented the first slice of #48; that slice alone did not
+complete the issue.
+
+This document records the narrower slice-1 contract. Subsequent prerequisite
+work for #49 added ordered feature accounting and step/choreographic validation
+through `validate_supported_program` in PR #61. See the [mixed-program
+contract](bounded-program-optimizer.md) and [milestone coverage](../milestone-44.md)
+for current combined support. The original entry points retain this scope.
 
 ## Inputs and outputs
 

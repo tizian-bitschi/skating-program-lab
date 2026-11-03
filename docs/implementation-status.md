@@ -2,6 +2,10 @@
 
 The library provides partial coverage. These tests cover selected cases, not every domain rule. See [rule sources](rule-sources.md) for editions and open questions.
 
+The [foundation milestone audit](milestone-44.md) maps the five workstreams of
+issue #44 to merged PRs, regression evidence and remaining limits. Issues being
+closed does not establish full rule coverage.
+
 ## Domain
 
 `src/lib.rs`, `src/plan.rs` and `src/execution.rs` model version and source identities, ordered plans, observations and supplied panel outcomes. `tests/domain.rs`, `tests/plan.rs` and `tests/execution.rs` cover selected representations and errors.
@@ -63,11 +67,14 @@ invalid sources and policies, override ordering/conflicts, unsupported scope and
 mechanisms, typed family/repetition policy, scoring and a synthetic extension.
 Existing validation, scoring, catalog and optimizer fixtures remain unchanged.
 
-Registry validation checks citation metadata, not source authenticity. Feature
-and level policies block selection as unsupported. Numerical scoring retains
-partial scope and does not establish category eligibility. The solver retains
-its finite jump domain and maximum five slots. No real Junior, Senior or national
-profile has been added. See the [ADR](adr/0002-rule-profiles-proposal.md).
+Registry validation checks citation metadata, not source authenticity. The
+registry's unimplemented feature/level policy mechanisms block selection;
+separate source-bound spin and mixed-program policies support the bounded
+evidence checks described below. Numerical scoring retains partial scope and
+does not establish category eligibility. The profile jump optimizer retains
+its finite jump domain and maximum five slots; the separate mixed-program
+optimizer supports up to ten slots. No real Junior, Senior or national profile
+has been added. See the [ADR](adr/0002-rule-profiles-proposal.md).
 
 Review regression tests additionally reject contradictory Axel/sequence/family
 requirements, missing or mismatched SOV source editions and unsupported scoring
