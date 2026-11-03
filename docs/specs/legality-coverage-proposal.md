@@ -254,3 +254,13 @@ explicitly empty lists report NotApplicable. The regression
 exercises both EightRevolutions and IncreaseOfSpeed with distinct, permitted Silver
 abbreviations. The two-foot feature-10 regression uses a permitted Gold change-foot
 combination and verifies absence of spin-eligibility violations.
+
+A present Position step with `position: None` is missing evidence, not an
+unsupported regulation. `feature_position_issue` classifies this once for both
+the validator and rule inventory. Known unsupported position variants retain
+Unsupported. Descriptor evidence scopes select the actual feature family, so an
+EightRevolutions-only list does not activate the separate features 7-9/12 position
+check. A blocked first-success prerequisite retains MissingEvidence or Unsupported
+for reuse coverage rather than becoming NotApplicable. The regression
+`missing_basic_position_is_unknown_and_known_unmodeled_position_is_unsupported`
+checks absent and known upright positions for EightRevolutions and IncreaseOfSpeed.

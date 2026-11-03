@@ -882,7 +882,11 @@ fn unknown_feature_lists_and_uncheckable_targets_differ_from_explicitly_empty_li
                 "program-feature-position",
                 "program-feature-once-per-program",
             ] {
-                let expected = if uncertain {
+                let expected = if uncertain
+                    && !(id == "program-feature-position"
+                        && feature == SpinFeature::EightRevolutions
+                        && missing_steps)
+                {
                     RuleCoverageState::MissingEvidence
                 } else {
                     RuleCoverageState::NotApplicable
@@ -893,6 +897,81 @@ fn unknown_feature_lists_and_uncheckable_targets_differ_from_explicitly_empty_li
                         && r.state == expected),
                     "{id} should be {expected:?}"
                 );
+            }
+        }
+    }
+}
+
+#[test]
+fn missing_basic_position_is_unknown_and_known_unmodeled_position_is_unsupported() {
+    for feature in [SpinFeature::EightRevolutions, SpinFeature::IncreaseOfSpeed] {
+        for position in [None, Some(SpinPosition::Upright)] {
+            let mut entry = spin(
+                SpinPosition::Upright,
+                Level::One,
+                Some(SpinFeatureAttempt {
+                    feature,
+                    position_step: 0,
+                    outcome: FeatureAttemptOutcome::Successful,
+                }),
+                8,
+            );
+            if let PlannedElement::RegularSpin(plan) = &mut entry.0 {
+                if let SpinStep::Position {
+                    position: target, ..
+                } = &mut plan.steps.as_mut().unwrap()[0]
+                {
+                    *target = position;
+                }
+            }
+            let r = report(
+                AdultCategory::Silver,
+                vec![entry],
+                SubmissionState::Complete,
+            );
+            let id = if feature == SpinFeature::EightRevolutions {
+                "program-eight-position"
+            } else {
+                "program-feature-position"
+            };
+            let kind = if position.is_none() {
+                FindingKind::Unknown
+            } else {
+                FindingKind::Unsupported
+            };
+            let state = if position.is_none() {
+                RuleCoverageState::MissingEvidence
+            } else {
+                RuleCoverageState::Unsupported
+            };
+            assert!(finding(&r, id, Some(0), kind));
+            assert!(!finding(
+                &r,
+                id,
+                Some(0),
+                if kind == FindingKind::Unknown {
+                    FindingKind::Unsupported
+                } else {
+                    FindingKind::Unknown
+                }
+            ));
+            assert!(r
+                .rules
+                .iter()
+                .any(|r| r.rule_id == id && r.element_index == Some(0) && r.state == state));
+            if feature == SpinFeature::EightRevolutions {
+                assert!(r
+                    .rules
+                    .iter()
+                    .any(|r| r.rule_id == "program-feature-once-per-program"
+                        && r.element_index == Some(0)
+                        && r.state == state));
+                assert!(!r
+                    .rules
+                    .iter()
+                    .any(|r| r.rule_id == "program-feature-once-per-program"
+                        && r.element_index == Some(0)
+                        && r.state == RuleCoverageState::NotApplicable));
             }
         }
     }
