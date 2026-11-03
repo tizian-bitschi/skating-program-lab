@@ -24,8 +24,9 @@ Personal predicates filter additions only. Explicit global predicates also
 check originals and report conflicting IDs; global variant indices are invalid.
 Atomic compounds remain intact and their jump components count across the whole
 program. Output identity compares ordered entries including evidence and supplied
-recognition/scenarios, excluding internal anchor assignments. Identical visible
-words are returned once even if an inserted element matches an original.
+recognition/scenarios and original IDs/placements. Different placements of an
+original and an identical addition remain distinct because provenance is visible.
+Equivalent assignments with the same provenance and evidence appear once (#68).
 
 Proof and tie completeness cover only the supplied finite domain and supported
 conditional rules. Attached generation audits retain omissions and domain caps;
@@ -287,3 +288,15 @@ still pass the common validator including all deferred obligations.
 Regression coverage includes exact sequence confirmation, automatic/manual
 Combination-position and both-entry exclusions, capped invalid/manual priority,
 normalized equivalent step sets and diagnostic-prose-independent classification.
+
+## Acceptance and measured limits (#68)
+
+See the [integration matrix and native measurements](../milestone-68.md) and
+`examples/workflow_bounds.rs`. Hard input ceilings (1000 definitions, ten slots,
+100000 validator proposals) are not latency guarantees. Six-slot generated
+Bronze/Silver/Gold/Masters domains exceed the measured 250 ms useful-result budget.
+No solver pruning or public API change is included in this acceptance audit.
+A result cap can leave `OptimalProven` with `enumeration_complete=false`: further
+optima may exist, and returned count is not a total. No pagination/streaming cursor
+exists; increasing a finite cap restarts the request. Preserve generation audit
+metadata separately when passing generated variants to `optimize_program`.

@@ -40,3 +40,12 @@ and unknown mechanisms remain unsupported. See the accepted
 [profile migration contract](adr/0002-rule-profiles-proposal.md).
 
 The implemented bounded mixed-element scenario contract, finite domains, personal restrictions and proof limits are specified in [bounded program optimization](specs/bounded-program-optimizer.md).
+
+## Product acceptance evidence
+
+The [milestone #68 matrix](milestone-68.md) maps all four product workflows to
+shared public entry points, independent reference cases, negative scenarios and
+remaining coverage limits. A proven finite BV objective, complete declared
+candidate generation, complete tie enumeration and full regulatory coverage are
+four separate claims. The current model establishes the first three only in
+explicit bounded conditional cases; regulatory coverage remains partial.

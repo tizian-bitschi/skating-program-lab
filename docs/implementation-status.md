@@ -138,3 +138,14 @@ Review regressions additionally cover per-sequence explicit direct-step evidence
 spin position/entry filters on automatic and manual combinations, manual-input
 validation independent of automatic caps, normalized unordered step feature
 sets, and typed finding scope shared by generator and optimizer preflight.
+
+## Product workflow acceptance (#68)
+
+The [four-function acceptance matrix and measured bounds](milestone-68.md) maps
+manual assessment, legality, generated optimization and anchored completion to
+shared-entry-point fixtures. Independent tiny-domain oracles compare maximum BV
+and every ordered optimum, including distinct anchor placements. All returned
+programs are reassessed and revalidated. Objective proof, generation completeness,
+tie enumeration and regulatory coverage remain separate. Broad six-slot native
+domains do not produce incumbents within the measured 250 ms budget; this is a
+recorded performance limit, not evidence of infeasibility or global optimality.

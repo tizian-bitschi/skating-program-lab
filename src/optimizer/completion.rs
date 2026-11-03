@@ -331,7 +331,18 @@ fn prepare_search(
     }
     let equivalence_keys = identities
         .iter()
-        .map(|e| identities.iter().position(|other| other == e).unwrap())
+        .enumerate()
+        .map(|(i, e)| {
+            // Original IDs identify fixed placements even when an addition looks identical.
+            if i >= request.variants.len() {
+                i
+            } else {
+                identities[..request.variants.len()]
+                    .iter()
+                    .position(|other| other == e)
+                    .unwrap()
+            }
+        })
         .collect();
     let placement = AnchoredPlacement {
         first_anchor: request.variants.len(),
