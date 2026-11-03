@@ -72,3 +72,17 @@ Closing the foundation milestone does not resolve these limits. The detailed
 [mixed-program](specs/bounded-program-optimizer.md) contracts define the supported
 subsets. Existing tests provide regression evidence; they do not establish every
 technical-panel rule.
+
+## Integration review corrections
+
+The #44 review found two validator coupling points and a combined-document
+citation. An internal `FeatureCreditEvaluation` contract now selects deferred
+legacy credit or mixed-program evaluation before spin checks run; the mixed
+validator no longer removes findings/traces by string ID. Local feature-target
+checks run in both modes. The shared jump validator alone evaluates direct
+Axel-step assumptions. Its trace cites Communication 2788 (May 19, 2026), p. 3,
+separately from the selected Adult category's July 16 announcement binding.
+Legacy jump findings and their source references remain compatible; the mixed
+entry point no longer adds a duplicate Unknown for the same missing assumption.
+`tests/program_validation.rs` verifies both spin scopes, invalid local targets,
+one sequence diagnostic and exact independent document/version/page references.
