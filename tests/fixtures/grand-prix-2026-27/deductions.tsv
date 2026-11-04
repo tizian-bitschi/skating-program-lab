@@ -1,0 +1,8 @@
+source	page	rank	row	amount	count	reason
+gpfra2026-M	1	1	1	-1.00		Late start
+gpfra2026-M	6	11	1	-2.00	2	Falls
+gpfra2026-W	3	5	1	-1.00	1	Falls
+gpfra2026-W	6	12	1	-6.00	4	Falls
+gpcan2026-M	6	11	1	-1.00	1	Falls
+gpcan2026-W	5	9	1	-1.00		Time violation
+gpcan2026-W	5	9	2	-1.00	1	Falls
