@@ -116,4 +116,17 @@ elements and three PCS rows per program, and verifies BASE + GOE, both printed
 subtotals, TES and segment accounting. Signed deductions are added to TES + PCS
 only when checking the segment score; TES remains the element-score sum.
 A deliberate grade-column corruption test verifies a location/field diagnostic.
-The tests do not rejudge GOE, compute PCS rounding, or validate Senior programs.
+Complete ordered headers are pinned for all six TSV files; test logic accesses
+fields by name. A separate reviewed code matrix checks every support label,
+including triples/quads inside marked compounds. Mutation tests reject swapped
+judge headers and incorrect support labels.
+
+PCS accounting independently multiplies each printed component result by its
+factor, rounds each component to hundredths, then sums and compares with the
+program's factored PCS. Source-grounded rounding cases include Hyungyeom KIM
+(Canada M p. 6/rank 11: 20.35 + 21.05 + 21.51 = 62.91), Aleksandr SELEVKO
+(France M p. 3/rank 5: 81.36) and Seojin YOUN (France W p. 6/rank 12: 43.78).
+Rounding only after summing gives one-cent differences in these cases; a
+regression test rejects that error with a skater/page diagnostic. Individual PCS
+judge marks are preserved and parity-checked, without rejudging their aggregate.
+The tests do not rejudge GOE or validate Senior programs.
