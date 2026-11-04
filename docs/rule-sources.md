@@ -16,6 +16,16 @@ Checked 2026-11-01. Page numbers below refer to printed document pages. The sour
 
 The [official handbook index](https://isu.org/en/figure-skating-rules/figure-skating-rule/handbooks-single-and-pair-skating) lists handbooks and Q&As. The May 5 original 2786 is superseded for the examples here by the identified June 2 update. Check for subsequent revisions at implementation time.
 
+## Grand Prix protocol observations
+
+The [2026/27 Grand Prix fixture inventory](fixtures/grand-prix-2026-27.md)
+records four official France/Canada Men/Women Free Skating Judges Scores reports,
+retrieved 2026-11-04, with exact segment URLs, printed editions and SHA-256 digests.
+Twelve selected real programs preserve recognized codes/calls, credited BASE,
+GOE, individual judge grades, scores, PCS and separate deductions with field
+locations. These are observed panel reports, not legality/optimality labels or
+new SOV data. The existing June 2, 2026 Communication 2786 edition still applies.
+
 ## Applicability and precedence
 
 The Adult announcement p. 4 applies the ISU Constitution, Sports Rules, pertinent Communications and the announcement. For a conflict with pertinent regulations or Communications it states that the announcement prevails, provided the Communication contains no special comments for Adult competitions. Apply that explicit qualification to the affected provision; do not claim a blanket precedence for all later material. Q&As clarify their stated subject and scope; check dates, event applicability and any later amendments. An unresolved conflict or scope question blocks a definitive affected finding, score or optimum, with the uncertainty and sources returned to the user.

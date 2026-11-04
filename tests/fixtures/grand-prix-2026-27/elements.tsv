@@ -1,0 +1,133 @@
+source	page	rank	row	code	info	base	factor	goe	j1	j2	j3	j4	j5	j6	j7	j8	j9	referee	score	support
+gpfra2026-M	1	1	1	4T+2T		10.80		1.90	2	2	2	2	2	2	1	3	2		12.70	requires #78/#77
+gpfra2026-M	1	1	2	4S		9.70		3.60	4	4	4	4	3	3	3	4	4		13.30	requires #78/#77
+gpfra2026-M	1	1	3	3A		8.00		-0.34	-1	-1	0	0	0	0	-1	-1	1		7.66	requires #78/#77
+gpfra2026-M	1	1	4	FCSp4		3.80		0.87	1	3	1	3	3	2	2	2	3		4.67	supported
+gpfra2026-M	1	1	5	StSq4		4.10		1.76	4	5	5	4	4	4	3	4	5		5.86	supported
+gpfra2026-M	1	1	6	4T		10.45	x	0.00	-1	0	0	1	-1	0	-1	1	1		10.45	requires #78/#77
+gpfra2026-M	1	1	7	3A+Eu+2S+2A+SEQ		13.86	x	0.23	1	-1	0	0	1	0	-1	1	1		14.09	requires #78/#77
+gpfra2026-M	1	1	8	3F		5.83	x	1.44	2	3	3	3	3	3	2	2	4		7.27	requires #78/#77
+gpfra2026-M	1	1	9	CCoSp4		4.20		1.02	2	2	1	3	3	2	3	2	3		5.22	supported
+gpfra2026-M	1	1	10	ChSq1		3.50		2.43	5	5	5	5	5	4	4	5	5		5.93	supported
+gpfra2026-M	1	1	11	ChSp1		3.50		1.29	3	2	2	3	3	2	3	2	4		4.79	supported
+gpfra2026-M	3	5	1	4Lzq	q	11.50		-0.66	-1	0	-1	0	-1	-1	-2	0	0		10.84	requires #78/#77
+gpfra2026-M	3	5	2	3T+Eu+3S+2A+SEQ		11.80		-0.18	0	-1	-1	-1	0	0	0	-2	1		11.62	requires #78/#77
+gpfra2026-M	3	5	3	1T		0.40		0.00	0	-1	0	0	0	0	0	0	0		0.40	supported
+gpfra2026-M	3	5	4	FSSp4		3.60		0.93	3	2	2	2	3	3	2	3	3		4.53	supported
+gpfra2026-M	3	5	5	2A+3Tq	q	8.25	x	-0.72	-2	-2	-1	-2	-1	-2	-2	-2	-1		7.53	requires #78/#77
+gpfra2026-M	3	5	6	StSq4		4.10		1.17	3	3	3	2	3	4	2	2	5		5.27	supported
+gpfra2026-M	3	5	7	2A*	*	0.00	x	0.00	-	-	-	-	-	-	-	-	-		0.00	supported
+gpfra2026-M	3	5	8	3Lz		6.49	x	1.10	2	2	2	2	2	2	0	1	2		7.59	requires #78/#77
+gpfra2026-M	3	5	9	CCoSp4		4.20		1.08	3	2	3	3	3	3	1	2	2		5.28	supported
+gpfra2026-M	3	5	10	ChSp1		3.50		1.21	3	2	2	2	3	3	2	2	4		4.71	supported
+gpfra2026-M	3	5	11	ChSq1		3.50		1.86	3	5	4	3	5	4	3	3	4		5.36	supported
+gpfra2026-M	6	11	1	4T<	<	7.60		-3.80	-5	-5	-5	-5	-5	-5	-5	-5	-5		3.80	requires #78/#77
+gpfra2026-M	6	11	2	4F!<	!,<	8.80		-3.90	-5	-4	-5	-4	-5	-4	-4	-5	-4		4.90	requires #78/#77
+gpfra2026-M	6	11	3	4Lz<+3T	<	13.40		-1.97	-2	-2	-2	-2	-2	-2	-2	-4	-3		11.43	requires #78/#77
+gpfra2026-M	6	11	4	ChSp1		3.50		0.50	1	1	0	0	2	0	2	2	1		4.00	supported
+gpfra2026-M	6	11	5	ChSq1		3.50		1.00	1	3	3	2	3	1	2	2	1		4.50	supported
+gpfra2026-M	6	11	6	4T+REP	F	8.36	x	-4.75	-5	-5	-5	-5	-5	-5	-5	-5	-5		3.61	requires #78/#77
+gpfra2026-M	6	11	7	3Lz+Eu+3S		11.22	x	-1.69	-3	-2	-2	-3	-3	-3	-3	-3	-3		9.53	requires #78/#77
+gpfra2026-M	6	11	8	3A<	F <	7.04	x	-3.20	-5	-5	-5	-5	-5	-5	-5	-5	-5		3.84	requires #78/#77
+gpfra2026-M	6	11	9	FCSp4		3.80		0.00	0	0	0	1	-1	-1	0	1	0		3.80	supported
+gpfra2026-M	6	11	10	StSq4		4.10		0.29	1	1	0	1	3	0	1	1	0		4.39	supported
+gpfra2026-M	6	11	11	CCoSp4		4.20		0.84	2	2	2	2	3	2	2	2	2		5.04	supported
+gpfra2026-W	1	1	1	3A		8.00		0.11	0	-1	0	0	2	0	0	1	0		8.11	requires #78/#77
+gpfra2026-W	1	1	2	3Lz+3T		10.10		1.60	2	2	3	2	3	3	3	3	3		11.70	requires #78/#77
+gpfra2026-W	1	1	3	3F!	!	5.30		0.53	1	0	1	-1	1	1	2	1	2		5.83	requires #78/#77
+gpfra2026-W	1	1	4	FSSp4		3.60		1.18	4	2	4	3	3	2	4	3	4		4.78	supported
+gpfra2026-W	1	1	5	ChSq1		3.50		1.43	3	2	3	3	3	2	3	3	3		4.93	supported
+gpfra2026-W	1	1	6	3Lo+2A+2A+SEQ		12.65	x	1.26	2	1	2	2	3	3	3	3	3		13.91	requires #78/#77
+gpfra2026-W	1	1	7	3Lz		6.49	x	1.60	3	2	3	2	2	3	4	3	3		8.09	requires #78/#77
+gpfra2026-W	1	1	8	3Lo		5.39	x	1.26	2	2	2	2	2	3	4	3	4		6.65	requires #78/#77
+gpfra2026-W	1	1	9	CCoSp4		4.20		1.68	4	3	4	4	4	4	4	4	4		5.88	supported
+gpfra2026-W	1	1	10	StSq4		4.10		1.52	4	4	3	3	4	3	5	4	4		5.62	supported
+gpfra2026-W	1	1	11	ChSp1		3.50		1.43	3	3	3	3	2	3	3	4	2		4.93	supported
+gpfra2026-W	3	5	1	2Lz		2.10		0.21	0	0	1	1	1	2	1	1	2		2.31	supported
+gpfra2026-W	3	5	2	3S		4.30		0.49	0	0	2	1	2	1	1	1	2		4.79	requires #78/#77
+gpfra2026-W	3	5	3	3T		4.20		1.02	2	2	3	2	3	2	4	2	3		5.22	requires #78/#77
+gpfra2026-W	3	5	4	FCSp3		3.40		1.02	3	3	3	3	4	3	3	3	3		4.42	supported
+gpfra2026-W	3	5	5	ChSq1		3.50		1.64	3	3	3	3	4	3	5	3	4		5.14	supported
+gpfra2026-W	3	5	6	2A+Eu+3F+2A+SEQ		13.09	x	1.67	3	3	4	3	3	3	4	3	3		14.76	requires #78/#77
+gpfra2026-W	3	5	7	2Lz		2.31	x	0.24	1	0	1	1	1	2	1	1	2		2.55	supported
+gpfra2026-W	3	5	8	3F+2T<	F <	6.97	x	-2.65	-5	-5	-5	-5	-5	-5	-5	-5	-5		4.32	requires #78/#77
+gpfra2026-W	3	5	9	ChSp1		3.50		0.07	-1	0	2	1	2	-1	-1	0	0		3.57	supported
+gpfra2026-W	3	5	10	StSq3		3.50		1.15	4	2	3	3	4	2	4	3	4		4.65	supported
+gpfra2026-W	3	5	11	CCoSp4		4.20		1.38	3	3	4	3	3	3	4	4	3		5.58	supported
+gpfra2026-W	6	12	1	3Lz<	F <	4.72		-2.36	-5	-5	-5	-5	-5	-5	-5	-5	-5		2.36	requires #78/#77
+gpfra2026-W	6	12	2	3Lo<	F <	3.92		-1.96	-5	-5	-5	-5	-5	-5	-5	-5	-5		1.96	requires #78/#77
+gpfra2026-W	6	12	3	1F		0.50		-0.06	-3	-1	0	-1	-1	-1	-2	-2	-1		0.44	supported
+gpfra2026-W	6	12	4	FCSp3		3.40		0.19	-1	0	2	1	2	1	1	-2	0		3.59	supported
+gpfra2026-W	6	12	5	ChSq1		3.50		1.00	2	2	2	2	2	2	3	1	2		4.50	supported
+gpfra2026-W	6	12	6	3Lz<<+REP	F <<	1.85	x	-1.05	-5	-5	-5	-5	-5	-5	-5	-5	-5		0.80	requires #78/#77
+gpfra2026-W	6	12	7	3F<<	F <<	1.98	x	-0.90	-5	-5	-5	-5	-5	-5	-5	-5	-5		1.08	requires #78/#77
+gpfra2026-W	6	12	8	2A+2Aq+2T+SEQ	q	8.69	x	-0.24	-1	0	-1	-1	-1	0	0	-1	-1		8.45	supported
+gpfra2026-W	6	12	9	CCoSp4		4.20		0.42	2	2	0	1	1	1	0	0	2		4.62	supported
+gpfra2026-W	6	12	10	StSq4		4.10		0.88	2	3	3	2	1	1	3	2	2		4.98	supported
+gpfra2026-W	6	12	11	ChSp1		3.50		1.00	3	2	2	3	1	2	3	1	1		4.50	supported
+gpcan2026-M	1	1	1	4S		9.70		-1.80	-1	-2	-1	-2	-2	-2	-3	-2	-2		7.90	requires #78/#77
+gpcan2026-M	1	1	2	4T+3T		13.70		1.90	2	2	2	2	2	2	2	1	2		15.60	requires #78/#77
+gpcan2026-M	1	1	3	4T		9.50		1.09	1	1	2	2	1	0	0	1	2		10.59	requires #78/#77
+gpcan2026-M	1	1	4	FCSp4		3.80		0.60	0	2	1	2	2	3	2	1	1		4.40	supported
+gpcan2026-M	1	1	5	StSq3		3.50		1.15	3	3	4	4	3	3	3	1	5		4.65	supported
+gpcan2026-M	1	1	6	3F+3A<+2A+SEQ	<	16.50	x	-1.19	-2	-2	-1	-2	-2	-2	-2	-1	-2		15.31	requires #78/#77
+gpcan2026-M	1	1	7	ChSp1		3.50		1.36	2	2	3	3	3	4	2	1	4		4.86	supported
+gpcan2026-M	1	1	8	3Aq	q	8.80	x	-0.91	-2	0	-1	0	-1	-2	-2	-2	0		7.89	requires #78/#77
+gpcan2026-M	1	1	9	3Lz		6.49	x	1.10	1	2	2	2	2	2	0	2	2		7.59	requires #78/#77
+gpcan2026-M	1	1	10	CCoSp3		3.60		1.03	1	3	3	3	2	3	3	3	3		4.63	supported
+gpcan2026-M	1	1	11	ChSq1		3.50		1.64	3	3	3	3	3	4	4	2	4		5.14	supported
+gpcan2026-M	4	7	1	4Lzq	q	11.50		-1.31	-1	-1	-1	-1	0	-2	-2	-1	-1		10.19	requires #78/#77
+gpcan2026-M	4	7	2	4S<	<	7.76		-1.77	-2	-3	-1	-2	-2	-3	-3	-2	-2		5.99	requires #78/#77
+gpcan2026-M	4	7	3	3A		8.00		1.14	1	1	2	2	1	1	2	-1	3		9.14	requires #78/#77
+gpcan2026-M	4	7	4	CCoSp2		3.00		0.64	2	2	1	2	2	2	2	3	3		3.64	supported
+gpcan2026-M	4	7	5	StSq2		2.70		0.27	1	2	0	1	2	1	0	-2	3		2.97	supported
+gpcan2026-M	4	7	6	4T+3T		15.07	x	2.44	2	3	2	3	3	3	3	2	2		17.51	requires #78/#77
+gpcan2026-M	4	7	7	3Lz+Eu+3S<	<	10.27	x	-2.70	-5	-5	-3	-5	-5	-5	-4	-4	-4		7.57	requires #78/#77
+gpcan2026-M	4	7	8	4T<	<	8.36	x	-2.50	-4	-3	-2	-4	-3	-3	-3	-3	-4		5.86	requires #78/#77
+gpcan2026-M	4	7	9	ChSq1		3.50		1.00	2	2	2	2	2	3	2	2	1		4.50	supported
+gpcan2026-M	4	7	10	FSSp3		3.10		0.53	1	2	2	2	3	2	1	2	1		3.63	supported
+gpcan2026-M	4	7	11	ChSp1		3.50		0.71	1	1	1	1	2	2	3	1	2		4.21	supported
+gpcan2026-M	6	11	1	4T<	<	7.60		-2.39	-2	-3	-1	-4	-4	-3	-4	-3	-3		5.21	requires #78/#77
+gpcan2026-M	6	11	2	4T<+REP	F <	6.08		-3.80	-5	-5	-5	-5	-5	-5	-5	-5	-5		2.28	requires #78/#77
+gpcan2026-M	6	11	3	3Lz!+2A+2A+SEQ	!	12.50		-0.25	0	-1	0	0	0	-1	-1	-1	0		12.25	requires #78/#77
+gpcan2026-M	6	11	4	FCSp4		3.80		0.33	0	1	0	0	2	1	0	2	2		4.13	supported
+gpcan2026-M	6	11	5	StSq4		4.10		0.41	0	1	2	0	2	1	0	2	1		4.51	supported
+gpcan2026-M	6	11	6	3Aq+3Tq	q,q	13.42	x	-3.20	-4	-4	-3	-4	-5	-5	-4	-4	-3		10.22	requires #78/#77
+gpcan2026-M	6	11	7	3A<*	<,*	0.00	x	0.00	-	-	-	-	-	-	-	-	-		0.00	requires #78/#77
+gpcan2026-M	6	11	8	3F		5.83	x	0.76	0	2	2	1	1	1	1	2	2		6.59	requires #78/#77
+gpcan2026-M	6	11	9	CCoSp4		4.20		0.78	1	2	1	2	2	2	2	3	2		4.98	supported
+gpcan2026-M	6	11	10	ChSq1		3.50		1.14	2	3	2	2	3	2	1	2	3		4.64	supported
+gpcan2026-M	6	11	11	ChSp1		3.50		1.21	2	3	3	2	3	2	2	2	3		4.71	supported
+gpcan2026-W	1	1	1	3A		8.00		2.63	2	3	2	4	3	3	4	4	4		10.63	requires #78/#77
+gpcan2026-W	1	1	2	4T<	<	7.60		-0.65	-1	-2	-1	0	0	-1	-1	0	-2		6.95	requires #78/#77
+gpcan2026-W	1	1	3	3Lz+3T		10.10		1.77	3	2	3	3	3	3	4	3	3		11.87	requires #78/#77
+gpcan2026-W	1	1	4	ChSq1		3.50		1.36	3	2	3	3	3	2	2	3	3		4.86	supported
+gpcan2026-W	1	1	5	FCSp4		3.80		1.14	3	2	3	3	3	3	3	3	3		4.94	supported
+gpcan2026-W	1	1	6	3F!+3T+2A+SEQ	!	14.08	x	0.61	0	1	2	0	1	1	2	2	1		14.69	requires #78/#77
+gpcan2026-W	1	1	7	3Lo		5.39	x	1.40	2	2	3	3	3	3	3	3	3		6.79	requires #78/#77
+gpcan2026-W	1	1	8	3Lz		6.49	x	1.60	2	3	1	3	4	2	3	3	3		8.09	requires #78/#77
+gpcan2026-W	1	1	9	StSq4		4.10		1.29	2	3	3	4	3	3	3	4	3		5.39	supported
+gpcan2026-W	1	1	10	ChSp1		3.50		1.64	1	4	3	3	3	3	5	4	3		5.14	supported
+gpcan2026-W	1	1	11	CCoSp4		4.20		2.10	5	5	5	5	4	5	5	5	5		6.30	supported
+gpcan2026-W	1	2	1	3S		4.30		1.11	2	3	2	3	3	3	3	2	2		5.41	requires #78/#77
+gpcan2026-W	1	2	2	3Lz+3T		10.10		1.18	2	2	2	2	2	2	3	2	2		11.28	requires #78/#77
+gpcan2026-W	1	2	3	3Lo		4.90		1.33	3	3	2	3	3	4	3	2	2		6.23	requires #78/#77
+gpcan2026-W	1	2	4	FCSp4		3.80		1.41	4	4	4	3	4	3	4	3	4		5.21	supported
+gpcan2026-W	1	2	5	StSq4		4.10		1.58	4	4	4	4	3	4	4	3	4		5.68	supported
+gpcan2026-W	1	2	6	3F!+2A+2A+SEQ	!	13.09	x	0.15	0	1	0	-1	0	1	2	0	0		13.24	requires #78/#77
+gpcan2026-W	1	2	7	3Lz		6.49	x	1.10	1	2	1	2	2	2	3	2	2		7.59	requires #78/#77
+gpcan2026-W	1	2	8	3F!	!	5.83	x	0.15	0	0	1	0	0	1	2	0	0		5.98	requires #78/#77
+gpcan2026-W	1	2	9	CCoSp4V		3.15		0.95	3	3	3	3	3	3	4	3	3		4.10	supported
+gpcan2026-W	1	2	10	ChSq1		3.50		1.14	2	3	2	4	2	2	3	2	1		4.64	supported
+gpcan2026-W	1	2	11	ChSp1		3.50		1.07	3	2	2	2	2	2	3	2	2		4.57	supported
+gpcan2026-W	5	9	1	3F!	!	5.30		0.30	1	1	1	0	1	0	2	0	0		5.60	requires #78/#77
+gpcan2026-W	5	9	2	3Lo		4.90		0.91	2	2	2	2	2	1	2	2	1		5.81	requires #78/#77
+gpcan2026-W	5	9	3	3Lz		5.90		1.10	2	1	2	2	2	2	3	1	2		7.00	requires #78/#77
+gpcan2026-W	5	9	4	CCoSp4		4.20		1.14	3	2	3	2	2	3	3	3	3		5.34	supported
+gpcan2026-W	5	9	5	ChSq1		3.50		0.79	1	2	2	2	2	1	1	2	1		4.29	supported
+gpcan2026-W	5	9	6	3F!+2T	!	7.26	x	-0.30	0	-1	0	-1	0	-1	0	-1	-1		6.96	requires #78/#77
+gpcan2026-W	5	9	7	3Lo+2A+2A<+SEQ	F <	11.92	x	-2.45	-5	-5	-5	-5	-5	-5	-5	-5	-5		9.47	requires #78/#77
+gpcan2026-W	5	9	8	3Sq	q	4.73	x	-0.74	-2	-2	-2	-1	-1	-2	-2	-1	-2		3.99	requires #78/#77
+gpcan2026-W	5	9	9	StSq3		3.50		0.50	1	2	2	1	2	1	2	1	1		4.00	supported
+gpcan2026-W	5	9	10	FSSp4		3.60		0.57	1	2	2	2	0	2	1	1	2		4.17	supported
+gpcan2026-W	5	9	11	ChSp1		3.50		0.64	1	2	1	2	1	2	1	1	1		4.14	supported
