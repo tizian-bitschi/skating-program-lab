@@ -86,3 +86,5 @@ Remove-Item -LiteralPath $rootLock
 Check-Describe $false
 if (Test-Path -LiteralPath $rootLock) { throw 'Build failure retained an originally absent lock' }
 'Runner lock lifecycle checks passed.'
+# The last child deliberately fails; do not propagate its exit code to CI.
+exit 0
