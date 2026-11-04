@@ -18,7 +18,7 @@ The core is intended for native and eventual WebAssembly use. Correctness and tr
 | `src/spin_validation.rs` | Additive indexed spin evidence, explicit source-bound spin policies and partial family coverage. |
 | `src/validation.rs` | `validate_program` returns findings and partial coverage for a plan. |
 | `src/catalog.rs`, `src/catalog/` | Immutable versioned SOV data and exact-code lookup; source-backed presence does not establish engine support. |
-| `src/scoring.rs`, `src/scoring/execution_evidence.rs` | Base values and scores from recognition and supplied facts; TES and deductions stay separate. |
+| `src/scoring.rs`, `src/scoring/execution_evidence.rs`, `src/scoring/panel.rs` | Shared catalog resolution, hypothetical judge scores and separate submitted-panel replay; TES and deductions stay separate. |
 | `src/optimizer.rs` | Exhaustive reference using validation and base-value lookup. |
 | `src/optimizer/pumpkin.rs` | Feature-gated bounded solver using the reference domain, validation and scoring. |
 | `solver-comparison/` | Separate executable comparing solvers against the reference, not a library dependency. |

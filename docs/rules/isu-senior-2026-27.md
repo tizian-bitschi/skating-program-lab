@@ -54,13 +54,13 @@ The profile is selected explicitly in every profile-aware request.
 | Numeric context | `SeniorScoringV1` derives second-solo 80% from complete clean supplied recognitions; manual intended and scenario stages remain separate; supplied panels are retained |
 | Generation | Explicit finite clean solos through quads and supported direct compounds, spin and movement templates; no automatic Euler generation |
 | Mixed/locked optimization | Shared validators, exact Senior identity, existing unfactored SOV objective; this objective excludes contextual REP and timing credit and is not a TES optimum |
-| Unsupported | Panel inference, variation categories, Euler foot transitions/consequences, marked advanced numerical scenarios and progressive fall deductions; uncertainty remains visible |
+| Unsupported | Panel inference, variation categories, Euler foot transitions/consequences and progressive fall deductions; uncertainty remains visible. Marked triple/quad replay is covered by [#78](../specs/senior-protocol-scoring.md). |
 
 Senior fall policy is `None`, never an Adult deduction default. Supported ordinary
 time scenarios use the Senior duration and separate time-deduction source;
 missing timing and interruption/incomplete-program consequences retain errors.
 Known non-jump `NoValue`/`Ignored` outcomes retain zero contributions and do not
-invalidate jump repetition credit. Incomplete jump identity or marked advanced
+invalidate jump repetition credit. Incomplete jump identity or unsupported advanced
 recognition suppresses affected advanced values; unrelated values survive.
 Element-only lookup has no ordered context;
 callers supply `+REP` or use profile/manual program scoring for the clean case.

@@ -5,6 +5,8 @@ use crate::{
 };
 
 mod execution_evidence;
+mod panel;
+pub use panel::*;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BaseValue {
@@ -182,8 +184,8 @@ fn jump_row(
 ) -> Option<&'static crate::CatalogRow> {
     let unmarked = notation.trim_end_matches(['q', '<', '!', 'e']);
     if !(senior
-        && unmarked == notation
-        && matches!(unmarked.as_bytes().first(), Some(b'3' | b'4' | b'5')))
+        && (matches!(unmarked.as_bytes().first(), Some(b'3' | b'4'))
+            || (unmarked == notation && unmarked.starts_with('5'))))
         && !matches!(
             unmarked,
             "1T" | "1S" | "1Lo" | "1F" | "1Lz" | "1A" | "2T" | "2S" | "2Lo" | "2F" | "2Lz" | "2A"
@@ -214,12 +216,16 @@ fn single_row(
     let legacy_section = match row.family {
         CatalogFamily::Jump if details.level().is_none() => {
             jump_row(table, &notation, senior).ok_or(BaseValueError::Unsupported)?;
-            Some(match row.source.page {
-                2 => "p. 2, Jumps",
-                3 => "p. 3, Jumps",
-                4 => "p. 4, Jumps",
-                _ => return Err(BaseValueError::Unsupported),
-            })
+            if senior && notation.starts_with(['3', '4', '5']) {
+                None
+            } else {
+                Some(match row.source.page {
+                    2 => "p. 2, Jumps",
+                    3 => "p. 3, Jumps",
+                    4 => "p. 4, Jumps",
+                    _ => return Err(BaseValueError::Unsupported),
+                })
+            }
         }
         CatalogFamily::Spin
         | CatalogFamily::StepSequence
@@ -243,6 +249,25 @@ fn single_row(
     })
 }
 
+fn without_repetition(
+    details: &crate::RecognitionDetails,
+) -> Result<crate::RecognitionDetails, BaseValueError> {
+    crate::RecognitionDetails::new(
+        details.components().to_vec(),
+        details.level(),
+        Some(
+            details
+                .calls()
+                .ok_or(BaseValueError::UnknownCalls)?
+                .iter()
+                .filter(|entry| entry.call != PanelCall::Repetition)
+                .cloned()
+                .collect(),
+        ),
+    )
+    .map_err(|_| BaseValueError::Unsupported)
+}
+
 fn repetition_row(
     table: ScoringTableId,
     details: &crate::RecognitionDetails,
@@ -256,20 +281,17 @@ fn repetition_row(
     {
         return Err(BaseValueError::Unsupported);
     }
-    let original = crate::RecognitionDetails::new(
-        details.components().to_vec(),
-        None,
-        Some(
-            details
-                .calls()
-                .ok_or(BaseValueError::UnknownCalls)?
-                .iter()
-                .filter(|entry| entry.call != PanelCall::Repetition)
-                .cloned()
-                .collect(),
-        ),
-    )
-    .map_err(|_| BaseValueError::Unsupported)?;
+    // Rule 612: solo repetition credit is limited to triple/quad/quint jumps.
+    // TPH p. 33 separately permits REP on an excess compound's retained first jump.
+    if senior
+        && details.components().len() == 1
+        && !details.components()[0]
+            .as_str()
+            .starts_with(['3', '4', '5'])
+    {
+        return Err(BaseValueError::Unsupported);
+    }
+    let original = without_repetition(details)?;
     let original_notation = original.notation().ok_or(BaseValueError::UnknownCalls)?;
     let mut resolved = if original.components().len() == 1 {
         single_row(table, &original, original_notation, senior)?
@@ -318,7 +340,10 @@ fn component_is_starred(calls: &[crate::RecordedCall], index: usize) -> bool {
     })
 }
 
-fn jump_unit_kind(details: &crate::RecognitionDetails) -> Result<JumpUnitShape, BaseValueError> {
+fn jump_unit_kind(
+    details: &crate::RecognitionDetails,
+    senior: bool,
+) -> Result<JumpUnitShape, BaseValueError> {
     let components = details.components();
     if !(2..=4).contains(&components.len()) || details.level().is_some() {
         return Err(BaseValueError::Unsupported);
@@ -355,6 +380,7 @@ fn jump_unit_kind(details: &crate::RecognitionDetails) -> Result<JumpUnitShape, 
             }
         } else if index != components.len()
             && !matches!(components[index].as_str(), "1A" | "2A")
+            && !(senior && matches!(components[index].as_str(), "3A" | "4A"))
             && interrupted_at.is_none()
         {
             return Err(BaseValueError::Unsupported);
@@ -375,17 +401,22 @@ fn jump_unit_kind(details: &crate::RecognitionDetails) -> Result<JumpUnitShape, 
                 return Err(BaseValueError::Unsupported);
             }
         } else if index > 0 {
-            later_axel |= matches!(code, "1A" | "2A");
+            let axel = matches!(code, "1A" | "2A") || (senior && matches!(code, "3A" | "4A"));
+            later_axel |= axel;
             if interrupted_at.is_some_and(|boundary| index >= boundary) {
                 continue;
             }
             if components[index - 1].as_str() == "Eu" {
-                if !matches!(code, "1S" | "2S" | "1F" | "2F") {
+                if !matches!(code, "1S" | "2S" | "1F" | "2F")
+                    && !(senior && matches!(code, "3S" | "4S" | "3F" | "4F"))
+                {
                     return Err(BaseValueError::Unsupported);
                 }
-            } else if matches!(code, "1A" | "2A") && sequence {
+            } else if axel && sequence {
                 later_axel = true;
-            } else if !matches!(code, "1T" | "2T" | "1Lo" | "2Lo") {
+            } else if !matches!(code, "1T" | "2T" | "1Lo" | "2Lo")
+                && !(senior && matches!(code, "3T" | "4T" | "3Lo" | "4Lo"))
+            {
                 return Err(BaseValueError::Unsupported);
             }
         }
@@ -409,7 +440,7 @@ fn jump_unit_row(
     notation: String,
     senior: bool,
 ) -> Result<ResolvedRow, BaseValueError> {
-    let shape = jump_unit_kind(details)?;
+    let shape = jump_unit_kind(details, senior)?;
     let calls = details.calls().ok_or(BaseValueError::UnknownCalls)?;
     let mut rows = Vec::new();
     for (index, code) in details.components().iter().enumerate() {
@@ -529,9 +560,13 @@ fn resolve_row(
             // Component deletion inside a combination needs separate reference-GOE rules.
             let starred = recognition.details.as_ref().is_some_and(|details| {
                 details.components().len() == 1
-                    && details.calls().is_some_and(
-                        |calls| matches!(calls, [entry] if entry.call == PanelCall::NotCounted),
-                    )
+                    && details.calls().is_some_and(|calls| {
+                        matches!(calls, [entry] if entry.call == PanelCall::NotCounted)
+                            || (recognition.ruleset == crate::RulesetId::IsuSenior2026_27June12
+                                && calls
+                                    .iter()
+                                    .any(|entry| entry.call == PanelCall::NotCounted))
+                    })
             });
             if starred {
                 Ok(ResolvedRow::NoValue)

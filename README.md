@@ -4,6 +4,10 @@ An open-source Rust library for planning technical figure skating programs. The 
 
 ## Current capabilities
 
+Senior numerical scoring also supports triple/quad calls and explicitly supplied
+judge panels. [Protocol replay](docs/specs/senior-protocol-scoring.md) separates
+printed official credit from timing verification and legacy hypothetical GOE.
+
 - **Legality coverage:** `assess_program_legality` reports individual evaluated,
   conditional, missing, unsupported and nonapplicable rules, with source editions
   and event replacements. Draft omissions are indexed separately from final

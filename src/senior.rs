@@ -23,6 +23,26 @@ pub(crate) const DEFINITION: SeniorDefinition = SeniorDefinition {
     combination_revolutions: 10,
 };
 
+pub(crate) fn advanced_repeat_limit_exceeded<T: Eq>(occurrences: &[(T, u8)]) -> bool {
+    let repeated: Vec<_> = occurrences
+        .iter()
+        .enumerate()
+        .filter(|(i, jump)| {
+            jump.1 >= 3
+                && !occurrences[..*i].contains(jump)
+                && occurrences.iter().filter(|other| *other == *jump).count() >= 2
+        })
+        .map(|(_, jump)| jump)
+        .collect();
+    repeated.len() > DEFINITION.max_repeated_advanced
+        || repeated.iter().filter(|jump| jump.1 >= 4).count()
+            > DEFINITION.max_repeated_quad_or_quint
+}
+
+pub(crate) fn kind_occurrences_exceeded<T: Eq>(occurrences: &[(T, u8)], kind: &T) -> bool {
+    occurrences.iter().filter(|jump| &jump.0 == kind).count() > DEFINITION.max_kind_occurrences
+}
+
 pub(crate) fn source(location: &str) -> SourceReference {
     SourceReference {
         document: "ISU Sports Rules — Figure Skating".into(),
@@ -177,12 +197,13 @@ pub fn senior_program_policy(category: SeniorCategory) -> ProgramPolicy {
     }
 }
 
-/// Resolve clean ordered repetition credit independently for each element.
+/// Resolve ordered repetition credit independently for each element.
 /// Definitive zero outcomes remain zero; uncertainty affects advanced jumps only.
 pub(crate) fn repetition_context(
     panels: &[Option<PanelRecognition>],
 ) -> Vec<Option<PanelRecognition>> {
     let mut occurrences: Vec<(String, usize, bool)> = vec![];
+    let mut all_jumps = vec![];
     let mut uncertain = false;
     let advanced = |panel: &PanelRecognition| {
         panel.details.as_ref().is_some_and(|d| {
@@ -214,26 +235,43 @@ pub(crate) fn repetition_context(
         };
         if advanced(panel)
             && details.calls().is_none_or(|calls| {
-                calls
-                    .iter()
-                    .any(|call| !matches!(call.call, PanelCall::Repetition | PanelCall::Sequence))
+                calls.iter().any(|call| {
+                    !matches!(
+                        call.call,
+                        PanelCall::Repetition
+                            | PanelCall::Sequence
+                            | PanelCall::Quarter
+                            | PanelCall::UnderRotated
+                            | PanelCall::Downgraded
+                            | PanelCall::UnclearEdge
+                            | PanelCall::WrongEdge
+                    )
+                })
             })
         {
             uncertain = true;
         }
         for code in details.components() {
+            if let Some(rotation @ b'1'..=b'5') = code.as_str().as_bytes().first() {
+                all_jumps.push((code.as_str()[1..].to_string(), rotation - b'0'));
+            }
             if matches!(code.as_str().as_bytes().first(), Some(b'3' | b'4' | b'5')) {
                 occurrences.push((code.as_str().into(), index, details.components().len() == 1));
             }
         }
     }
+    let invalid_repetition = advanced_repeat_limit_exceeded(&all_jumps)
+        || all_jumps.iter().any(|jump| {
+            (jump.1 >= 2 && all_jumps.iter().filter(|other| *other == jump).count() > 2)
+                || kind_occurrences_exceeded(&all_jumps, &jump.0)
+        });
     let mut adjusted = panels.to_vec();
-    if uncertain {
+    if uncertain || invalid_repetition {
         for panel in &mut adjusted {
-            if panel
-                .as_ref()
-                .is_some_and(|p| p.outcome == RecognitionOutcome::Recognized && advanced(p))
-            {
+            if panel.as_ref().is_some_and(|p| {
+                p.outcome == RecognitionOutcome::Recognized
+                    && (advanced(p) || (invalid_repetition && !nonjump(p)))
+            }) {
                 *panel = None;
             }
         }

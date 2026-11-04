@@ -490,29 +490,7 @@ impl<'a> Validator<'a> {
     }
     fn program_checks(&mut self) {
         if crate::senior::selected(self.profile, Rule::Repetition) {
-            let unique: Vec<_> = self
-                .occurrences
-                .iter()
-                .enumerate()
-                .filter(|(i, jump)| !self.occurrences[..*i].contains(jump))
-                .map(|(_, jump)| *jump)
-                .collect();
-            let repeated: Vec<_> = unique
-                .iter()
-                .filter(|jump| {
-                    jump.1 >= 3
-                        && self
-                            .occurrences
-                            .iter()
-                            .filter(|other| *other == *jump)
-                            .count()
-                            >= 2
-                })
-                .collect();
-            if repeated.len() > crate::senior::DEFINITION.max_repeated_advanced
-                || repeated.iter().filter(|jump| jump.1 >= 4).count()
-                    > crate::senior::DEFINITION.max_repeated_quad_or_quint
-            {
+            if crate::senior::advanced_repeat_limit_exceeded(&self.occurrences) {
                 self.add(FindingKind::Violation, Rule::Repetition, None, None,
                     "Only two triple/quad/quint types may repeat, including at most one quad or quint type.");
             }
@@ -524,13 +502,7 @@ impl<'a> Validator<'a> {
                 JumpKind::Lutz,
                 JumpKind::Axel,
             ] {
-                if self
-                    .occurrences
-                    .iter()
-                    .filter(|jump| jump.0 == kind)
-                    .count()
-                    > crate::senior::DEFINITION.max_kind_occurrences
-                {
+                if crate::senior::kind_occurrences_exceeded(&self.occurrences, &kind) {
                     self.add(
                         FindingKind::Violation,
                         Rule::Repetition,
