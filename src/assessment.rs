@@ -224,9 +224,9 @@ pub fn assess_manual_program(
         AssessmentStatus::NoViolationInCoveredRules
     };
     let senior = profile.binding(ProfileRule::Scoring).mechanism == RuleMechanism::SeniorScoringV1;
-    let contextual = |panels: Option<Vec<PanelRecognition>>| {
+    let contextual = |panels: Vec<Option<PanelRecognition>>| {
         if senior {
-            panels.and_then(|panels| crate::senior::repetition_context(&panels))
+            crate::senior::repetition_context(&panels)
         } else {
             panels
         }
@@ -282,36 +282,30 @@ pub fn assess_manual_program(
                 {
                     Err(AssessmentValueError::PlanRecognitionMismatch)
                 }
-                Some(_) if senior && intended_context.is_none() => {
+                Some(_) if senior && intended_context[index].is_none() => {
                     Err(AssessmentValueError::BaseValue(BaseValueError::Unsupported))
                 }
                 Some(panel) => lookup_base_value(
                     request.scoring_table,
-                    intended_context
-                        .as_ref()
-                        .map_or(panel, |panels| &panels[index]),
+                    intended_context[index].as_ref().unwrap_or(panel),
                     &[],
                 )
                 .map_err(AssessmentValueError::BaseValue),
             };
             let scenario_base = entry.scenario.as_ref().map(|s| {
-                if senior && scenario_context.is_none() {
+                if senior && scenario_context[index].is_none() {
                     return Err(BaseValueError::Unsupported);
                 }
                 lookup_base_value(
                     request.scoring_table,
-                    scenario_context
-                        .as_ref()
-                        .map_or(&s.recognition, |panels| &panels[index]),
+                    scenario_context[index].as_ref().unwrap_or(&s.recognition),
                     &s.annotations,
                 )
             });
             let scenario_score = entry.scenario.as_ref().and_then(|s| {
-                let recognition = scenario_context
-                    .as_ref()
-                    .map_or(&s.recognition, |panels| &panels[index]);
+                let recognition = scenario_context[index].as_ref().unwrap_or(&s.recognition);
                 s.final_goe.map(|goe| {
-                    if senior && scenario_context.is_none() {
+                    if senior && scenario_context[index].is_none() {
                         return Err(ElementScoreError::UnsupportedMarks);
                     }
                     match &s.execution {
@@ -372,7 +366,7 @@ pub fn assess_manual_program(
     });
     // Boundary credit needs a supported complete scenario. Missing GOE is never
     // replaced with a zero grade, including inside the legacy adapter.
-    let planning_score = if (!senior || scenario_context.is_some())
+    let planning_score = if (!senior || scenario_context.iter().all(Option::is_some))
         && has_goe
         && request.request_hypothetical_total
         && request.second_half_boundary.is_some()
@@ -384,9 +378,9 @@ pub fn assess_manual_program(
             .map(|(index, e)| {
                 let s = e.scenario.as_ref()?;
                 Some(ProgramElement {
-                    recognition: scenario_context
+                    recognition: scenario_context[index]
                         .as_ref()
-                        .map_or(&s.recognition, |panels| &panels[index])
+                        .unwrap_or(&s.recognition)
                         .clone(),
                     annotations: vec![],
                     goe: s.final_goe?,

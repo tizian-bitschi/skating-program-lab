@@ -59,8 +59,10 @@ The profile is selected explicitly in every profile-aware request.
 Senior fall policy is `None`, never an Adult deduction default. Supported ordinary
 time scenarios use the Senior duration and separate time-deduction source;
 missing timing and interruption/incomplete-program consequences retain errors.
-The clean context helper rejects incomplete or marked recognition instead of
-reporting an exact unadjusted TES. Element-only lookup has no ordered context;
+Known non-jump `NoValue`/`Ignored` outcomes retain zero contributions and do not
+invalidate jump repetition credit. Incomplete jump identity or marked advanced
+recognition suppresses affected advanced values; unrelated values survive.
+Element-only lookup has no ordered context;
 callers supply `+REP` or use profile/manual program scoring for the clean case.
 
 Sports Rules and applicable Communications/clarifications apply in their stated
@@ -72,3 +74,8 @@ typed Senior constraints even when a synthetic profile has a different name.
 
 `tests/senior_profiles.rs` contains independent boundary and integration checks.
 The full default and minimal-feature suites retain the Adult/custom regressions.
+Review regressions cover both public policy boundaries, a positive mixed
+Senior optimum of 13.80 and locked completion of all eleven slots. Built-in
+program/spin policy resolution and override integrity live in `profiles.rs`.
+Mixed search posts the existing mandatory-variant predicates directly to the
+solver and still checks them in the shared final validator.

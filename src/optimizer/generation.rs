@@ -274,19 +274,11 @@ pub fn generate_program_candidates(
     let profile = registry
         .resolve(&request.profile, request.scoring_table)
         .map_err(E::Profile)?;
-    let policy = [
-        AdultCategory::Bronze,
-        AdultCategory::Silver,
-        AdultCategory::Gold,
-        AdultCategory::Masters,
-    ]
-    .into_iter()
-    .find(|c| adult_profile(*c) == *profile)
-    .map(adult_program_policy)
-    .or_else(|| crate::senior::built_in_policy(profile))
-    .ok_or(E::UnsupportedGenerator(
-        "only exact built-in Adult and Senior 2026/27 profiles have generation contracts",
-    ))?;
+    let policy = crate::profiles::resolve_program_policy(profile, None)
+        .map_err(E::Profile)?
+        .ok_or(E::UnsupportedGenerator(
+            "only exact built-in Adult and Senior 2026/27 profiles have generation contracts",
+        ))?;
     let max_rotation = if crate::senior::selected(profile, ProfileRule::Eligibility) {
         4
     } else {

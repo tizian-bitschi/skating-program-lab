@@ -281,14 +281,8 @@ pub fn assess_program_legality(
             }
         }
     }
-    let adult = [
-        AdultCategory::Bronze,
-        AdultCategory::Silver,
-        AdultCategory::Gold,
-        AdultCategory::Masters,
-    ]
-    .iter()
-    .any(|c| *profile == adult_profile(*c));
+    let adult = crate::profiles::built_in_program_policy(profile).is_some()
+        && profile.scoring.recognition_ruleset == RulesetId::IsuAdult2026_27July16;
     if adult || crate::senior::selected(profile, ProfileRule::Eligibility) {
         for (id, source, state, reason) in [
             ("program-duration", &profile.scoring.duration_source, RuleCoverageState::MissingEvidence, "No actual program duration is supplied; timing and incomplete-program consequences remain unevaluated."),

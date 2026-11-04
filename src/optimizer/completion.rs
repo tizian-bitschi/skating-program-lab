@@ -145,9 +145,10 @@ fn validate_request(
 ) -> Result<Vec<(usize, usize)>, ProgramCompletionError> {
     use ProgramCompletionError as E;
     let n = request.original.len();
+    let limit = crate::profiles::program_search_limit(profile);
     if request.season != profile.season
-        || n > 10
-        || request.max_additions > 10 - n
+        || n > limit
+        || request.max_additions > limit.saturating_sub(n)
         || request.min_additions > request.max_additions
         || n + request.max_additions == 0
         || request.variants.len() + n > 1000

@@ -298,21 +298,7 @@ pub fn validate_supported_program(
         kind: ProfileErrorKind::Invalid,
         reason: reason.into(),
     };
-    if crate::senior::built_in_policy(profile).is_some_and(|expected| *policy != expected) {
-        return Err(invalid(
-            "built-in Senior policies cannot be overridden; register an explicit custom profile",
-        ));
-    }
-    for category in [
-        AdultCategory::Bronze,
-        AdultCategory::Silver,
-        AdultCategory::Gold,
-        AdultCategory::Masters,
-    ] {
-        if *profile == adult_profile(category) && *policy != adult_program_policy(category) {
-            return Err(invalid("built-in profile policies cannot be overridden; register an explicit custom profile"));
-        }
-    }
+    crate::profiles::resolve_program_policy(profile, Some(policy))?;
     if [
         &policy.step_source,
         &policy.choreography_source,

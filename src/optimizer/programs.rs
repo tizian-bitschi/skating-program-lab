@@ -422,7 +422,7 @@ pub(super) fn optimize_anchored(
         .map_err(E::Profile)?;
     if request.season != profile.season
         || request.max_elements == 0
-        || request.max_elements > 10
+        || request.max_elements > crate::profiles::program_search_limit(profile)
         || request.min_elements > request.max_elements
         || request.max_solutions == 0
         || request.max_proposals == 0
@@ -509,6 +509,22 @@ pub(super) fn optimize_anchored(
         status: OptimizerStatus::Incomplete, enumeration_complete: false, termination_reason: JumpTerminationReason::Interrupted, examined_programs: 0, candidates: vec![] };
     let (mut solver, slots, objective) =
         solver_common::ordered_slots(&values, request.max_elements, request.min_elements);
+    // Mandatory variants constrain the search as well as the final shared check.
+    for group in &request.must_have {
+        let clause = slots
+            .iter()
+            .flat_map(|&slot| {
+                result
+                    .universe
+                    .iter()
+                    .enumerate()
+                    .filter(|(_, variant)| group.contains(variant))
+                    .map(move |(code, _)| predicate!(slot == code as i32 + 1))
+            })
+            .collect::<Vec<_>>();
+        let tag = solver.new_constraint_tag();
+        solver.add_clause(clause, tag);
+    }
     if let Some(a) = anchors {
         result.assumptions = "Original recognition, calls and qualification assumptions are supplied and retained; additions use explicit clean recognition and supplied feature qualification. No official recognition, execution, GOE or second-half credit is inferred.";
         solver_common::anchor_slots(&mut solver, &slots, &result.universe, a);

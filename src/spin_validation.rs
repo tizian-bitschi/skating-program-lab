@@ -387,18 +387,8 @@ pub(crate) fn validate_profile_program_with_assumptions(
     feature_credit: FeatureCreditEvaluation,
 ) -> Result<EvidenceValidationReport, ProfileSelectionError> {
     let profile = registry.resolve(&program.profile, program.scoring_table)?;
-    let built_in = [
-        AdultCategory::Bronze,
-        AdultCategory::Silver,
-        AdultCategory::Gold,
-        AdultCategory::Masters,
-    ]
-    .into_iter()
-    .find(|c| adult_profile(*c) == *profile);
-    let default = built_in
-        .map(adult_regular_spin_policy)
-        .or_else(|| crate::senior::built_in_policy(profile).map(|p| p.spins));
-    let policy = policy.or(default.as_ref());
+    let resolved = crate::profiles::resolve_spin_policy(profile, policy)?;
+    let policy = resolved.as_ref();
     if let Some(p) = policy {
         let sources = std::iter::once(&p.source)
             .chain(p.positions.as_ref().map(|r| &r.source))

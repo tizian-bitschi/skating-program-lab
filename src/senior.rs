@@ -177,28 +177,49 @@ pub fn senior_program_policy(category: SeniorCategory) -> ProgramPolicy {
     }
 }
 
-pub(crate) fn built_in_policy(profile: &RuleProfile) -> Option<ProgramPolicy> {
-    [SeniorCategory::Women, SeniorCategory::Men]
-        .into_iter()
-        .find(|category| senior_profile(*category) == *profile)
-        .map(senior_program_policy)
-}
-
-/// Derive only the clean ordered second-solo case. Supplied panel objects stay intact.
-/// Marked/unknown recognition needs the separate panel-consequence workstream.
-pub(crate) fn repetition_context(panels: &[PanelRecognition]) -> Option<Vec<PanelRecognition>> {
+/// Resolve clean ordered repetition credit independently for each element.
+/// Definitive zero outcomes remain zero; uncertainty affects advanced jumps only.
+pub(crate) fn repetition_context(
+    panels: &[Option<PanelRecognition>],
+) -> Vec<Option<PanelRecognition>> {
     let mut occurrences: Vec<(String, usize, bool)> = vec![];
+    let mut uncertain = false;
+    let advanced = |panel: &PanelRecognition| {
+        panel.details.as_ref().is_some_and(|d| {
+            d.components()
+                .iter()
+                .any(|c| matches!(c.as_str().as_bytes().first(), Some(b'3' | b'4' | b'5')))
+        })
+    };
+    let nonjump = |panel: &PanelRecognition| {
+        panel.details.as_ref().is_some_and(|d| {
+            d.components()
+                .iter()
+                .all(|c| !c.as_str().starts_with(char::is_numeric) && c.as_str() != "Eu")
+        })
+    };
     for (index, panel) in panels.iter().enumerate() {
+        let Some(panel) = panel else {
+            uncertain = true;
+            continue;
+        };
         if panel.outcome != RecognitionOutcome::Recognized {
-            return None;
+            // A known non-jump cannot change jump repetition, including a no-value spin.
+            uncertain |= !nonjump(panel);
+            continue;
         }
-        let details = panel.details.as_ref()?;
-        let calls = details.calls()?;
-        if calls
-            .iter()
-            .any(|call| !matches!(call.call, PanelCall::Repetition | PanelCall::Sequence))
+        let Some(details) = panel.details.as_ref() else {
+            uncertain = true;
+            continue;
+        };
+        if advanced(panel)
+            && details.calls().is_none_or(|calls| {
+                calls
+                    .iter()
+                    .any(|call| !matches!(call.call, PanelCall::Repetition | PanelCall::Sequence))
+            })
         {
-            return None;
+            uncertain = true;
         }
         for code in details.components() {
             if matches!(code.as_str().as_bytes().first(), Some(b'3' | b'4' | b'5')) {
@@ -207,24 +228,40 @@ pub(crate) fn repetition_context(panels: &[PanelRecognition]) -> Option<Vec<Pane
         }
     }
     let mut adjusted = panels.to_vec();
+    if uncertain {
+        for panel in &mut adjusted {
+            if panel
+                .as_ref()
+                .is_some_and(|p| p.outcome == RecognitionOutcome::Recognized && advanced(p))
+            {
+                *panel = None;
+            }
+        }
+        return adjusted;
+    }
     for (code, index, solo) in &occurrences {
         let matching: Vec<_> = occurrences.iter().filter(|e| e.0 == *code).collect();
         if *solo && matching.len() == 2 && matching.iter().all(|e| e.2) && matching[1].1 == *index {
-            let details = adjusted[*index].details.as_ref()?;
-            let mut calls = details.calls()?.to_vec();
+            let panel = adjusted[*index]
+                .as_mut()
+                .expect("known advanced recognition");
+            let details = panel.details.as_ref().expect("known advanced details");
+            let mut calls = details.calls().expect("known clean calls").to_vec();
             if !calls.iter().any(|c| c.call == PanelCall::Repetition) {
                 calls.push(RecordedCall {
                     target: CallTarget::Element,
                     call: PanelCall::Repetition,
                 });
-                adjusted[*index].details = RecognitionDetails::new(
-                    details.components().to_vec(),
-                    details.level(),
-                    Some(calls),
-                )
-                .ok();
+                panel.details = Some(
+                    RecognitionDetails::new(
+                        details.components().to_vec(),
+                        details.level(),
+                        Some(calls),
+                    )
+                    .expect("valid repetition call"),
+                );
             }
         }
     }
-    Some(adjusted)
+    adjusted
 }

@@ -754,7 +754,26 @@ fn generator_mixed_solver_and_locked_completion_resolve_senior_identity() {
     )
     .unwrap();
     assert_eq!(mixed.status, OptimizerStatus::InfeasibleProven); // a jump-only plan lacks required roles
-    let original = skeleton()
+    let mut full_skeleton = skeleton();
+    full_skeleton.extend(
+        [
+            JumpKind::ToeLoop,
+            JumpKind::Salchow,
+            JumpKind::Loop,
+            JumpKind::Flip,
+            JumpKind::Lutz,
+        ]
+        .into_iter()
+        .map(|kind| {
+            (
+                solo(kind, 2),
+                ElementPlanEvidence::Jump {
+                    direct_transitions_assumed: false,
+                },
+            )
+        }),
+    );
+    let original = full_skeleton
         .into_iter()
         .enumerate()
         .map(|(i, (planned, evidence))| {
@@ -765,6 +784,11 @@ fn generator_mixed_solver_and_locked_completion_resolve_senior_identity() {
                 3 => (vec!["ChSp1"], None),
                 4 => (vec!["StSq"], Some(Level::Basic)),
                 5 => (vec!["ChSq1"], None),
+                6 => (vec!["2T"], None),
+                7 => (vec!["2S"], None),
+                8 => (vec!["2Lo"], None),
+                9 => (vec!["2F"], None),
+                10 => (vec!["2Lz"], None),
                 _ => unreachable!(),
             };
             let mut recognition = panel(&codes, level);
@@ -805,6 +829,7 @@ fn generator_mixed_solver_and_locked_completion_resolve_senior_identity() {
     };
     let result = complete_program(&registry, &request).unwrap();
     assert_eq!(result.candidates.len(), 1);
+    assert_eq!(result.candidates[0].program.elements.len(), 11);
     assert_eq!(
         result.candidates[0].assessment.request.entries,
         request
@@ -813,4 +838,194 @@ fn generator_mixed_solver_and_locked_completion_resolve_senior_identity() {
             .map(|e| e.entry.clone())
             .collect::<Vec<_>>()
     );
+}
+
+#[test]
+fn known_zero_spins_preserve_repetition_credit_and_unrelated_values() {
+    let profile = senior_profile(SeniorCategory::Women);
+    for outcome in [RecognitionOutcome::NoValue, RecognitionOutcome::Ignored] {
+        let mut zero = panel(&["ChSp1"], None);
+        zero.outcome = outcome;
+        let elements = [panel(&["3Lz"], None), panel(&["3Lz"], None), zero]
+            .into_iter()
+            .map(|recognition| ProgramElement {
+                recognition,
+                annotations: vec![],
+                goe: 0,
+                fall: Some(false),
+                start_ms: Some(10_000),
+            })
+            .collect::<Vec<_>>();
+        let result = score_profile_program(
+            &ProfileRegistry::senior(),
+            &profile.id,
+            TABLE,
+            &elements,
+            Some(0),
+            Some(ProgramTiming {
+                duration_seconds: 240,
+                ordinary_timing_confirmed: true,
+                second_half_default_confirmed: true,
+            }),
+            None,
+        )
+        .unwrap();
+        assert_eq!(result.score.tes_hundredths, Some(1062));
+        assert_eq!(
+            result.score.elements[0]
+                .as_ref()
+                .unwrap()
+                .credited_base_hundredths,
+            590
+        );
+        assert_eq!(
+            result.score.elements[1]
+                .as_ref()
+                .unwrap()
+                .credited_base_hundredths,
+            472
+        );
+        assert!(matches!(
+            &result.score.elements[2],
+            Err(ProgramScoreError::Element(
+                ElementScoreError::NoValue | ElementScoreError::Ignored
+            ))
+        ));
+    }
+    let mut unknown = panel(&["ChSp1"], None);
+    unknown.outcome = RecognitionOutcome::Unknown;
+    unknown.details = None;
+    let elements = [panel(&["ChSp1"], None), panel(&["3Lz"], None), unknown]
+        .into_iter()
+        .map(|recognition| ProgramElement {
+            recognition,
+            annotations: vec![],
+            goe: 0,
+            fall: Some(false),
+            start_ms: Some(1000),
+        })
+        .collect::<Vec<_>>();
+    let result = score_profile_program(
+        &ProfileRegistry::senior(),
+        &profile.id,
+        TABLE,
+        &elements,
+        Some(0),
+        Some(ProgramTiming {
+            duration_seconds: 240,
+            ordinary_timing_confirmed: true,
+            second_half_default_confirmed: true,
+        }),
+        None,
+    )
+    .unwrap();
+    assert!(result.score.elements[0].is_ok());
+    assert!(result.score.elements[1].is_err());
+    assert_eq!(result.score.tes_hundredths, None);
+}
+
+#[test]
+fn official_spin_policy_integrity_is_identical_at_both_public_boundaries() {
+    let registry = ProfileRegistry::senior();
+    let p = program(vec![]);
+    for remove_roles in [false, true] {
+        let mut policy = senior_program_policy(SeniorCategory::Women);
+        if remove_roles {
+            policy.spins.required.clear();
+        } else {
+            policy.spins.max_spins = 4;
+        }
+        assert_eq!(
+            validate_profile_program_with_evidence(
+                &registry,
+                &p,
+                &ProgramValidationEvidence::default(),
+                Some(&policy.spins)
+            )
+            .unwrap_err()
+            .kind,
+            ProfileErrorKind::Invalid
+        );
+        assert_eq!(
+            validate_supported_program(&registry, &p, &[], &policy)
+                .unwrap_err()
+                .kind,
+            ProfileErrorKind::Invalid
+        );
+    }
+    let mut custom = senior_profile(SeniorCategory::Women);
+    custom.id.name = "custom-spin-policy".into();
+    custom.provenance = ProfileProvenance::Synthetic;
+    let mut registry = ProfileRegistry::default();
+    registry.register(custom.clone()).unwrap();
+    let mut p = p;
+    p.profile = custom.id.clone();
+    let mut policy = senior_program_policy(SeniorCategory::Women);
+    policy.spins.profile = custom.id;
+    policy.spins.max_spins = 4;
+    assert!(validate_profile_program_with_evidence(
+        &registry,
+        &p,
+        &ProgramValidationEvidence::default(),
+        Some(&policy.spins)
+    )
+    .is_ok());
+    assert!(validate_supported_program(&registry, &p, &[], &policy).is_ok());
+}
+
+#[cfg(feature = "optimizer")]
+#[test]
+fn mixed_senior_optimizer_produces_a_valid_complete_program() {
+    let profile = senior_profile(SeniorCategory::Women);
+    let mut entries = skeleton();
+    entries[0].0 = compound(&[(JumpKind::Axel, 1), (JumpKind::ToeLoop, 1)], false);
+    let variants = entries
+        .into_iter()
+        .map(|(element, evidence)| ProgramVariant {
+            element,
+            evidence,
+            recognition_assumed: true,
+        })
+        .collect::<Vec<_>>();
+    let result = optimize_program(
+        &ProfileRegistry::senior(),
+        &ProgramOptimizationRequest {
+            season: profile.season,
+            profile: profile.id.clone(),
+            scoring_table: TABLE,
+            policy: senior_program_policy(SeniorCategory::Women),
+            must_have: (0..variants.len()).map(|i| vec![i]).collect(),
+            variants,
+            exclusions: vec![],
+            min_elements: 6,
+            max_elements: 6,
+            objective: OptimizerObjective::MaximizeUnfactoredBaseValueHundredths,
+            equivalence: ProgramEquivalence::OrderedVariants,
+            max_proposals: 100_000,
+            max_solutions: 1,
+            enumerate_equal_optima: false,
+            time_limit: None,
+        },
+    )
+    .unwrap();
+    assert_eq!(result.status, OptimizerStatus::OptimalProven);
+    let candidate = &result.candidates[0];
+    assert_eq!(candidate.program.profile, profile.id);
+    assert_eq!(candidate.base_hundredths, 1380); // 1A+1T 1.50, CoSpB 1.80, FCSpB 1.90, ChSp1 3.50, StSqB 1.60, ChSq1 3.50
+    assert_eq!(candidate.program.elements.len(), 6);
+    assert_eq!(
+        candidate
+            .program
+            .elements
+            .iter()
+            .filter(|e| matches!(e, PlannedElement::Jump(_)))
+            .count(),
+        1
+    );
+    assert!(candidate
+        .validation
+        .validation
+        .findings
+        .iter()
+        .all(|f| f.rule_id == "spin-execution-recognition"));
 }

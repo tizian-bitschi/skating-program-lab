@@ -624,23 +624,22 @@ pub fn score_profile_program(
         ));
     }
     let senior = profile.binding(ProfileRule::Scoring).mechanism == RuleMechanism::SeniorScoringV1;
+    let panels = elements
+        .iter()
+        .map(|e| Some(e.recognition.clone()))
+        .collect::<Vec<_>>();
     let contextual = if senior {
-        crate::senior::repetition_context(
-            &elements
-                .iter()
-                .map(|e| e.recognition.clone())
-                .collect::<Vec<_>>(),
-        )
+        crate::senior::repetition_context(&panels)
     } else {
-        None
+        panels
     };
     let adjusted: Vec<_> = elements
         .iter()
         .enumerate()
         .map(|(i, e)| {
             let mut e = e.clone();
-            if let Some(panels) = &contextual {
-                e.recognition = panels[i].clone();
+            if let Some(panel) = &contextual[i] {
+                e.recognition = panel.clone();
             }
             e
         })
@@ -654,11 +653,13 @@ pub fn score_profile_program(
         timing,
         execution,
     );
-    if senior && contextual.is_none() {
-        score.tes_hundredths = None;
-        score.elements.fill(Err(ProgramScoreError::Element(
-            ElementScoreError::UnsupportedMarks,
-        )));
+    for (index, panel) in contextual.iter().enumerate() {
+        if panel.is_none() {
+            score.elements[index] = Err(ProgramScoreError::Element(
+                ElementScoreError::UnsupportedMarks,
+            ));
+            score.tes_hundredths = None;
+        }
     }
     Ok(ProfileProgramScore {
         profile: id.clone(),
@@ -1008,4 +1009,64 @@ pub fn adult_profile(category: AdultCategory) -> RuleProfile {
         scoring: ProfileScoringPolicy { recognition_ruleset: RulesetId::IsuAdult2026_27July16, duration_seconds: duration, duration_source, time_deduction_source: time_source, fall_hundredths: if bronze {Some(50)} else {None}, fall_source },
         unsupported_policies: vec![],
     }
+}
+
+/// Sole built-in identity-to-policy adapter; consumers do not identify categories.
+pub(crate) fn built_in_program_policy(profile: &RuleProfile) -> Option<ProgramPolicy> {
+    [
+        AdultCategory::Bronze,
+        AdultCategory::Silver,
+        AdultCategory::Gold,
+        AdultCategory::Masters,
+    ]
+    .into_iter()
+    .find(|c| adult_profile(*c) == *profile)
+    .map(adult_program_policy)
+    .or_else(|| {
+        [SeniorCategory::Women, SeniorCategory::Men]
+            .into_iter()
+            .find(|c| senior_profile(*c) == *profile)
+            .map(senior_program_policy)
+    })
+}
+
+#[cfg(feature = "optimizer")]
+pub(crate) fn program_search_limit(profile: &RuleProfile) -> usize {
+    if crate::senior::selected(profile, ProfileRule::Count) {
+        crate::senior::DEFINITION.max_elements
+    } else {
+        10
+    }
+}
+
+fn check_builtin_override<T: PartialEq>(
+    profile: &RuleProfile,
+    expected: Option<&T>,
+    supplied: Option<&T>,
+) -> Result<(), ProfileSelectionError> {
+    if expected.zip(supplied).is_some_and(|(a, b)| a != b) {
+        return Err(profile.error(
+            ProfileErrorKind::Invalid,
+            "built-in profile policies cannot be overridden; register an explicit custom profile",
+        ));
+    }
+    Ok(())
+}
+
+pub(crate) fn resolve_program_policy(
+    profile: &RuleProfile,
+    supplied: Option<&ProgramPolicy>,
+) -> Result<Option<ProgramPolicy>, ProfileSelectionError> {
+    let expected = built_in_program_policy(profile);
+    check_builtin_override(profile, expected.as_ref(), supplied)?;
+    Ok(supplied.cloned().or(expected))
+}
+
+pub(crate) fn resolve_spin_policy(
+    profile: &RuleProfile,
+    supplied: Option<&RegularSpinPolicy>,
+) -> Result<Option<RegularSpinPolicy>, ProfileSelectionError> {
+    let expected = built_in_program_policy(profile).map(|p| p.spins);
+    check_builtin_override(profile, expected.as_ref(), supplied)?;
+    Ok(supplied.cloned().or(expected))
 }
