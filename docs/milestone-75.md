@@ -2,7 +2,7 @@
 
 Acceptance baseline: `b8f9825` (all six child PRs merged). This audit adds
 one source-ordered eleven-slot regression and connects the parent criteria to
-existing independent evidence. It changes no public API, rule, solver or CI.
+existing independent evidence. It changes no public API, rule or solver.
 
 ## Workstreams and acceptance evidence
 
@@ -52,7 +52,10 @@ Run `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`,
 `cargo test` and `cargo test --no-default-features`. Fixture verification is part
 of the test suites. The benchmark report pins the historical runner and lock;
 `pwsh -NoProfile -File benchmarks/senior-grand-prix/test-runner.ps1` checks its
-revision/cleanliness guards. New measurements must use the pinned reproduction
+revision/cleanliness guards and tests lock restoration after successful and
+failed dependency-free builds, with both present and absent original locks.
+These fast setup checks do not rerun historical performance measurements.
+New measurements must use the pinned reproduction
 instructions; this audit does not relabel historical CSVs as a fresh run.
 
 Numerical protocol parity does not establish independent panel recognition,
@@ -63,3 +66,19 @@ excludes those additions and tests the error. No pruning improvement, broad
 interactive success or global optimum is established. #56 and #58 remain open.
 Short Programs, Junior, Pair, Ice Dance, PCS/TSS reconstruction and UI/HTTP remain
 outside this milestone.
+
+## Integration review and merge history
+
+The six child PRs were merged by their author without submitted GitHub reviews.
+That history does not satisfy the issue's no-self-merge instruction; a later
+audit cannot retroactively change it. Merged status alone is not acceptance.
+
+The parent integration is undergoing a separate external GPT-6 review in
+[this review chat](https://chatgpt.com/c/6aeb3ee3-f828-83ed-ac4d-da0cc81af888).
+The reviewer checked the six integrated workstreams, CI, source sequence and
+test coverage, and returned `REQUEST_CHANGES` on the initial `b022ab7` revision.
+Its findings cover benchmark CI, contradictory capability text and independent
+source-order assertions. Approval remains pending until that same reviewer
+accepts the corrected parent revision. This is an external AI review, not a
+human certification or a submitted GitHub approval. The requested workflow
+permits a merge only after its final explicit `APPROVE` and successful checks.
