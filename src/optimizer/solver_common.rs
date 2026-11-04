@@ -29,6 +29,9 @@ pub(super) fn ordered_slots(
         .iter()
         .map(|_| solver.new_bounded_integer(0, max_value))
         .collect();
+    // Mixed requests: <=11 slots, each catalog BaseValue is u16, hence
+    // objective <=720885 and absolute linear activity <=1441770 (well within i32).
+    // The jump-only caller has at most five slots and the same value type.
     let objective = solver.new_bounded_integer(0, max_value * max_elements as i32);
     let mut terms: Vec<_> = scores.iter().map(|score| score.scaled(1)).collect();
     terms.push(objective.scaled(-1));
@@ -194,5 +197,65 @@ pub(super) fn enumerate<E>(
                 return Ok(EnumerationEnd::Interrupted)
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod ordered_boundary_tests {
+    use super::*;
+    use pumpkin_solver::core::{
+        optimisation::{linear_sat_unsat::LinearSatUnsat, OptimisationDirection},
+        results::ProblemSolution,
+    };
+    use std::ops::ControlFlow;
+
+    #[test]
+    fn eleven_slot_integer_objective_matches_independent_extreme_sums() {
+        // 4A=1250, a three-component upper bound=3750; also cover every
+        // representable BaseValue, independently of catalog/scorer selection.
+        for (value, expected) in [(1250, 13750), (3750, 41250), (65535, 720885)] {
+            let (mut solver, slots, objective) = ordered_slots(&[0, value], 11, 11);
+            let mut brancher = solver.default_brancher();
+            let result = solver.optimise(
+                &mut brancher,
+                &mut Deadline(None),
+                &mut ResolutionResolver::default(),
+                LinearSatUnsat::new(
+                    OptimisationDirection::Maximise,
+                    objective,
+                    |_: &Solver,
+                     _: SolutionReference,
+                     _: &pumpkin_solver::core::DefaultBrancher,
+                     _: &ResolutionResolver| {
+                        ControlFlow::<()>::Continue(())
+                    },
+                ),
+            );
+            let OptimisationResult::Optimal(solution) = result else {
+                panic!("expected exact optimum")
+            };
+            assert_eq!(solution.get_integer_value(objective), expected);
+            assert!(slots.iter().all(|s| solution.get_integer_value(*s) == 1));
+        }
+        let (mut solver, slots, objective) = ordered_slots(&[0], 11, 0);
+        let mut brancher = solver.default_brancher();
+        let result = solver.optimise(
+            &mut brancher,
+            &mut Deadline(None),
+            &mut ResolutionResolver::default(),
+            LinearSatUnsat::new(
+                OptimisationDirection::Maximise,
+                objective,
+                |_: &Solver,
+                 _: SolutionReference,
+                 _: &pumpkin_solver::core::DefaultBrancher,
+                 _: &ResolutionResolver| { ControlFlow::<()>::Continue(()) },
+            ),
+        );
+        let OptimisationResult::Optimal(solution) = result else {
+            panic!("expected empty optimum")
+        };
+        assert_eq!(solution.get_integer_value(objective), 0);
+        assert!(slots.iter().all(|s| solution.get_integer_value(*s) == 0));
     }
 }

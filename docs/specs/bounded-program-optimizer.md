@@ -31,7 +31,7 @@ Equivalent assignments with the same provenance and evidence appear once (#68).
 Proof and tie completeness cover only the supplied finite domain and supported
 conditional rules. Attached generation audits retain omissions and domain caps;
 they never expand proof scope. Time/proposal/output caps retain the existing
-optimizer semantics. Total slots remain bounded at ten, original plus addition
+optimizer semantics. Total slots are bounded at eleven for Senior Rule 612 profiles and ten for other profiles, original plus addition
 definitions at 1,000, and validator proposals at 100,000. An empty request with
 zero maximum total slots is rejected. Evidence requiring unsupported panel paths
 remains indeterminate rather than being converted into a proven optimum.
@@ -292,7 +292,7 @@ normalized equivalent step sets and diagnostic-prose-independent classification.
 ## Acceptance and measured limits (#68)
 
 See the [integration matrix and native measurements](../milestone-68.md) and
-`examples/workflow_bounds.rs`. Hard input ceilings (1000 definitions, ten slots,
+`examples/workflow_bounds.rs`. Hard input ceilings (1000 definitions, eleven Senior / ten other slots,
 100000 validator proposals) are not latency guarantees. Six-slot generated
 Bronze/Silver/Gold/Masters domains exceed the measured 250 ms useful-result budget.
 No solver pruning or public API change is included in this acceptance audit.
@@ -300,3 +300,35 @@ A result cap can leave `OptimalProven` with `enumeration_complete=false`: furthe
 optima may exist, and returned count is not a total. No pagination/streaming cursor
 exists; increasing a finite cap restarts the request. Preserve generation audit
 metadata separately when passing generated variants to `optimize_program`.
+
+
+## Eleven-slot engineering audit (#79)
+
+The mixed optimizer and locked completion share the dynamic ordered-slot model.
+Senior requests use `min(Rule 612 maximum, 11)`; eleven is also an independent
+engineering ceiling, not an assertion that every eleven-element plan is legal.
+Other profiles retain their ten-slot request bound and their own validator caps.
+A twelfth Senior slot is rejected at request validation; direct plan validation
+also reports the source-bound `senior-jump-count` finding under Rule 612.
+
+Each scored variant is a catalog `u16` value. Even eleven maximal representable
+values sum to 720885 hundredths. The signed objective and its equality's absolute
+linear activity (at most 1441770) fit `i32`; accepted totals and original/added
+subtotals fit `u32`, and manual assessment compares exact `i64` hundredths.
+This proof covers larger triple/quad rows and three-component values without
+assuming today's largest SOV row. It does not add contextual repetition or
+second-half bonuses to the unfactored objective.
+
+Slot indices, zero suffixes, anchor positions, gap constraints and completed
+recognition indices derive from vector lengths. Originals keep separate solver
+identities even when an addition has the same plan and recognition. Tests compare
+all eleven insertion positions against an independent provenance/BV oracle,
+including absolute positions and forbidden gaps, and exercise a complete
+six-jump Senior scenario through both APIs. Numeric solver tests use both a
+literal 2026 quad bound and the full `u16` boundary, independently of the scorer.
+
+The 1000-definition, 100000-proposal, generated-domain and result safeguards
+remain in force. Full requests with eleven distinct mandatory variants need not
+enumerate 11! ties: a result cap leaves `enumeration_complete = false` even after
+objective proof. Proposal/time caps remain conservative; no latency guarantee or
+global optimum follows from supporting eleven slots. Performance work is #81.

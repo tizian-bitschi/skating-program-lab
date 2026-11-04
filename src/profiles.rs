@@ -1032,8 +1032,13 @@ pub(crate) fn built_in_program_policy(profile: &RuleProfile) -> Option<ProgramPo
 
 #[cfg(feature = "optimizer")]
 pub(crate) fn program_search_limit(profile: &RuleProfile) -> usize {
+    // Engineering ceiling independent of Rule 612; increasing it needs a new
+    // arithmetic/search review. Other profiles retain the legacy ten-slot bound.
+    const ORDERED_SLOT_LIMIT: usize = 11;
     if crate::senior::selected(profile, ProfileRule::Count) {
-        crate::senior::DEFINITION.max_elements
+        crate::senior::DEFINITION
+            .max_elements
+            .min(ORDERED_SLOT_LIMIT)
     } else {
         10
     }

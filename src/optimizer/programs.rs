@@ -361,6 +361,7 @@ fn checked(
             validation.sources.push(value.source.clone());
         }
     }
+    // At most eleven u16 catalog values: <=720885, exact in u32.
     let base_hundredths = per_element.iter().map(|v| u32::from(v.hundredths)).sum();
     Ok(Some(ProgramCandidate {
         program,

@@ -1,5 +1,11 @@
 # Implementation status
 
+Issue #79 audits the shared eleven-slot Senior model, separates the finite
+engineering ceiling from Rule 612, and adds full/partial completion, exact tie,
+provenance and independent numeric-bound regressions. Existing search and result
+caps remain; eleven-slot capacity carries no latency or global-optimum promise.
+See the [engineering audit](specs/bounded-program-optimizer.md#eleven-slot-engineering-audit-79).
+
 Issue #78 adds table-backed Senior triple/quad call scoring and optional explicit
 multi-judge aggregation. Protocol replay reproduces all 132 independently
 transcribed #76 rows, retaining printed-credit provenance and unresolved inputs.
@@ -126,8 +132,8 @@ separate source-bound spin and mixed-program policies support the bounded
 evidence checks described below. Numerical scoring retains partial scope and
 does not establish category eligibility. The profile jump optimizer retains
 its finite jump domain and maximum five slots; the separate mixed-program
-optimizer supports up to ten slots. No real Junior, Senior or national profile
-has been added. See the [ADR](adr/0002-rule-profiles-proposal.md).
+optimizer supports eleven Senior slots and ten slots for other profiles. Senior
+Women/Men profiles are now available; Junior and national profiles remain absent. See the [ADR](adr/0002-rule-profiles-proposal.md).
 
 Review regression tests additionally reject contradictory Axel/sequence/family
 requirements, missing or mismatched SOV source editions and unsupported scoring

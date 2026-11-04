@@ -1029,3 +1029,311 @@ fn mixed_senior_optimizer_produces_a_valid_complete_program() {
         .iter()
         .all(|f| f.rule_id == "spin-execution-recognition"));
 }
+
+#[cfg(feature = "optimizer")]
+mod eleven_slots {
+    use super::*;
+    use std::collections::BTreeSet;
+
+    fn fixture() -> ProgramCompletionRequest {
+        let profile = senior_profile(SeniorCategory::Women);
+        let mut entries = skeleton();
+        entries.extend(
+            [
+                JumpKind::ToeLoop,
+                JumpKind::Salchow,
+                JumpKind::Loop,
+                JumpKind::Flip,
+            ]
+            .map(|kind| {
+                (
+                    solo(kind, 2),
+                    ElementPlanEvidence::Jump {
+                        direct_transitions_assumed: false,
+                    },
+                )
+            }),
+        );
+        let codes = [
+            "1A", "CoSp", "FCSp", "ChSp1", "StSq", "ChSq1", "2T", "2S", "2Lo", "2F",
+        ];
+        let original = entries
+            .into_iter()
+            .enumerate()
+            .map(|(i, (planned, evidence))| {
+                let mut recognition =
+                    panel(&[codes[i]], matches!(i, 1 | 2 | 4).then_some(Level::Basic));
+                recognition.planned_element = Some(i);
+                CompletionEntry {
+                    id: format!("anchor-{i}"),
+                    locked: true,
+                    entry: ManualProgramEntry {
+                        planned,
+                        evidence,
+                        intended_recognition: Some(recognition),
+                        scenario: None,
+                    },
+                }
+            })
+            .collect();
+        ProgramCompletionRequest {
+            season: profile.season,
+            profile: profile.id,
+            scoring_table: TABLE,
+            policy: senior_program_policy(SeniorCategory::Women),
+            original,
+            variants: vec![ProgramVariant {
+                element: solo(JumpKind::ToeLoop, 2),
+                evidence: ElementPlanEvidence::Jump {
+                    direct_transitions_assumed: false,
+                },
+                recognition_assumed: true,
+            }],
+            generated_domain: None,
+            exclusions: vec![],
+            global_exclusions: vec![],
+            insertion: CompletionInsertionPolicy {
+                boundaries: (0..=10).collect(),
+                absolute_positions: vec![],
+            },
+            min_additions: 1,
+            max_additions: 1,
+            objective: OptimizerObjective::MaximizeUnfactoredBaseValueHundredths,
+            max_proposals: 100,
+            max_solutions: 100,
+            enumerate_equal_optima: true,
+            time_limit: None,
+        }
+    }
+
+    #[test]
+    fn all_eleven_insertion_ties_preserve_equal_looking_originals_and_recognition() {
+        let registry = ProfileRegistry::senior();
+        for (boundaries, absolute, expected) in [
+            (
+                (0..=10).collect(),
+                vec![],
+                (0..=10).collect::<BTreeSet<_>>(),
+            ),
+            (vec![0, 5, 10], vec![], BTreeSet::from([0, 5, 10])),
+            (
+                (0..=10).collect(),
+                vec![("anchor-6".into(), 6)],
+                (7..=10).collect(),
+            ),
+        ] {
+            let mut req = fixture();
+            req.insertion.boundaries = boundaries;
+            req.insertion.absolute_positions = absolute;
+            let result = complete_program(&registry, &req).unwrap();
+            assert_eq!(result.status, OptimizerStatus::OptimalProven);
+            assert!(result.enumeration_complete);
+            let mut positions = BTreeSet::new();
+            for candidate in result.candidates {
+                assert_eq!(candidate.total_base_hundredths, 2080);
+                assert_eq!(candidate.existing_base_hundredths, 1950);
+                assert_eq!(candidate.added_base_hundredths, 130);
+                assert_eq!(candidate.program.profile, req.profile);
+                assert_eq!(candidate.program.scoring_table, TABLE);
+                let added = candidate
+                    .provenance
+                    .iter()
+                    .position(|p| matches!(p, CompletionProvenance::Inserted { .. }))
+                    .unwrap();
+                positions.insert(added);
+                assert_eq!(
+                    candidate.provenance[added],
+                    CompletionProvenance::Inserted {
+                        variant_index: 0,
+                        boundary: added,
+                        ordinal: 0
+                    }
+                );
+                for (i, original) in req.original.iter().enumerate() {
+                    let index = i + usize::from(i >= added);
+                    assert_eq!(
+                        candidate.provenance[index],
+                        CompletionProvenance::Original {
+                            id: original.id.clone(),
+                            original_index: i,
+                            locked: true
+                        }
+                    );
+                    let mut entry = original.entry.clone();
+                    entry.intended_recognition.as_mut().unwrap().planned_element = Some(index);
+                    assert_eq!(candidate.assessment.request.entries[index], entry);
+                    assert_eq!(candidate.evidence[index], original.entry.evidence);
+                }
+                for (index, value) in candidate.per_element.iter().enumerate() {
+                    assert_eq!(
+                        BaseValueOutcome::Value(value.clone()),
+                        lookup_base_value(
+                            TABLE,
+                            candidate.assessment.request.entries[index]
+                                .intended_recognition
+                                .as_ref()
+                                .unwrap(),
+                            &[]
+                        )
+                        .unwrap()
+                    );
+                }
+            }
+            assert_eq!(positions, expected);
+        }
+    }
+
+    #[test]
+    fn eleven_slot_caps_and_empty_suffix_are_conservative() {
+        let registry = ProfileRegistry::senior();
+        let mut req = fixture();
+        req.max_solutions = 1;
+        let result = complete_program(&registry, &req).unwrap();
+        assert_eq!(result.status, OptimizerStatus::OptimalProven);
+        assert!(!result.enumeration_complete);
+        assert_eq!(
+            result.termination_reason,
+            JumpTerminationReason::SolutionLimit
+        );
+        req.max_solutions = 100;
+        req.min_additions = 0;
+        req.variants.clear();
+        let result = complete_program(&registry, &req).unwrap();
+        assert!(result.enumeration_complete);
+        assert_eq!(result.candidates[0].program.elements.len(), 10);
+        assert_eq!(result.candidates[0].total_base_hundredths, 1950);
+        req.max_additions = 2;
+        assert!(matches!(
+            complete_program(&registry, &req),
+            Err(ProgramCompletionError::InvalidRequest(_))
+        ));
+    }
+
+    #[test]
+    fn eleven_slot_original_ruleset_mismatch_is_rejected() {
+        let mut req = fixture();
+        req.original[0]
+            .entry
+            .intended_recognition
+            .as_mut()
+            .unwrap()
+            .ruleset = RulesetId::IsuAdult2026_27July16;
+        assert!(complete_program(&ProfileRegistry::senior(), &req).is_err());
+    }
+
+    #[test]
+    fn full_eleven_slot_quad_scenario_is_rescored_and_twelfth_slot_rejected() {
+        let registry = ProfileRegistry::senior();
+        let req = fixture();
+        let mut variants: Vec<_> = req
+            .original
+            .iter()
+            .map(|o| ProgramVariant {
+                element: o.entry.planned.clone(),
+                evidence: o.entry.evidence.clone(),
+                recognition_assumed: true,
+            })
+            .collect();
+        // Independent clean SOV values: 3A=800, 4T=950, 4S=970, 4Lo=1050, 4F=1100, 4Lz=1150.
+        for (i, kind, rotations) in [
+            (0, JumpKind::Axel, 3),
+            (6, JumpKind::ToeLoop, 4),
+            (7, JumpKind::Salchow, 4),
+            (8, JumpKind::Loop, 4),
+            (9, JumpKind::Flip, 4),
+        ] {
+            variants[i].element = solo(kind, rotations);
+        }
+        variants.push(ProgramVariant {
+            element: solo(JumpKind::Lutz, 4),
+            evidence: ElementPlanEvidence::Jump {
+                direct_transitions_assumed: false,
+            },
+            recognition_assumed: true,
+        });
+        let mut full = ProgramOptimizationRequest {
+            season: req.season,
+            profile: req.profile,
+            scoring_table: TABLE,
+            policy: req.policy,
+            must_have: (0..11).map(|i| vec![i]).collect(),
+            variants,
+            exclusions: vec![],
+            min_elements: 11,
+            max_elements: 11,
+            objective: req.objective,
+            equivalence: ProgramEquivalence::OrderedVariants,
+            max_proposals: 100,
+            max_solutions: 1,
+            enumerate_equal_optima: true,
+            time_limit: None,
+        };
+        // Capacity is independent of solving an 11! ordered domain. A zero
+        // deadline tests public request acceptance without a latency promise.
+        full.time_limit = Some(std::time::Duration::ZERO);
+        let result = optimize_program(&registry, &full).unwrap();
+        assert_eq!(result.status, OptimizerStatus::Incomplete);
+        assert!(!result.enumeration_complete);
+        let mut locked = fixture();
+        let codes = [
+            "3A", "CoSp", "FCSp", "ChSp1", "StSq", "ChSq1", "4T", "4S", "4Lo", "4F", "4Lz",
+        ];
+        locked.original = full
+            .variants
+            .iter()
+            .enumerate()
+            .map(|(i, v)| {
+                let mut recognition =
+                    panel(&[codes[i]], matches!(i, 1 | 2 | 4).then_some(Level::Basic));
+                recognition.planned_element = Some(i);
+                CompletionEntry {
+                    id: format!("quad-{i}"),
+                    locked: true,
+                    entry: ManualProgramEntry {
+                        planned: v.element.clone(),
+                        evidence: v.evidence.clone(),
+                        intended_recognition: Some(recognition),
+                        scenario: None,
+                    },
+                }
+            })
+            .collect();
+        locked.variants.clear();
+        locked.insertion.boundaries.clear();
+        locked.min_additions = 0;
+        locked.max_additions = 0;
+        let result = complete_program(&registry, &locked).unwrap();
+        assert_eq!(result.status, OptimizerStatus::OptimalProven);
+        assert!(result.enumeration_complete);
+        let candidate = &result.candidates[0];
+        assert_eq!(candidate.total_base_hundredths, 7250); // jumps 6020 + other roles 1230
+        assert_eq!(
+            candidate.program.elements,
+            full.variants
+                .iter()
+                .map(|v| v.element.clone())
+                .collect::<Vec<_>>()
+        );
+        assert!(candidate
+            .validation
+            .validation
+            .findings
+            .iter()
+            .all(|f| f.rule_id == "spin-execution-recognition"));
+        full.max_elements = 12;
+        assert!(matches!(
+            optimize_program(&registry, &full),
+            Err(ProgramOptimizationError::InvalidRequest(_))
+        ));
+        let mut twelve = candidate.program.clone();
+        twelve.elements.push(PlannedElement::Unspecified);
+        let report = validate_profile_program(&registry, &twelve).unwrap();
+        let finding = report
+            .validation
+            .findings
+            .iter()
+            .find(|f| f.rule_id == "senior-jump-count" && f.kind == FindingKind::Violation)
+            .unwrap();
+        assert!(format!("{finding:?}").contains("612"));
+    }
+}
