@@ -1,66 +1,10 @@
 use skating_program_lab::*;
-use std::collections::BTreeMap;
 
 const TABLE: ScoringTableId = ScoringTableId::Isu2786June2_2026;
 
-// Fixture adapter only: production callers supply typed recognition, not strings.
-fn recognition(code: &str) -> PanelRecognition {
-    let mut calls = vec![];
-    let mut components = vec![];
-    let mut level = None;
-    for token in code.split('+') {
-        if token == "SEQ" {
-            calls.push(RecordedCall {
-                target: CallTarget::BetweenComponents(components.len()),
-                call: PanelCall::Sequence,
-            });
-            continue;
-        }
-        if token == "REP" {
-            calls.push(RecordedCall {
-                target: CallTarget::Element,
-                call: PanelCall::Repetition,
-            });
-            continue;
-        }
-        let mut stem = token.to_string();
-        let target = CallTarget::Component(components.len());
-        for (suffix, call) in [
-            ("*", PanelCall::NotCounted),
-            ("<<", PanelCall::Downgraded),
-            ("<", PanelCall::UnderRotated),
-            ("q", PanelCall::Quarter),
-            ("!", PanelCall::UnclearEdge),
-            ("e", PanelCall::WrongEdge),
-            ("V", PanelCall::ReducedSpinValue),
-        ] {
-            if let Some(value) = stem.strip_suffix(suffix) {
-                stem = value.into();
-                calls.push(RecordedCall { target, call });
-            }
-        }
-        if !stem.starts_with(char::is_numeric) && !matches!(stem.as_str(), "Eu" | "ChSq1" | "ChSp1")
-        {
-            level = Some(match stem.pop().unwrap() {
-                'B' => Level::Basic,
-                '1' => Level::One,
-                '2' => Level::Two,
-                '3' => Level::Three,
-                '4' => Level::Four,
-                _ => panic!("{code}"),
-            });
-        }
-        components.push(ComponentCode::try_from(stem.as_str()).unwrap());
-    }
-    PanelRecognition {
-        ruleset: RulesetId::IsuSenior2026_27June12,
-        source: None,
-        planned_element: None,
-        observed_element: None,
-        outcome: RecognitionOutcome::Recognized,
-        details: Some(RecognitionDetails::new(components, level, Some(calls)).unwrap()),
-    }
-}
+#[path = "support/protocol_recognition.rs"]
+mod protocol_recognition;
+use protocol_recognition::recognition;
 
 fn panel(values: &[i8]) -> JudgePanelGrades {
     JudgePanelGrades {
@@ -155,84 +99,6 @@ fn missing_and_invalid_grades_never_become_zero_or_a_reduced_panel() {
             if count >= 5 { count - 2 } else { count }
         );
     }
-}
-
-fn cents(text: &str) -> i32 {
-    let (a, b) = text.trim_start_matches('-').split_once('.').unwrap();
-    let value = a.parse::<i32>().unwrap() * 100 + b.parse::<i32>().unwrap();
-    if text.starts_with('-') {
-        -value
-    } else {
-        value
-    }
-}
-
-#[test]
-fn all_independently_transcribed_protocol_rows_replay_to_printed_hundredths() {
-    let mut programs: BTreeMap<String, Vec<(ProtocolElementInput, Vec<String>)>> = BTreeMap::new();
-    for line in include_str!("fixtures/grand-prix-2026-27/elements.tsv")
-        .lines()
-        .skip(1)
-    {
-        let f: Vec<_> = line.split('\t').collect();
-        let mut row = input(f[4]);
-        row.source = source(&format!(
-            "{} page {} rank {} row {}",
-            f[0], f[1], f[2], f[3]
-        ));
-        row.printed_second_half = f[7] == "x";
-        row.judges = Some(JudgePanelGrades {
-            grades: f[9..18]
-                .iter()
-                .map(|g| {
-                    if *g == "-" {
-                        None
-                    } else {
-                        Some(g.parse().unwrap())
-                    }
-                })
-                .collect(),
-        });
-        programs
-            .entry(format!("{} {} {}", f[0], f[1], f[2]))
-            .or_default()
-            .push((row, f.iter().map(|s| s.to_string()).collect()));
-    }
-    let mut checked = 0;
-    for rows in programs.values() {
-        let inputs: Vec<_> = rows.iter().map(|(r, _)| r.clone()).collect();
-        let report = replay(&inputs);
-        let mut expected_tes = 0;
-        for ((input, fields), scored) in rows.iter().zip(report.elements) {
-            let scored =
-                scored.unwrap_or_else(|e| panic!("{} {}: {e:?}", input.source.location, fields[4]));
-            assert_eq!(
-                i32::from(scored.credited_base_hundredths),
-                cents(&fields[6]),
-                "{} BV",
-                input.source.location
-            );
-            assert_eq!(
-                scored
-                    .panel_goe
-                    .as_ref()
-                    .map_or(0, |g| i32::from(g.goe_hundredths)),
-                cents(&fields[8]),
-                "{} GOE",
-                input.source.location
-            );
-            assert_eq!(
-                scored.score_hundredths,
-                Some(cents(&fields[19])),
-                "{} total",
-                input.source.location
-            );
-            expected_tes += i64::from(cents(&fields[19]));
-            checked += 1;
-        }
-        assert_eq!(report.tes_hundredths, Some(expected_tes));
-    }
-    assert_eq!(checked, 132);
 }
 
 #[test]

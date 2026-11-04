@@ -84,8 +84,10 @@ segment score are outside this report.
 | Unsupported execution causes #56/#58 | Existing unsupported consequences remain explicit when supplied; no automatic adjudication |
 | Quint calls, timing verification, PCS | No new support from #78 |
 
-`tests/panel_scoring.rs` compares all 132 rows from twelve #76 programs with
-independently transcribed BV, GOE and element totals, and sums per-program TES.
+`tests/official_replay.rs` compares all 132 rows from twelve #76 programs with
+independently transcribed BV, GOE and element totals, verifies printed per-program TES,
+and returns structured discrepancies and verified partial subtotals. See the
+[full replay report](../grand-prix-2026-27-replay.md).
 Focused SOV tests cover edge marks absent from the selected protocol snapshot,
 numerical trimming/rounding, reduced and missing panels, and repeated-solo versus
 compound and forbidden-repeat boundaries. Existing Adult fixtures are unchanged.

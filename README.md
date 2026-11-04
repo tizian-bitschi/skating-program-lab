@@ -4,6 +4,10 @@ An open-source Rust library for planning technical figure skating programs. The 
 
 ## Current capabilities
 
+The [official Grand Prix replay report](docs/grand-prix-2026-27-replay.md)
+records exact TES parity for twelve source-verified programs and explicit
+manual-assessment evidence gaps.
+
 Senior numerical scoring also supports triple/quad calls and explicitly supplied
 judge panels. [Protocol replay](docs/specs/senior-protocol-scoring.md) separates
 printed official credit from timing verification and legacy hypothetical GOE.
