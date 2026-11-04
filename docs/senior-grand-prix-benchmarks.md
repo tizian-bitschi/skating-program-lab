@@ -2,15 +2,43 @@
 
 ## Reproduction and scope
 
-Runtime and domain source: `ed1f4ae` (base `c14943a`). Checkout that commit
-and run `pwsh -File benchmarks/senior-grand-prix/run.ps1`. It builds Debug and
-Release offline, with the committed benchmark dependency snapshot, before timing
+Original measurement runtime/domain source: `ed1f4ae` (base `c14943a`).
+The hardened runner and neutral domain refactor are pinned at
+`1c5b9ccc8f594ad5b7d081aa278951bb12385559`. In a fresh checkout run:
+
+```powershell
+git checkout --detach 1c5b9ccc8f594ad5b7d081aa278951bb12385559
+pwsh -NoProfile -File benchmarks/senior-grand-prix/run.ps1 -ExpectedRevision 1c5b9ccc8f594ad5b7d081aa278951bb12385559
+```
+
+The runner resolves the explicit expected commit, requires that exact HEAD,
+and rejects tracked changes and untracked files **before** touching locks or
+building. Its new manifest records expected/actual SHA, `dirty=false` and lock
+SHA-256. Outputs go under ignored `target/senior-grand-prix/`, so measurement
+artifacts do not dirty the pinned source checkout. `-VerifyOnly` checks the
+revision/state without a build; `test-runner.ps1` tests wrong/unknown revisions,
+tracked modifications and untracked files in an isolated temporary repository.
+
+Both builds run offline with the committed dependency snapshot before timing
 the native binaries at 250, 1000, 5000 and 30000 ms. Rust dependencies and the
 MSVC/Rust toolchain must already be installed; offline does not mean vendored
-dependencies. The runner restores an existing root lockfile after the run.
-On another native platform, copy the benchmark lock to `Cargo.lock`, build with
+dependencies. The runner restores an existing root lockfile byte-for-byte, or
+removes its temporary root lock if none existed. On another native platform,
+first copy `benchmarks/senior-grand-prix/Cargo.lock` to the root `Cargo.lock`
+(preserve any existing file), build with
 `cargo build --offline --locked --example senior_grand_prix` (also `--release`),
 then invoke `target/{debug,release}/examples/senior_grand_prix <milliseconds>`.
+Restore the previous root lockfile afterward.
+
+The original manifest below records the original run's HEAD; that older runner
+did not enforce/record a clean state. Do not infer a historical `dirty=false`
+assertion from it. The source-derived domain dump before/after the neutral
+refactor is identical (SHA-256 after normalizing CRLF to LF:
+`4259be2a3f988e43f264f175e98093792ec7dfc3c80517b221289dc28cfb86e0`).
+It covers every selected row, generation request, variant, omission and completion
+request. These review fixes change provenance guards, test coverage and output
+serialization, not the measured candidate domains, solver or scoring. The 192
+original observations remain historical baseline data, not re-labelled new runs.
 
 The unchanged production solver is the baseline. No pruning/model optimization
 is adopted in this PR, so there is no before/after speedup claim. Anchored and
@@ -51,9 +79,15 @@ cited values remain in `tests/fixtures/grand-prix-2026-27/elements.tsv`.
 the exact protocol URL, page edition and SHA-256. The benchmark selects source
 + rank 1, checks the eleven ordered row indices and carries source/page/row,
 original notation and printed BASE into each derived anchor's provenance.
-Run `cargo run --offline --locked --example senior_grand_prix -- --describe`
-to inspect every selected original row, request, generated variant, omission
-reason and conditional completion anchor. This dump is untimed.
+Use the same pinned runner to inspect every selected original row, request,
+generated variant, omission reason and conditional completion anchor:
+
+```powershell
+pwsh -NoProfile -File benchmarks/senior-grand-prix/run.ps1 -ExpectedRevision 1c5b9ccc8f594ad5b7d081aa278951bb12385559 -Describe
+```
+
+This prepares/restores the pinned root lock even on a fresh checkout; its untimed
+dump is `target/senior-grand-prix/domains.txt`.
 
 **None of these four published programs fits the supported plan-evidence model
 without supplied assumptions.** Protocol recognition has no revolution counts,
@@ -118,7 +152,7 @@ the benchmark, and it does not add contextual credit to the objective.
 
 `tests/senior_benchmarks.rs` uses an independent combinatorial enumerator:
 one Axel plus each five roles exactly once produces **1440** feasible ordered
-words. With literal SOV coefficients (2A 330, 3A 800, CCoSpB 200, FCSpB 190,
+words per source. The full and restricted oracle runs cover all four source profiles. With literal SOV coefficients (2A 330, 3A 800, CCoSpB 200, FCSpB 190,
 ChSq1 350, StSqB 160, ChSp1 350), the optimum is **2050** with **720** ordered
 ties. Every independently feasible word passes shared validation; the full
 optimizer returns the exact optimal word set. Excluding 3A independently yields
@@ -218,7 +252,11 @@ optimization and repeated host measurements.
 
 `cargo fmt --check`, `cargo clippy --offline --all-targets -- -D warnings`,
 `cargo test --offline` and `cargo test --offline --no-default-features` pass.
-The four new benchmark tests include the explicit Senior completion mismatch.
+The four integration tests include the explicit Senior completion mismatch and
+all four source profiles in the full oracle. The example CSV schema/proof-bound
+test and PowerShell runner-preflight self-check also pass. A fresh detached
+checkout successfully runs `-Describe` without a root lock, and cleanup/restoration
+of both absent and existing root lockfiles is checked.
 The runner completed both builds and all 192 rows; a separate data check verifies
 24 rows per file, proposal caps, proof-bound/status consistency and unavailable
 internal metrics. Production source, public APIs and CI configuration are unchanged.
