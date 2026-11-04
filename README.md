@@ -32,6 +32,7 @@ An open-source Rust library for planning technical figure skating programs. The 
 - Product scope and stages: [requirements](docs/requirements.md).
 - Module boundaries and data flow: [architecture](docs/architecture.md). Current support and tests: [implementation status](docs/implementation-status.md).
 - Cross-workstream coverage, compatibility and remaining limits: [foundation milestone #44](docs/milestone-44.md).
+- Four backend workflows, merged workstreams and acceptance evidence: [product milestone #63](docs/milestone-63.md).
 - Domain work: [Adult rules](docs/rules/isu-adult-2026-27.md), [source editions and open questions](docs/rule-sources.md), and [source review](docs/rule-review.md).
 - Feature work: [scoring](docs/specs/scoring.md) and [optimization](docs/specs/optimization.md), including the [category-aware jump optimizer](docs/specs/optimization.md#category-aware-jump-optimizer). Solver evidence: [Pumpkin ADR](docs/adr/0001-pumpkin.md) and [comparison](docs/solver-comparison.md).
 - Coding agents: [AGENTS.md](AGENTS.md).
