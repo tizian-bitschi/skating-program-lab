@@ -1,70 +1,39 @@
 use skating_program_lab::*;
+#[path = "generation_defaults.rs"]
+mod generation_defaults;
 
 pub fn domain(category: AdultCategory, broad: bool) -> CandidateGenerationRequest {
-    let p = adult_profile(category);
-    CandidateGenerationRequest {
-        season: p.season,
-        profile: p.id,
-        scoring_table: p.scoring_table,
-        discipline: ProfileDiscipline::Single,
-        segment: ProgramSegment::FreeSkating,
-        jump_kinds: if broad {
-            vec![
-                JumpKind::ToeLoop,
-                JumpKind::Salchow,
-                JumpKind::Loop,
-                JumpKind::Flip,
-                JumpKind::Lutz,
-                JumpKind::Axel,
-            ]
-        } else {
-            vec![JumpKind::ToeLoop, JumpKind::Salchow]
-        },
-        rotations: if broad { vec![1, 2] } else { vec![1] },
-        solo_jumps: true,
-        direct_combinations: broad,
-        axel_sequences: false,
-        confirmed_sequence_transitions: vec![],
-        max_compound_length: 2,
-        base_spins: vec![SpinAbbreviation {
-            kind: RegularSpinKind::Sit,
-            entry: SpinEntry::NonFlying,
-            change_foot: false,
-        }],
-        spin_plans: if broad {
-            vec![
-                qualified_spin(RegularSpinKind::Camel),
-                qualified_spin(RegularSpinKind::Sit),
-            ]
-        } else {
-            vec![]
-        },
-        movement_plans: vec![
-            ElementPlanEvidence::ChoreographicSequence {
-                movements: Some(vec![SkatingMovement::Spiral, SkatingMovement::SpreadEagle]),
-                clearly_visible: Some(true),
-            },
-            ElementPlanEvidence::Step {
-                level: Level::Basic,
-                clean_difficult_turns: Some(2),
-                full_ice_coverage: Some(true),
-                movement: Some(SkatingMovement::Spiral),
-                qualified_features: Some(vec![]),
-                qualification_assumed: true,
-            },
-            ElementPlanEvidence::ChoreographicSpin {
-                consecutive_revolutions_per_foot: Some(vec![3]),
-            },
-        ],
-        manual_variants: vec![],
-        exclusions: vec![],
-        excluded_spin_positions: vec![],
-        excluded_spin_entries: vec![],
-        skill_limits: PersonalSkillLimits::default(),
-        recognition_assumed: true,
-        max_candidates: 1000,
-        max_expansions: 100_000,
-    }
+    let mut g = generation_defaults::request(adult_profile(category));
+    g.jump_kinds = if broad {
+        vec![
+            JumpKind::ToeLoop,
+            JumpKind::Salchow,
+            JumpKind::Loop,
+            JumpKind::Flip,
+            JumpKind::Lutz,
+            JumpKind::Axel,
+        ]
+    } else {
+        vec![JumpKind::ToeLoop, JumpKind::Salchow]
+    };
+    g.rotations = if broad { vec![1, 2] } else { vec![1] };
+    g.solo_jumps = true;
+    g.direct_combinations = broad;
+    g.base_spins = vec![SpinAbbreviation {
+        kind: RegularSpinKind::Sit,
+        entry: SpinEntry::NonFlying,
+        change_foot: false,
+    }];
+    g.spin_plans = if broad {
+        vec![
+            qualified_spin(RegularSpinKind::Camel),
+            qualified_spin(RegularSpinKind::Sit),
+        ]
+    } else {
+        vec![]
+    };
+    g.movement_plans = generation_defaults::basic_movements();
+    g
 }
 
 fn qualified_spin(kind: RegularSpinKind) -> SpinGenerationPlan {

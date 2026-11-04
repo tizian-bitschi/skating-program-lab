@@ -1,9 +1,24 @@
 use skating_program_lab::*;
 use std::collections::BTreeMap;
 
-#[path = "workflows.rs"]
-#[allow(dead_code)]
-mod workflows;
+#[path = "generation_defaults.rs"]
+mod generation_defaults;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Scale {
+    Small,
+    Medium,
+    Large,
+}
+impl std::fmt::Display for Scale {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            Self::Small => "small",
+            Self::Medium => "medium",
+            Self::Large => "large",
+        })
+    }
+}
 
 pub const SOURCES: [&str; 4] = ["gpfra2026-W", "gpfra2026-M", "gpcan2026-W", "gpcan2026-M"];
 pub const ELEMENTS: &str = include_str!("../fixtures/grand-prix-2026-27/elements.tsv");
@@ -61,15 +76,14 @@ pub fn solo(code: &str) -> Option<ListedJump> {
 }
 
 // Conditional Basic plans: the protocol supplies families, never these motion facts.
-pub fn generation(source: &str, scale: &str) -> CandidateGenerationRequest {
+pub fn generation(source: &str, scale: Scale) -> CandidateGenerationRequest {
     let profile = senior_profile(category(source));
-    let mut g = workflows::domain(AdultCategory::Masters, false);
-    g.season = profile.season;
-    g.profile = profile.id;
-    g.scoring_table = profile.scoring_table;
-    g.jump_kinds = if scale == "small" {
+    let mut g = generation_defaults::request(profile);
+    g.solo_jumps = true;
+    g.movement_plans = generation_defaults::basic_movements();
+    g.jump_kinds = if scale == Scale::Small {
         vec![JumpKind::Axel]
-    } else if scale == "medium" {
+    } else if scale == Scale::Medium {
         vec![JumpKind::ToeLoop, JumpKind::Axel]
     } else {
         vec![
@@ -81,9 +95,9 @@ pub fn generation(source: &str, scale: &str) -> CandidateGenerationRequest {
             JumpKind::Axel,
         ]
     };
-    g.rotations = if scale == "small" {
+    g.rotations = if scale == Scale::Small {
         vec![2, 3]
-    } else if scale == "medium" {
+    } else if scale == Scale::Medium {
         vec![1, 2]
     } else {
         vec![2, 3, 4]
@@ -105,12 +119,12 @@ pub fn generation(source: &str, scale: &str) -> CandidateGenerationRequest {
         },
     ];
     // Keep medium additions at exactly three explicit safe planning alternatives.
-    if scale == "medium" {
+    if scale == Scale::Medium {
         g.exclusions = vec![PersonalExclusion::Jump(solo("1A").unwrap())];
         g.base_spins.clear();
         g.movement_plans.clear();
     }
-    if scale == "large" {
+    if scale == Scale::Large {
         g.direct_combinations = true;
         g.axel_sequences = true; // No direct-step evidence: omissions must remain audited.
         g.exclusions = vec![PersonalExclusion::Jump(solo("4Lz").unwrap())];
@@ -215,11 +229,11 @@ pub fn anchor(id: String, v: &ProgramVariant, source: Option<SourceReference>) -
 
 pub fn completion(
     source: &str,
-    scale: &str,
+    scale: Scale,
     domain: CandidateGenerationResult,
 ) -> ProgramCompletionRequest {
     let registry = ProfileRegistry::senior();
-    let small = generate_program_candidates(&registry, &generation(source, "small")).unwrap();
+    let small = generate_program_candidates(&registry, &generation(source, Scale::Small)).unwrap();
     let roles: Vec<_> = small
         .variants
         .iter()
@@ -228,7 +242,7 @@ pub fn completion(
         .collect();
     assert_eq!(roles.len(), 5);
     let mut original = vec![];
-    if scale == "small" {
+    if scale == Scale::Small {
         original = roles
             .iter()
             .enumerate()
@@ -291,9 +305,9 @@ pub fn completion(
     }
     let p = senior_profile(category(source));
     let n = original.len();
-    let additions = if scale == "large" {
+    let additions = if scale == Scale::Large {
         4
-    } else if scale == "medium" {
+    } else if scale == Scale::Medium {
         3
     } else {
         1
@@ -301,7 +315,7 @@ pub fn completion(
     // Manual assessment applies Senior second-solo credit, while this search
     // objective is unfactored. Exclude high solo additions to avoid that known
     // unsupported cross-contract case; compounds retain shared repetition checks.
-    let exclusions = if scale == "large" {
+    let exclusions = if scale == Scale::Large {
         domain.variants.iter().enumerate().filter_map(|(i,v)| {
             matches!(&v.element, PlannedElement::Jump(JumpElement::Solo(j)) if j.rotations.is_some_and(|r| r >= 3)).then_some(PersonalExclusion::Variant(i))
         }).collect()
@@ -319,7 +333,7 @@ pub fn completion(
         exclusions,
         global_exclusions: vec![],
         insertion: CompletionInsertionPolicy {
-            boundaries: if scale == "small" {
+            boundaries: if scale == Scale::Small {
                 (0..=n).collect()
             } else {
                 vec![0, n / 2, n]

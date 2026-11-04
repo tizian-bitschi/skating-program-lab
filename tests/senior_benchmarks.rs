@@ -26,75 +26,83 @@ fn words(axel: usize) -> BTreeSet<Vec<usize>> {
 #[test]
 fn independent_small_oracle_checks_all_feasible_words_and_complete_optimal_ties() {
     let registry = ProfileRegistry::senior();
-    let source = "gpcan2026-W";
-    let generated =
-        generate_program_candidates(&registry, &domains::generation(source, "small")).unwrap();
-    assert_eq!(generated.variants.len(), 7);
-    assert_eq!(
-        generated.variants[0].element,
-        PlannedElement::Jump(JumpElement::Solo(domains::solo("2A").unwrap()))
-    );
-    assert_eq!(
-        generated.variants[1].element,
-        PlannedElement::Jump(JumpElement::Solo(domains::solo("3A").unwrap()))
-    );
-    // Communication 2786 independent literal coefficients: 2A,3A,CCoSpB,
-    // FCSpB,ChSq1,StSqB,ChSp1. Generator order is asserted through these values.
-    let values = [330, 800, 200, 190, 350, 160, 350];
-    let mut q = domains::small_full(source, generated.variants);
-    q.max_proposals = 10_000;
-    let feasible: BTreeSet<_> = words(0).union(&words(1)).cloned().collect();
-    assert_eq!(feasible.len(), 1440);
-    // Check every independently feasible word against shared plan validation;
-    // optimal enumeration below compares every ordered tie, not just one BV.
-    for word in &feasible {
-        let p = ProfileProgram {
-            profile: q.profile.clone(),
-            scoring_table: q.scoring_table,
-            elements: word
-                .iter()
-                .map(|i| q.variants[*i].element.clone())
-                .collect(),
-        };
-        let evidence: Vec<_> = word
-            .iter()
-            .map(|i| q.variants[*i].evidence.clone())
-            .collect();
-        let r = validate_supported_program(&registry, &p, &evidence, &q.policy).unwrap();
-        assert!(r
-            .validation
-            .findings
-            .iter()
-            .all(|f| f.rule_id == "spin-execution-recognition"));
-    }
-    let r = optimize_program(&registry, &q).unwrap();
-    assert_eq!(r.status, OptimizerStatus::OptimalProven);
-    assert!(r.enumeration_complete);
-    assert_eq!(
-        r.candidates
-            .iter()
-            .map(|c| c.variant_indices.clone())
-            .collect::<BTreeSet<_>>(),
-        words(1)
-    );
-    for c in r.candidates {
-        assert_eq!(c.base_hundredths, 2050);
+    for source in domains::SOURCES {
+        let extra = u32::from(source == "gpfra2026-W") * 10;
+        let generated = generate_program_candidates(
+            &registry,
+            &domains::generation(source, domains::Scale::Small),
+        )
+        .unwrap();
+        assert_eq!(generated.variants.len(), 7);
         assert_eq!(
-            c.base_hundredths,
-            c.variant_indices.iter().map(|i| values[*i]).sum()
+            generated.variants[0].element,
+            PlannedElement::Jump(JumpElement::Solo(domains::solo("2A").unwrap()))
         );
-    }
-    q.exclusions = vec![PersonalExclusion::Variant(1)];
-    let r = optimize_program(&registry, &q).unwrap();
-    assert!(r.enumeration_complete);
-    assert_eq!(
-        r.candidates
+        assert_eq!(
+            generated.variants[1].element,
+            PlannedElement::Jump(JumpElement::Solo(domains::solo("3A").unwrap()))
+        );
+        // Communication 2786 independent literal coefficients: 2A,3A,CCoSpB,
+        // FCSpB,ChSq1,StSqB,ChSp1. Generator order is asserted through these values.
+        let values = [330, 800, 200, 190 + extra, 350, 160, 350];
+        let mut q = domains::small_full(source, generated.variants);
+        q.max_proposals = 10_000;
+        let feasible: BTreeSet<_> = words(0).union(&words(1)).cloned().collect();
+        assert_eq!(feasible.len(), 1440);
+        // Check every independently feasible word against shared plan validation;
+        // optimal enumeration below compares every ordered tie, not just one BV.
+        for word in &feasible {
+            let p = ProfileProgram {
+                profile: q.profile.clone(),
+                scoring_table: q.scoring_table,
+                elements: word
+                    .iter()
+                    .map(|i| q.variants[*i].element.clone())
+                    .collect(),
+            };
+            let evidence: Vec<_> = word
+                .iter()
+                .map(|i| q.variants[*i].evidence.clone())
+                .collect();
+            let r = validate_supported_program(&registry, &p, &evidence, &q.policy).unwrap();
+            assert!(r
+                .validation
+                .findings
+                .iter()
+                .all(|f| f.rule_id == "spin-execution-recognition"));
+        }
+        let r = optimize_program(&registry, &q).unwrap();
+        assert_eq!(r.status, OptimizerStatus::OptimalProven);
+        assert!(r.enumeration_complete);
+        assert_eq!(
+            r.candidates
+                .iter()
+                .map(|c| c.variant_indices.clone())
+                .collect::<BTreeSet<_>>(),
+            words(1)
+        );
+        for c in r.candidates {
+            assert_eq!(c.base_hundredths, 2050 + extra);
+            assert_eq!(
+                c.base_hundredths,
+                c.variant_indices.iter().map(|i| values[*i]).sum()
+            );
+        }
+        q.exclusions = vec![PersonalExclusion::Variant(1)];
+        let r = optimize_program(&registry, &q).unwrap();
+        assert!(r.enumeration_complete);
+        assert_eq!(
+            r.candidates
+                .iter()
+                .map(|c| c.variant_indices.clone())
+                .collect::<BTreeSet<_>>(),
+            words(0)
+        );
+        assert!(r
+            .candidates
             .iter()
-            .map(|c| c.variant_indices.clone())
-            .collect::<BTreeSet<_>>(),
-        words(0)
-    );
-    assert!(r.candidates.iter().all(|c| c.base_hundredths == 1580));
+            .all(|c| c.base_hundredths == 1580 + extra));
+    }
 }
 
 #[test]
@@ -113,10 +121,13 @@ fn source_identity_order_values_and_conditional_medium_anchors_survive() {
             .find(|r| r["source"] == source)
             .unwrap();
         assert_eq!(edition["sha256"].len(), 64);
-        let d =
-            generate_program_candidates(&registry, &domains::generation(source, "medium")).unwrap();
+        let d = generate_program_candidates(
+            &registry,
+            &domains::generation(source, domains::Scale::Medium),
+        )
+        .unwrap();
         assert_eq!(d.variants.len(), 3);
-        let mut q = domains::completion(source, "medium", d);
+        let mut q = domains::completion(source, domains::Scale::Medium, d);
         q.max_proposals = 1000;
         let r = complete_program(&registry, &q).unwrap();
         assert_eq!(r.status, OptimizerStatus::OptimalProven);
@@ -156,8 +167,12 @@ fn source_identity_order_values_and_conditional_medium_anchors_survive() {
 fn repeated_high_solo_completion_remains_an_explicit_unsupported_contract_case() {
     let registry = ProfileRegistry::senior();
     let source = "gpcan2026-W";
-    let d = generate_program_candidates(&registry, &domains::generation(source, "small")).unwrap();
-    let mut q = domains::completion(source, "small", d);
+    let d = generate_program_candidates(
+        &registry,
+        &domains::generation(source, domains::Scale::Small),
+    )
+    .unwrap();
+    let mut q = domains::completion(source, domains::Scale::Small, d);
     let axel = q.variants[1].clone();
     q.original
         .push(domains::anchor("conditional-3A".into(), &axel, None));
@@ -176,9 +191,12 @@ fn repeated_high_solo_completion_remains_an_explicit_unsupported_contract_case()
 fn completion_oracle_restrictions_caps_negative_and_eleven_slot_deadline() {
     let registry = ProfileRegistry::senior();
     for source in domains::SOURCES {
-        let d =
-            generate_program_candidates(&registry, &domains::generation(source, "small")).unwrap();
-        let mut q = domains::completion(source, "small", d);
+        let d = generate_program_candidates(
+            &registry,
+            &domains::generation(source, domains::Scale::Small),
+        )
+        .unwrap();
+        let mut q = domains::completion(source, domains::Scale::Small, d);
         let r = complete_program(&registry, &q).unwrap();
         assert_eq!(r.status, OptimizerStatus::OptimalProven);
         assert!(r.enumeration_complete);
@@ -235,7 +253,7 @@ fn completion_oracle_restrictions_caps_negative_and_eleven_slot_deadline() {
             complete_program(&registry, &q).unwrap().status,
             OptimizerStatus::InfeasibleProven
         );
-        let mut g = domains::generation(source, "large");
+        let mut g = domains::generation(source, domains::Scale::Large);
         let d = generate_program_candidates(&registry, &g).unwrap();
         assert_eq!(
             d.audit.completeness,
@@ -247,7 +265,7 @@ fn completion_oracle_restrictions_caps_negative_and_eleven_slot_deadline() {
             .iter()
             .all(|v| v.element
                 != PlannedElement::Jump(JumpElement::Solo(domains::solo("4Lz").unwrap()))));
-        let mut q = domains::completion(source, "large", d);
+        let mut q = domains::completion(source, domains::Scale::Large, d);
         q.time_limit = Some(Duration::ZERO);
         assert_eq!(q.original.len() + q.max_additions, 11);
         let r = complete_program(&registry, &q).unwrap();
