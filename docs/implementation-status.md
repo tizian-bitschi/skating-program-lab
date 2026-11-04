@@ -1,5 +1,10 @@
 # Implementation status
 
+The [product milestone #63 audit](milestone-63.md) maps the four backend workflows
+and merged workstreams #64–#68 to executable acceptance evidence and remaining
+limits. Supported finite conditional optimization and partial rule coverage do
+not establish an official result or full regulatory compliance.
+
 ## Rule coverage (#67)
 
 `assess_program_legality` adds stage-aware rule coverage without changing existing
