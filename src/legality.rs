@@ -281,22 +281,23 @@ pub fn assess_program_legality(
             }
         }
     }
-    // Adult-only regulatory gaps must never be inferred from a category label.
-    if [
+    let adult = [
         AdultCategory::Bronze,
         AdultCategory::Silver,
         AdultCategory::Gold,
         AdultCategory::Masters,
     ]
     .iter()
-    .any(|c| *profile == adult_profile(*c))
-    {
+    .any(|c| *profile == adult_profile(*c));
+    if adult || crate::senior::selected(profile, ProfileRule::Eligibility) {
         for (id, source, state, reason) in [
             ("program-duration", &profile.scoring.duration_source, RuleCoverageState::MissingEvidence, "No actual program duration is supplied; timing and incomplete-program consequences remain unevaluated."),
             ("program-performance-panel", &policy.feature_source, RuleCoverageState::MissingEvidence, "Plans do not establish actual edges, uninterrupted execution, musical fit, panel identification or fallback recognition."),
-            ("program-waltz-recognition", &profile.binding(ProfileRule::Eligibility).source, RuleCoverageState::Unsupported, "The planned listed-jump model cannot represent a Waltz jump and its category-specific counting consequences."),
         ] {
             inventory(&mut rules, id, source, None, state, reason);
+        }
+        if adult {
+            inventory(&mut rules, "program-waltz-recognition", &profile.binding(ProfileRule::Eligibility).source, None, RuleCoverageState::Unsupported, "The planned listed-jump model cannot represent a Waltz jump and its category-specific counting consequences.");
         }
         for index in spins {
             inventory(&mut rules, "program-variation-categories", &policy.feature_source, Some(index), RuleCoverageState::Unsupported,

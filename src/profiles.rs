@@ -28,6 +28,8 @@ pub enum ProfileProvenance {
 pub enum RuleMechanism {
     JumpPlanV1,
     AdultScoringV1,
+    SeniorJumpPlanV1,
+    SeniorScoringV1,
     Unsupported(String),
 }
 
@@ -114,7 +116,8 @@ pub struct FamilyPolicy {
     pub required: Vec<ProfileElementFamily>,
 }
 
-/// Limits have the semantics of the named JumpPlanV1 evaluator.
+/// Limits use the selected named jump evaluator. Senior singles use the
+/// across-rotations kind cap instead of the identical-double/advanced cap.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct JumpPolicy {
     pub allowed: Vec<JumpPermission>,
@@ -301,6 +304,15 @@ fn citation_valid(source: &SourceReference) -> bool {
         .all(|s| !s.trim().is_empty())
 }
 impl ProfileRegistry {
+    pub fn senior() -> Self {
+        let mut registry = Self::default();
+        for category in [SeniorCategory::Women, SeniorCategory::Men] {
+            registry
+                .register(senior_profile(category))
+                .expect("built-in Senior profile");
+        }
+        registry
+    }
     pub fn adult() -> Self {
         let mut registry = Self::default();
         for category in [
@@ -471,6 +483,14 @@ impl ProfileRegistry {
             return Err(fail("invalid scoring or unsupported-policy metadata"));
         }
         let required = ProfileRule::ALL;
+        if profile.bindings.iter().any(|b| {
+            b.rule == ProfileRule::Scoring && b.mechanism == RuleMechanism::SeniorScoringV1
+        }) && profile.scoring.recognition_ruleset != RulesetId::IsuSenior2026_27June12
+        {
+            return Err(fail(
+                "Senior scoring requires the source-bound Senior recognition ruleset",
+            ));
+        }
         if profile.bindings.len() != required.len()
             || required
                 .iter()
@@ -483,8 +503,12 @@ impl ProfileRegistry {
                 && citation_valid(&b.source)
                 && profile.sources.contains(&b.source)
                 && match b.mechanism {
-                    RuleMechanism::JumpPlanV1 => b.rule != ProfileRule::Scoring,
-                    RuleMechanism::AdultScoringV1 => b.rule == ProfileRule::Scoring,
+                    RuleMechanism::JumpPlanV1 | RuleMechanism::SeniorJumpPlanV1 => {
+                        b.rule != ProfileRule::Scoring
+                    }
+                    RuleMechanism::AdultScoringV1 | RuleMechanism::SeniorScoringV1 => {
+                        b.rule == ProfileRule::Scoring
+                    }
                     RuleMechanism::Unsupported(_) => true,
                 }
         };
@@ -599,17 +623,46 @@ pub fn score_profile_program(
             "recognition ruleset does not match profile compatibility binding",
         ));
     }
+    let senior = profile.binding(ProfileRule::Scoring).mechanism == RuleMechanism::SeniorScoringV1;
+    let contextual = if senior {
+        crate::senior::repetition_context(
+            &elements
+                .iter()
+                .map(|e| e.recognition.clone())
+                .collect::<Vec<_>>(),
+        )
+    } else {
+        None
+    };
+    let adjusted: Vec<_> = elements
+        .iter()
+        .enumerate()
+        .map(|(i, e)| {
+            let mut e = e.clone();
+            if let Some(panels) = &contextual {
+                e.recognition = panels[i].clone();
+            }
+            e
+        })
+        .collect();
+    let mut score = crate::scoring::score_program_internal(
+        profile.scoring.recognition_ruleset,
+        &profile.scoring,
+        table,
+        &adjusted,
+        outside_falls,
+        timing,
+        execution,
+    );
+    if senior && contextual.is_none() {
+        score.tes_hundredths = None;
+        score.elements.fill(Err(ProgramScoreError::Element(
+            ElementScoreError::UnsupportedMarks,
+        )));
+    }
     Ok(ProfileProgramScore {
         profile: id.clone(),
-        score: crate::scoring::score_program_internal(
-            profile.scoring.recognition_ruleset,
-            &profile.scoring,
-            table,
-            elements,
-            outside_falls,
-            timing,
-            execution,
-        ),
+        score,
     })
 }
 

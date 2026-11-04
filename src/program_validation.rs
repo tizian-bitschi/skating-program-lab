@@ -298,6 +298,11 @@ pub fn validate_supported_program(
         kind: ProfileErrorKind::Invalid,
         reason: reason.into(),
     };
+    if crate::senior::built_in_policy(profile).is_some_and(|expected| *policy != expected) {
+        return Err(invalid(
+            "built-in Senior policies cannot be overridden; register an explicit custom profile",
+        ));
+    }
     for category in [
         AdultCategory::Bronze,
         AdultCategory::Silver,
@@ -858,6 +863,14 @@ pub(crate) fn completion_findings(
     // Missing families share the same capacity. An Axel can occupy one of the
     // required jump families; ChSp and regular roles cannot share an element.
     let jointly_insertable = jump_count + needed_jumps <= profile.jumps.max_jumps
+        && (!crate::senior::selected(profile, ProfileRule::Count)
+            || program.elements.len()
+                + needed_jumps
+                + missing_regular
+                + missing_chsp
+                + missing(ProfileElementFamily::StepSequence)
+                + missing(ProfileElementFamily::ChoreographicSequence)
+                <= crate::senior::DEFINITION.max_elements)
         && count(ProfileElementFamily::Combination) + missing_combos
             <= profile.jumps.max_combinations
         && count(ProfileElementFamily::JumpSequence) + missing_sequences

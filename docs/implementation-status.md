@@ -1,5 +1,13 @@
 # Implementation status
 
+Issue #77 adds source-bound 2026/27 Senior Women/Men Free Skating profiles,
+Rule 612 jump constraints, distinct spin roles and shared family evidence
+validation. Clean ordered program/manual contexts apply second-solo 80%
+credit without changing catalog BV or supplied panel data. Candidate generation,
+mixed optimization and locked completion resolve Senior identities. The
+[Senior source review and coverage matrix](rules/isu-senior-2026-27.md) records
+edition bindings, independent tests and unsupported panel/scoring cases.
+
 The [product milestone #63 audit](milestone-63.md) maps the four backend workflows
 and merged workstreams #64–#68 to executable acceptance evidence and remaining
 limits. Supported finite conditional optimization and partial rule coverage do

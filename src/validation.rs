@@ -287,12 +287,13 @@ impl<'a> Validator<'a> {
         }
         if let (Some(kind), Some(rotations @ 1..)) = (jump.kind, jump.rotations) {
             self.occurrences.push((kind, rotations));
-            if self
-                .occurrences
-                .iter()
-                .filter(|&&entry| entry == (kind, rotations))
-                .count()
-                > self.policy.max_repetitions
+            if (!crate::senior::selected(self.profile, Rule::Repetition) || rotations >= 2)
+                && self
+                    .occurrences
+                    .iter()
+                    .filter(|&&entry| entry == (kind, rotations))
+                    .count()
+                    > self.policy.max_repetitions
             {
                 self.add(
                     FindingKind::Violation,
@@ -477,11 +478,69 @@ impl<'a> Validator<'a> {
         }
         for (i, part) in parts.iter().enumerate() {
             if let JumpPart::Jump(jump) = part {
+                if crate::senior::selected(self.profile, Rule::Structure)
+                    && jump.rotations.is_some_and(|n| n >= 5)
+                {
+                    self.add(FindingKind::Violation, Rule::Structure, Some(index), Some(i),
+                        "Senior combinations and sequences permit only single through quadruple jumps.");
+                }
                 self.jump(jump, index, Some(i));
             }
         }
     }
     fn program_checks(&mut self) {
+        if crate::senior::selected(self.profile, Rule::Repetition) {
+            let unique: Vec<_> = self
+                .occurrences
+                .iter()
+                .enumerate()
+                .filter(|(i, jump)| !self.occurrences[..*i].contains(jump))
+                .map(|(_, jump)| *jump)
+                .collect();
+            let repeated: Vec<_> = unique
+                .iter()
+                .filter(|jump| {
+                    jump.1 >= 3
+                        && self
+                            .occurrences
+                            .iter()
+                            .filter(|other| *other == *jump)
+                            .count()
+                            >= 2
+                })
+                .collect();
+            if repeated.len() > crate::senior::DEFINITION.max_repeated_advanced
+                || repeated.iter().filter(|jump| jump.1 >= 4).count()
+                    > crate::senior::DEFINITION.max_repeated_quad_or_quint
+            {
+                self.add(FindingKind::Violation, Rule::Repetition, None, None,
+                    "Only two triple/quad/quint types may repeat, including at most one quad or quint type.");
+            }
+            for kind in [
+                JumpKind::ToeLoop,
+                JumpKind::Salchow,
+                JumpKind::Loop,
+                JumpKind::Flip,
+                JumpKind::Lutz,
+                JumpKind::Axel,
+            ] {
+                if self
+                    .occurrences
+                    .iter()
+                    .filter(|jump| jump.0 == kind)
+                    .count()
+                    > crate::senior::DEFINITION.max_kind_occurrences
+                {
+                    self.add(
+                        FindingKind::Violation,
+                        Rule::Repetition,
+                        None,
+                        None,
+                        "A jump kind across all rotation counts may occur at most three times.",
+                    );
+                }
+            }
+        }
         for rule in [
             Rule::Count,
             Rule::CompoundCount,
@@ -650,6 +709,18 @@ pub(crate) fn validate_elements_traced(
     assumed_direct_sequences: &[usize],
 ) -> (ValidationResult, Vec<AppliedRule>) {
     let mut validator = Validator::new(profile, assumed_direct_sequences);
+    if crate::senior::selected(profile, Rule::Count) {
+        validator.apply(Rule::Count, None, None);
+        if elements.len() > crate::senior::DEFINITION.max_elements {
+            validator.add(
+                FindingKind::Violation,
+                Rule::Count,
+                None,
+                None,
+                "Senior Free Skating permits at most eleven element slots.",
+            );
+        }
+    }
     for (index, element) in elements.iter().enumerate() {
         match element {
             PlannedElement::Unspecified => {

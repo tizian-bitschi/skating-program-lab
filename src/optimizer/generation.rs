@@ -98,7 +98,7 @@ pub enum CandidateGenerationError {
     InvalidManualVariant { index: usize, reason: String },
 }
 
-const DOMAIN: &str = "Selected clean single/double solos; direct two/three-jump combinations with ToeLoop/Loop continuations; Axel sequences with every continuation Axel; explicit finite spin and movement evidence templates; manual subset. No Euler, other transitions, automatic difficult-variation inference or all-physical-program completeness.";
+const DOMAIN: &str = "Selected clean solos (Adult singles/doubles; Senior through quads); direct two/three-jump combinations with ToeLoop/Loop continuations; Axel sequences with every continuation Axel; explicit finite spin and movement evidence templates; manual subset. No Euler, other transitions, automatic difficult-variation inference or all-physical-program completeness.";
 const ASSUMPTIONS: &str = "Clean execution and recognition are explicit hypothetical assumptions. Supplied feature qualification must be supported by shared checks. No candidate establishes program-wide eligibility, feature reuse, physical skateability or a panel call. Capped domains cannot certify an optimum over all eligible alternatives.";
 
 struct Generator<'a> {
@@ -274,7 +274,7 @@ pub fn generate_program_candidates(
     let profile = registry
         .resolve(&request.profile, request.scoring_table)
         .map_err(E::Profile)?;
-    let category = [
+    let policy = [
         AdultCategory::Bronze,
         AdultCategory::Silver,
         AdultCategory::Gold,
@@ -282,9 +282,16 @@ pub fn generate_program_candidates(
     ]
     .into_iter()
     .find(|c| adult_profile(*c) == *profile)
+    .map(adult_program_policy)
+    .or_else(|| crate::senior::built_in_policy(profile))
     .ok_or(E::UnsupportedGenerator(
-        "only exact built-in Adult 2026/27 profiles have generation contracts",
+        "only exact built-in Adult and Senior 2026/27 profiles have generation contracts",
     ))?;
+    let max_rotation = if crate::senior::selected(profile, ProfileRule::Eligibility) {
+        4
+    } else {
+        2
+    };
     if request.discipline != ProfileDiscipline::Single
         || request.segment != ProgramSegment::FreeSkating
     {
@@ -298,7 +305,7 @@ pub fn generate_program_candidates(
         || request.max_expansions == 0
         || request.max_expansions > 100_000
         || request.jump_kinds.len() > 6
-        || request.rotations.len() > 2
+        || request.rotations.len() > usize::from(max_rotation)
         || request.exclusions.len() > 1000
         || request.excluded_spin_positions.len() > 3
         || request.excluded_spin_entries.len() > 2
@@ -308,12 +315,15 @@ pub fn generate_program_candidates(
             .iter()
             .any(|j| !(2..=3).contains(&j.len()))
         || !(2..=3).contains(&request.max_compound_length)
-        || request.rotations.iter().any(|n| !(1..=2).contains(n))
+        || request
+            .rotations
+            .iter()
+            .any(|n| !(1..=max_rotation).contains(n))
         || request.skill_limits.max_jump_rotations == Some(0)
         || request.skill_limits.max_position_revolutions == Some(0)
     {
         return Err(E::InvalidRequest(
-            "invalid identity, bounds or skill limits; rotations must be 1 or 2",
+            "invalid identity, bounds or skill limits; rotations exceed the supported profile generation domain",
         ));
     }
     if request.exclusions.iter().any(|x| {
@@ -347,7 +357,7 @@ pub fn generate_program_candidates(
     let mut g = Generator {
         registry,
         request,
-        policy: adult_program_policy(category),
+        policy,
         result: CandidateGenerationResult {
             variants: vec![],
             audit: CandidateGenerationAudit {
@@ -376,7 +386,7 @@ pub fn generate_program_candidates(
         }
     }
     let mut jumps = vec![];
-    for n in 1..=2 {
+    for n in 1..=max_rotation {
         for kind in [
             JumpKind::ToeLoop,
             JumpKind::Salchow,

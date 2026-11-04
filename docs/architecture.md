@@ -37,6 +37,15 @@ A UI, native host or service may consume the library later. Full validation, com
 
 ## Versioned rule profiles
 
+The approved [Senior contract](specs/issue-77-senior-profile-proposal.md) adds
+source-bound Women/Men Free Skating identities. `src/senior.rs` owns their
+shared technical definition and clean second-solo context. Named
+`SeniorJumpPlanV1` bindings extend the shared validator; `SeniorScoringV1`
+selects program-context credit. Public struct layouts remain unchanged.
+Generation and mixed/locked optimization use the same Senior program policy;
+catalog values and the unfactored optimizer objective remain separate from
+contextual credit. See the [source review and coverage matrix](rules/isu-senior-2026-27.md).
+
 The accepted [profile ADR](adr/0002-rule-profiles-proposal.md) defines the additive
 migration. `src/profiles.rs` owns profile identities, immutable registration,
 source bindings and explicit event overrides. Validation, numerical scoring and

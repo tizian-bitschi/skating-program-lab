@@ -116,6 +116,13 @@ pub(super) fn score(
     if !variant.recognition_assumed {
         return Err(unsupported());
     }
+    let check_jump = |jump: &ListedJump| {
+        if ruleset == RulesetId::IsuSenior2026_27June12 {
+            crate::plan_recognition::jump_component(jump).ok_or_else(unsupported)
+        } else {
+            super::jumps::jump_code(jump).map_err(|_| unsupported())
+        }
+    };
     // Keep the optimizer's finite clean subset separate from structural encoding.
     match (&variant.element, &variant.evidence) {
         (
@@ -125,7 +132,7 @@ pub(super) fn score(
             },
         ) => match jump {
             JumpElement::Solo(j) => {
-                super::jumps::jump_code(j).map_err(|_| unsupported())?;
+                check_jump(j)?;
             }
             JumpElement::Combination(parts) | JumpElement::Sequence(parts) => {
                 if !(2..=3).contains(&parts.len())
@@ -137,7 +144,7 @@ pub(super) fn score(
                     let JumpPart::Jump(j) = part else {
                         return Err(unsupported());
                     };
-                    super::jumps::jump_code(j).map_err(|_| unsupported())?;
+                    check_jump(j)?;
                 }
             }
         },
