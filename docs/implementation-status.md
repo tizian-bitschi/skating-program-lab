@@ -1,5 +1,16 @@
 # Implementation status
 
+Issue #81 adds [source-derived Senior native benchmarks](senior-grand-prix-benchmarks.md)
+for both Grand Prix events, Women/Men, three domain scales and both full/completion
+APIs. Independent small-domain oracles check all 1440 feasible words and complete
+optimal tie sets; medium tests preserve source-linked immutable anchors and
+literal BV subtotals. Measurements use a pinned runtime/dependency snapshot,
+explicit budgets and conservative proof flags. No solver optimization or latency
+guarantee is established. Original protocols lack plan motion evidence; these
+domains are conditional abstractions, not official program/feature validation.
+High-solo repetition across Senior completion/manual scoring remains an explicit
+`InconsistentAssessment` boundary; the large completion domain excludes such additions.
+
 Issue #79 audits the shared eleven-slot Senior model, separates the finite
 engineering ceiling from Rule 612, and adds full/partial completion, exact tie,
 provenance and independent numeric-bound regressions. Existing search and result
