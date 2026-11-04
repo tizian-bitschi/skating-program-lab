@@ -4,7 +4,8 @@ The offline harness in `tests/official_replay.rs` runs the twelve curated
 [#76 reports](fixtures/grand-prix-2026-27.md) through the public #78
 `score_protocol_program` API with the matching Women/Men Senior profile.
 Run `cargo test --test official_replay -- --nocapture` for program summaries.
-The test runtime reads committed TSV data only.
+The test runtime reads committed TSV data only. Fixture schema and strict
+decimal helpers are shared with `grand_prix_fixtures` in `tests/support/fixture.rs`.
 
 ## Numerical results
 
@@ -43,8 +44,9 @@ it supplies calls and levels, not execution observations or inferred intent.
 The independent `reviewed-source.tsv` transcription checks every printed
 element field, including code, Info, ordinal, x, all nine judge positions,
 GOE, BASE and score. A changed grade that leaves the trimmed mean unchanged
-still prevents an exact status. Row comparison uses chronological position,
-so swapping complete records cannot preserve exact status.
+still prevents an exact status. Row comparison uses the printed source ordinal and separately verifies its
+strict chronological order. Swapping complete records prevents exact status;
+a missing row preserves verified contributions from the remaining source rows.
 
 The independent June 2 SOV extraction
 `tests/fixtures/isu-2786-2026-06-02-source-values.tsv` supplies each recognized
@@ -75,11 +77,17 @@ raw/canonical code, SOV source rows, outcome and missing fact/rule or scoring
 error. `exact_tes` is absent if any row is unsupported, any source field differs,
 the row count changes, or the published TES differs. `verified_subtotal` sums
 only individually exact rows; unresolved/mismatched rows remain listed.
-Unknown tokens become unknown recognition with explicit BV/GOE/score gaps.
+Unknown and unsupported SOV tokens become unknown recognition with separate
+expected source amounts and absent actual BV/GOE/score values. Explicit row
+states are Exact, Mismatch, Unsupported and Unreproducible. Extra rows and
+missing reference positions produce structured gaps while preserving all
+individually verified subtotal contributions.
 Missing judge positions remain missing, never zero or a smaller panel.
 
-Mutation tests alter published GOE, one individual grade, code, an unsupported
-call, printed x, chronological order and a missing row. Each prevents exact
+Mutation tests alter published GOE, individual grades, code (including Pair-only
+`ChPLi1`), printed x, chronological order, missing/extra rows and missing manifest
+references. A `j8 = 4` mutation leaves the trimmed numerical GOE and score
+unchanged while source verification prevents exact status. Each prevents exact
 status and retains the skater/row location. Expected scores come from the
 source fixtures, never from production scorer output.
 
@@ -94,7 +102,13 @@ movement evidence is absent. The placeholder solo slots express no claim about
 the athlete's intended compound choreography. Supplied recognition remains
 separate in scenarios. No scalar final GOE, fall, timing boundary or execution
 evidence is fabricated. Both entry points return the same shared validation;
-assessment is `Indeterminate` and legality retains source-linked missing evidence.
+assessment is `Indeterminate`. The replay adapter preserves raw API validation
+and projects placeholder-dependent compound-structure/transition applicability
+to source-linked `MissingEvidence` coverage. The solo placeholders establish no
+claim that compound rules are inapplicable to the recognized program. Tests
+pin both rule coverage states and preserve the original regulatory references.
+This report adaptation lives in `tests/support/manual_replay.rs`; the production
+legality API is unchanged.
 
 Exact **numerical replay of supplied recognition** does not establish independent
 timing, recognition eligibility or execution legality. Published x is supplied

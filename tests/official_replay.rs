@@ -3,7 +3,7 @@ use std::collections::BTreeMap;
 
 #[path = "support/protocol_recognition.rs"]
 mod protocol_recognition;
-use protocol_recognition::recognition;
+use protocol_recognition::{recognition, try_recognition};
 
 const TABLE: ScoringTableId = ScoringTableId::Isu2786June2_2026;
 const ELEMENTS: &str = include_str!("fixtures/grand-prix-2026-27/elements.tsv");
@@ -15,31 +15,30 @@ const DEDUCTIONS: &str = include_str!("fixtures/grand-prix-2026-27/deductions.ts
 
 type Record = BTreeMap<String, String>;
 
+#[path = "support/fixture.rs"]
+mod fixture;
+use fixture::{cents as checked_cents, rows};
+
 fn records(text: &str) -> Vec<Record> {
-    let mut lines = text.lines().filter(|s| !s.starts_with('#'));
-    let header: Vec<_> = lines.next().unwrap().split('\t').collect();
-    lines
-        .map(|line| {
-            let cells: Vec<_> = line.split('\t').collect();
-            assert_eq!(cells.len(), header.len(), "{line}");
-            header
+    let schema = text.lines().find(|s| !s.starts_with('#')).unwrap();
+    let data = text
+        .lines()
+        .filter(|s| !s.starts_with('#'))
+        .collect::<Vec<_>>()
+        .join("\n");
+    rows(&data, schema)
+        .into_iter()
+        .map(|r| {
+            r.fields
                 .iter()
-                .zip(cells)
-                .map(|(k, v)| (k.to_string(), v.to_string()))
+                .map(|(k, _)| (k.to_string(), r.get(k).to_string()))
                 .collect()
         })
         .collect()
 }
 
 fn cents(text: &str) -> i64 {
-    let (whole, fraction) = text.trim_start_matches('-').split_once('.').unwrap();
-    assert_eq!(fraction.len(), 2);
-    let n = whole.parse::<i64>().unwrap() * 100 + fraction.parse::<i64>().unwrap();
-    if text.starts_with('-') {
-        -n
-    } else {
-        n
-    }
+    checked_cents(text, "official replay amount")
 }
 
 fn same_program(a: &Record, b: &Record) -> bool {
@@ -50,12 +49,21 @@ fn same_program(a: &Record, b: &Record) -> bool {
 struct Difference {
     field: String,
     expected: String,
-    actual: String,
+    actual: Option<String>,
     delta_hundredths: Option<i64>,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+enum SupportState {
+    Exact,
+    Mismatch,
+    Unsupported,
+    Unreproducible,
 }
 
 #[derive(Debug)]
 struct RowReport {
+    support: SupportState,
     location: String,
     raw_code: String,
     canonical: Option<String>,
@@ -68,14 +76,17 @@ struct RowReport {
 
 impl RowReport {
     fn exact(&self) -> bool {
-        self.differences.is_empty() && self.missing.is_empty() && self.score.is_some()
+        self.support == SupportState::Exact
+            && self.differences.is_empty()
+            && self.missing.is_empty()
+            && self.score.is_some()
     }
     fn number(&mut self, field: &str, expected: i64, actual: Option<i64>) {
         if actual != Some(expected) {
             self.differences.push(Difference {
                 field: field.into(),
                 expected: expected.to_string(),
-                actual: format!("{actual:?}"),
+                actual: actual.map(|n| n.to_string()),
                 delta_hundredths: actual.map(|n| n - expected),
             });
         }
@@ -95,16 +106,13 @@ struct ReplayReport {
 }
 
 // The reviewed transcription is an independent source oracle, never scorer output.
-fn reviewed_element(program: &Record, index: usize) -> Record {
-    let manifest = records(REVIEWED);
-    let row = manifest
-        .iter()
-        .find(|r| {
-            same_program(r, program)
-                && r["kind"] == "element"
-                && r["printed_fields"].split('|').next() == Some(&(index + 1).to_string())
-        })
-        .unwrap();
+fn reviewed_element(manifest: &str, program: &Record, ordinal: &str) -> Option<Record> {
+    let manifest = records(manifest);
+    let row = manifest.iter().find(|r| {
+        same_program(r, program)
+            && r["kind"] == "element"
+            && r["printed_fields"].split('|').next() == Some(ordinal)
+    })?;
     let header: Vec<_> = ELEMENTS
         .lines()
         .next()
@@ -113,14 +121,20 @@ fn reviewed_element(program: &Record, index: usize) -> Record {
         .skip(3)
         .take(17)
         .collect();
-    header
-        .into_iter()
-        .zip(row["printed_fields"].split('|'))
-        .map(|(k, v)| (k.into(), v.into()))
-        .collect()
+    Some(
+        header
+            .into_iter()
+            .zip(row["printed_fields"].split('|'))
+            .map(|(k, v)| (k.into(), v.into()))
+            .collect(),
+    )
 }
 
 fn replay(program: &Record, elements: &[Record]) -> ReplayReport {
+    replay_with_manifest(program, elements, REVIEWED)
+}
+
+fn replay_with_manifest(program: &Record, elements: &[Record], manifest: &str) -> ReplayReport {
     let source = records(SOURCES)
         .into_iter()
         .find(|s| s["source"] == program["source"])
@@ -141,9 +155,10 @@ fn replay(program: &Record, elements: &[Record]) -> ReplayReport {
             program["name"],
             program["page"],
             program["rank"],
-            index + 1
+            row["row"]
         );
         let mut report = RowReport {
+            support: SupportState::Unreproducible,
             location: format!("{location} / {}", source["pdf_url"]),
             raw_code: row["code"].clone(),
             canonical: None,
@@ -153,13 +168,28 @@ fn replay(program: &Record, elements: &[Record]) -> ReplayReport {
             missing: vec![],
             score: None,
         };
-        let expected = reviewed_element(program, index);
-        for (field, value) in &expected {
+        let expected = reviewed_element(manifest, program, &row["row"]);
+        if index > 0
+            && elements[index - 1]["row"].parse::<usize>().ok() >= row["row"].parse::<usize>().ok()
+        {
+            report.differences.push(Difference {
+                field: "order".into(),
+                expected: "strictly increasing source ordinals".into(),
+                actual: Some(row["row"].clone()),
+                delta_hundredths: None,
+            });
+        }
+        if expected.is_none() {
+            report
+                .missing
+                .push("source manifest: no matching element ordinal".into());
+        }
+        for (field, value) in expected.iter().flatten() {
             if row.get(field) != Some(value) {
                 report.differences.push(Difference {
                     field: field.clone(),
                     expected: value.clone(),
-                    actual: row.get(field).cloned().unwrap_or_default(),
+                    actual: row.get(field).cloned(),
                     delta_hundredths: None,
                 });
             }
@@ -169,8 +199,8 @@ fn replay(program: &Record, elements: &[Record]) -> ReplayReport {
             matches!(token, "SEQ" | "REP")
                 || sov.iter().any(|s| s["code"] == token.trim_end_matches('*'))
         });
-        let panel = if known {
-            let mut panel = recognition(&row["code"]);
+        let panel = if let Some(mut panel) = known.then(|| try_recognition(&row["code"])).flatten()
+        {
             report.canonical = panel.details.as_ref().and_then(|d| d.notation());
             panel.source = Some(SourceReference {
                 document: source["pdf_url"].clone(),
@@ -218,8 +248,19 @@ fn replay(program: &Record, elements: &[Record]) -> ReplayReport {
     .unwrap();
     for ((row, report), actual) in elements.iter().zip(&mut reports).zip(scored.elements) {
         match actual {
-            Err(e) => report.missing.push(format!("BV/GOE/score: {e:?}")),
+            Err(e) => {
+                report.support = SupportState::Unsupported;
+                report.missing.push(format!("BV/GOE/score: {e:?}"));
+                for (field, printed) in [
+                    ("credited BASE", "base"),
+                    ("GOE", "goe"),
+                    ("score", "score"),
+                ] {
+                    report.number(field, cents(&row[printed]), None);
+                }
+            }
             Ok(score) => {
+                report.support = SupportState::Exact;
                 report.outcome = Some(score.table_base.clone());
                 // Each component's table BASE comes from the independently extracted SOV.
                 // Whole stars remain NoValue; zero is not a fabricated table row.
@@ -286,6 +327,11 @@ fn replay(program: &Record, elements: &[Record]) -> ReplayReport {
                     score.score_hundredths.map(i64::from),
                 );
                 report.score = score.score_hundredths.map(i64::from);
+                if !report.missing.is_empty() || report.score.is_none() {
+                    report.support = SupportState::Unreproducible;
+                } else if !report.differences.is_empty() {
+                    report.support = SupportState::Mismatch;
+                }
             }
         }
     }
@@ -383,6 +429,8 @@ fn mutations_cannot_keep_an_exact_total_even_if_arithmetic_is_unchanged() {
         ("j1", "3"),
         ("code", "4T+3T"),
         ("code", "4Tz"),
+        ("code", "1Tw1"),
+        ("code", "ChPLi1"),
         ("factor", "x"),
     ] {
         let mut elements = program_elements(&program);
@@ -396,7 +444,7 @@ fn mutations_cannot_keep_an_exact_total_even_if_arithmetic_is_unchanged() {
             "{report:#?}"
         );
         for d in &row.differences {
-            assert_ne!(d.expected, d.actual);
+            assert_ne!(Some(&d.expected), d.actual.as_ref());
             if let Some(delta) = d.delta_hundredths {
                 assert_ne!(delta, 0);
             }
@@ -407,147 +455,73 @@ fn mutations_cannot_keep_an_exact_total_even_if_arithmetic_is_unchanged() {
     elements.swap(0, 1);
     let report = replay(&program, &elements);
     assert!(report.exact_tes.is_none());
-    assert!(report.rows[0].differences.iter().any(|d| d.field == "row"));
+    assert!(report
+        .rows
+        .iter()
+        .any(|r| r.differences.iter().any(|d| d.field == "order")));
     let mut elements = program_elements(&program);
     elements.remove(0);
-    assert!(replay(&program, &elements).exact_tes.is_none());
+    let report = replay(&program, &elements);
+    assert!(report.exact_tes.is_none());
+    assert_eq!(report.verified_subtotal, report.published_tes - 1270);
+    let mut elements = program_elements(&program);
+    let mut extra = elements[0].clone();
+    extra.insert("row".into(), "12".into());
+    elements.push(extra);
+    let report = replay(&program, &elements);
+    assert!(report.exact_tes.is_none());
+    assert!(report.rows[11]
+        .missing
+        .iter()
+        .any(|m| m.contains("manifest")));
+    assert!(report.rows[11].location.contains("element 12"));
+}
+
+#[path = "support/manual_replay.rs"]
+mod manual_replay;
+
+#[test]
+fn unchanged_trimmed_goe_still_fails_source_verification() {
+    let program = records(PROGRAMS).remove(0);
+    let baseline = replay(&program, &program_elements(&program));
+    let mut elements = program_elements(&program);
+    elements[0].insert("j8".into(), "4".into());
+    let report = replay(&program, &elements);
+    assert_eq!(report.rows[0].score, baseline.rows[0].score);
+    assert!(report.exact_tes.is_none());
+    assert_eq!(report.rows[0].support, SupportState::Mismatch);
+    assert!(report.rows[0].differences.iter().any(|d| d.field == "j8"));
 }
 
 #[test]
-fn complete_source_linked_manual_envelope_keeps_movement_evidence_missing() {
-    let program = records(PROGRAMS)
-        .into_iter()
-        .find(|p| p["name"] == "Ami NAKAI")
-        .unwrap();
-    let source = records(SOURCES)
-        .into_iter()
-        .find(|s| s["source"] == program["source"])
-        .unwrap();
-    let entries: Vec<_> = program_elements(&program)
+fn absent_reference_and_unknown_positions_keep_verified_subtotals() {
+    let program = records(PROGRAMS).remove(0);
+    let elements = program_elements(&program);
+    let missing_reference = REVIEWED
+        .lines()
+        .filter(|line| !line.starts_with("gpfra2026-M\t1\t1\telement\t1|"))
+        .collect::<Vec<_>>()
+        .join("\n");
+    let report = replay_with_manifest(&program, &elements, &missing_reference);
+    assert!(report.exact_tes.is_none());
+    assert_eq!(report.rows[0].support, SupportState::Unreproducible);
+    assert_eq!(report.verified_subtotal, report.published_tes - 1270);
+    let mut elements = elements;
+    elements[0].insert("row".into(), "99".into());
+    let report = replay(&program, &elements);
+    assert!(report.exact_tes.is_none());
+    assert!(report.rows[0]
+        .missing
         .iter()
-        .enumerate()
-        .map(|(index, row)| {
-            let mut panel = recognition(&row["code"]);
-            panel.planned_element = Some(index);
-            panel.source = Some(SourceReference {
-                document: source["pdf_url"].clone(),
-                version: source["sha256"].clone(),
-                location: format!("Ami NAKAI / page 1 rank 1 element {}", index + 1),
-            });
-            // A hypothetical family envelope only. Notation supplies no intended
-            // jump choreography, transition, spin entry, feature order or start time.
-            let (planned, evidence) = if row["code"].starts_with(char::is_numeric) {
-                (
-                    PlannedElement::Jump(JumpElement::Solo(ListedJump {
-                        kind: None,
-                        rotations: None,
-                    })),
-                    ElementPlanEvidence::Jump {
-                        direct_transitions_assumed: false,
-                    },
-                )
-            } else if row["code"] == "StSq4" {
-                (
-                    PlannedElement::StepSequence,
-                    ElementPlanEvidence::Step {
-                        level: Level::Four,
-                        clean_difficult_turns: None,
-                        full_ice_coverage: None,
-                        movement: None,
-                        qualified_features: None,
-                        qualification_assumed: false,
-                    },
-                )
-            } else if row["code"] == "ChSq1" {
-                (
-                    PlannedElement::ChoreographicSequence { movements: None },
-                    ElementPlanEvidence::ChoreographicSequence {
-                        movements: None,
-                        clearly_visible: None,
-                    },
-                )
-            } else if row["code"] == "ChSp1" {
-                (
-                    PlannedElement::ChoreographicSpin,
-                    ElementPlanEvidence::ChoreographicSpin {
-                        consecutive_revolutions_per_foot: None,
-                    },
-                )
-            } else {
-                (
-                    PlannedElement::RegularSpin(RegularSpin {
-                        entry: None,
-                        steps: None,
-                    }),
-                    ElementPlanEvidence::Spin {
-                        spin: RegularSpinEvidence {
-                            panel: Some(panel.clone()),
-                            ..Default::default()
-                        },
-                        local_feature_qualification_assumed: false,
-                    },
-                )
-            };
-            ManualProgramEntry {
-                planned,
-                evidence,
-                intended_recognition: None,
-                scenario: Some(ManualElementScenario {
-                    recognition: panel,
-                    annotations: vec![],
-                    final_goe: None,
-                    fall: None,
-                    execution: None,
-                }),
-            }
-        })
-        .collect();
-    let registry = ProfileRegistry::senior();
-    let request = ManualProgramRequest {
-        profile: senior_profile(SeniorCategory::Women).id,
-        scoring_table: TABLE,
-        policy: senior_program_policy(SeniorCategory::Women),
-        submission: SubmissionState::Complete,
-        entries,
-        request_hypothetical_total: false,
-        second_half_boundary: None,
-    };
-    let assessment = assess_manual_program(&registry, &request).unwrap();
-    let legality = assess_program_legality(
-        &registry,
-        &ProfileProgram {
-            profile: request.profile.clone(),
-            scoring_table: TABLE,
-            elements: request.entries.iter().map(|e| e.planned.clone()).collect(),
-        },
-        &request
-            .entries
+        .any(|m| m.contains("manifest")));
+    assert!(report.rows[0].location.contains("element 99"));
+    elements[0].insert("code".into(), "ChPLi1".into());
+    let report = replay(&program, &elements);
+    assert_eq!(report.rows[0].support, SupportState::Unsupported);
+    for field in ["credited BASE", "GOE", "score"] {
+        assert!(report.rows[0]
+            .differences
             .iter()
-            .map(|e| e.evidence.clone())
-            .collect::<Vec<_>>(),
-        &request.policy,
-        SubmissionState::Complete,
-    )
-    .unwrap();
-    assert_eq!(assessment.elements.len(), 11);
-    assert_eq!(assessment.request, request);
-    assert_eq!(assessment.validation, legality.validation);
-    assert_eq!(assessment.status, AssessmentStatus::Indeterminate);
-    assert!(assessment.hypothetical_total.is_none());
-    assert!(legality
-        .rules
-        .iter()
-        .any(|r| r.state == RuleCoverageState::MissingEvidence));
-    assert!(legality.rules.iter().all(|r| !r.source.location.is_empty()));
-    for entry in &assessment.request.entries {
-        let scenario = entry.scenario.as_ref().unwrap();
-        assert!(scenario.final_goe.is_none() && scenario.execution.is_none());
-        assert!(scenario
-            .recognition
-            .source
-            .as_ref()
-            .unwrap()
-            .location
-            .contains("Ami NAKAI"));
+            .any(|d| d.field == field && d.actual.is_none() && !d.expected.is_empty()));
     }
 }

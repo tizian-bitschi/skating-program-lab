@@ -2,6 +2,10 @@ use skating_program_lab::*;
 
 // Fixture adapter only: production callers supply typed recognition, not strings.
 pub fn recognition(code: &str) -> PanelRecognition {
+    try_recognition(code).unwrap_or_else(|| panic!("unsupported fixture code: {code}"))
+}
+
+pub fn try_recognition(code: &str) -> Option<PanelRecognition> {
     let mut calls = vec![];
     let mut components = vec![];
     let mut level = None;
@@ -38,23 +42,23 @@ pub fn recognition(code: &str) -> PanelRecognition {
         }
         if !stem.starts_with(char::is_numeric) && !matches!(stem.as_str(), "Eu" | "ChSq1" | "ChSp1")
         {
-            level = Some(match stem.pop().unwrap() {
+            level = Some(match stem.pop()? {
                 'B' => Level::Basic,
                 '1' => Level::One,
                 '2' => Level::Two,
                 '3' => Level::Three,
                 '4' => Level::Four,
-                _ => panic!("{code}"),
+                _ => return None,
             });
         }
-        components.push(ComponentCode::try_from(stem.as_str()).unwrap());
+        components.push(ComponentCode::try_from(stem.as_str()).ok()?);
     }
-    PanelRecognition {
+    Some(PanelRecognition {
         ruleset: RulesetId::IsuSenior2026_27June12,
         source: None,
         planned_element: None,
         observed_element: None,
         outcome: RecognitionOutcome::Recognized,
-        details: Some(RecognitionDetails::new(components, level, Some(calls)).unwrap()),
-    }
+        details: Some(RecognitionDetails::new(components, level, Some(calls)).ok()?),
+    })
 }
