@@ -108,3 +108,14 @@ this evidence. Native batch users must choose explicit time and output budgets.
 Further pruning needs its own measured implementation and independent rule tests;
 this acceptance audit does not silently duplicate skating rules in solver clauses.
 
+## Senior follow-up (#81)
+
+The [Grand Prix benchmark report](senior-grand-prix-benchmarks.md) adds pinned,
+offline source-derived Women/Men domains from France and Canada at three scales,
+both full and immutable-completion paths, independent optimum/tie oracles, and
+250 ms / 1 s / 5 s / 30 s Debug/Release observations. The historical Adult data
+above stays unchanged. Its six-slot 19–64-variant results do not establish a
+speedup comparison against different Senior inputs. Eleven-slot Senior capacity
+is an engineering limit; bounded generation, objective proof, ordered tie
+exhaustion and regulatory coverage remain separate claims.
+

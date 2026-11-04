@@ -332,3 +332,33 @@ remain in force. Full requests with eleven distinct mandatory variants need not
 enumerate 11! ties: a result cap leaves `enumeration_complete = false` even after
 objective proof. Proposal/time caps remain conservative; no latency guarantee or
 global optimum follows from supporting eleven slots. Performance work is #81.
+
+## Source-derived Senior benchmark guidance (#81)
+
+The [native Grand Prix report](../senior-grand-prix-benchmarks.md) records pinned
+Debug/Release requests at 250 ms, 1 s, 5 s and 30 s, across small exhaustive,
+medium anchored and eleven-slot broad domains. The offline runner and independent
+oracle tests reuse production generation, shared validation and existing APIs;
+no solver, public-interface, CI or request-ceiling change is included.
+
+Use narrowly declared variants and immutable supplied-evidence originals first.
+Keep the generation audit and explicit conditional plan assumptions with every
+result. Protocol recognition alone does not establish spin features, movement,
+transition qualification or full regulatory compliance. A generated finite-domain
+audit and a solver optimum are independent; tie count is total only when
+`enumeration_complete=true`. An interrupted attempt with no incumbent stays
+`Incomplete`; absence of an incumbent is not proof of infeasibility.
+
+For Senior completion, avoid repeated high clean solo additions: manual assessment
+applies second-solo contextual credit while the objective remains unadjusted
+catalog BV. This can return `InconsistentAssessment`. The benchmark records that
+boundary and excludes >=3-rotation solo additions in its broad completion case;
+it does not silently interpret an error as a feasible or optimal plan.
+
+API wall time includes preflight/model/search/assessment; separate exact
+first-incumbent/proof times, memory and solver nodes are not exposed. Cooperative
+deadlines are not hard realtime guarantees. No safe interactive success threshold
+or general eleven-slot performance guarantee follows from these measurements.
+Use explicit bounded budgets, report proof scope, and expect incomplete broad
+attempts. A later optimization needs identical-input before/after measurements
+and independent equivalence tests before adoption.

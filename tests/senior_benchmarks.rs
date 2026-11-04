@@ -122,8 +122,19 @@ fn source_identity_order_values_and_conditional_medium_anchors_survive() {
         assert_eq!(r.status, OptimizerStatus::OptimalProven);
         assert!(r.enumeration_complete);
         assert_eq!(r.candidates.len(), 30);
+        let existing = match source {
+            "gpfra2026-W" => 2650,
+            "gpfra2026-M" => 3020,
+            "gpcan2026-W" => 2540,
+            "gpcan2026-M" => 3170,
+            _ => unreachable!(),
+        };
         for c in &r.candidates {
             domains::verify_originals(&q, c);
+            // Independently: two 2A (330 each), one 2T (130); third 2A forbidden.
+            assert_eq!(c.existing_base_hundredths, existing);
+            assert_eq!(c.added_base_hundredths, 790);
+            assert_eq!(c.total_base_hundredths, existing + 790);
             assert_eq!(c.program.elements.len(), 10);
             assert!(c
                 .validation
@@ -139,6 +150,26 @@ fn source_identity_order_values_and_conditional_medium_anchors_survive() {
             }
         }
     }
+}
+
+#[test]
+fn repeated_high_solo_completion_remains_an_explicit_unsupported_contract_case() {
+    let registry = ProfileRegistry::senior();
+    let source = "gpcan2026-W";
+    let d = generate_program_candidates(&registry, &domains::generation(source, "small")).unwrap();
+    let mut q = domains::completion(source, "small", d);
+    let axel = q.variants[1].clone();
+    q.original
+        .push(domains::anchor("conditional-3A".into(), &axel, None));
+    q.variants = vec![axel];
+    q.generated_domain = None;
+    q.insertion.boundaries = vec![6];
+    // Senior assessment credits the second clean solo at 80%; finite search
+    // maximizes unadjusted catalog BV. Never report this error as a valid plan.
+    assert_eq!(
+        complete_program(&registry, &q).unwrap_err(),
+        ProgramCompletionError::InconsistentAssessment
+    );
 }
 
 #[test]

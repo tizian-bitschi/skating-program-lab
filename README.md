@@ -4,6 +4,10 @@ An open-source Rust library for planning technical figure skating programs. The 
 
 ## Current capabilities
 
+The [Senior Grand Prix benchmark report](docs/senior-grand-prix-benchmarks.md)
+records offline source-derived domains, independent optimum/tie oracles and native
+Debug/Release limits for full optimization and immutable completion.
+
 The [official Grand Prix replay report](docs/grand-prix-2026-27-replay.md)
 records exact TES parity for twelve source-verified programs and explicit
 manual-assessment evidence gaps.
