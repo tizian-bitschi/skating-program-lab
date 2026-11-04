@@ -4,6 +4,102 @@ mod domains;
 use skating_program_lab::*;
 use std::{collections::BTreeSet, time::Duration};
 
+#[path = "support/protocol_recognition.rs"]
+mod protocol_recognition;
+
+#[test]
+fn source_order_eleven_slot_conditional_plan_is_completed_and_rescored() {
+    let registry = ProfileRegistry::senior();
+    let source = "gpfra2026-W";
+    let domain = generate_program_candidates(
+        &registry,
+        &domains::generation(source, domains::Scale::Medium),
+    )
+    .unwrap();
+    let mut request = domains::completion(source, domains::Scale::Medium, domain);
+    let anchors = request.original.clone();
+    let rows = domains::source_rows(source);
+    let edition = domains::records(domains::EDITIONS)
+        .into_iter()
+        .find(|r| r["source"] == source)
+        .unwrap();
+    request.original = rows
+        .iter()
+        .map(|row| {
+            let id = format!("{source}:rank1:row{}", row["row"]);
+            if !row["code"].starts_with(char::is_numeric) {
+                return anchors.iter().find(|a| a.id == id).unwrap().clone();
+            }
+            // The source supplies recognition/order; clean plans and direct steps
+            // are explicit hypothetical assumptions, not inferred movement evidence.
+            let code = row["code"].trim_end_matches('!');
+            let parts: Vec<_> = code
+                .split('+')
+                .filter(|s| *s != "SEQ")
+                .map(|s| JumpPart::Jump(domains::solo(s).unwrap()))
+                .collect();
+            let jump = if code.ends_with("+SEQ") {
+                JumpElement::Sequence(parts)
+            } else if parts.len() > 1 {
+                JumpElement::Combination(parts)
+            } else {
+                JumpElement::Solo(domains::solo(code).unwrap())
+            };
+            let mut recognition = protocol_recognition::recognition(code);
+            recognition.source = Some(SourceReference {
+                document: edition["pdf_url"].into(),
+                version: edition["sha256"].into(),
+                location: format!(
+                    "Ami NAKAI / page 1 rank 1 row {}; conditional clean plan of {}",
+                    row["row"], row["code"]
+                ),
+            });
+            CompletionEntry {
+                id,
+                locked: true,
+                entry: ManualProgramEntry {
+                    planned: PlannedElement::Jump(jump),
+                    evidence: ElementPlanEvidence::Jump {
+                        direct_transitions_assumed: code.contains('+'),
+                    },
+                    intended_recognition: Some(recognition),
+                    scenario: None,
+                },
+            }
+        })
+        .collect();
+    request.variants.clear();
+    request.generated_domain = None;
+    request.insertion.boundaries.clear();
+    request.min_additions = 0;
+    request.max_additions = 0;
+    let result = complete_program(&registry, &request).unwrap();
+    assert_eq!(result.status, OptimizerStatus::OptimalProven);
+    assert!(result.enumeration_complete);
+    assert_eq!(result.candidates.len(), 1);
+    let candidate = &result.candidates[0];
+    domains::verify_originals(&request, candidate);
+    assert_eq!(candidate.program.elements.len(), 11);
+    // Independent June 2 values: jumps 800+1010+530+1150+590+490;
+    // Basic roles FSSp 200, CCoSp 200, StSq 160, ChSq 350, ChSp 350.
+    assert_eq!(candidate.total_base_hundredths, 5830);
+    assert_eq!(candidate.added_base_hundredths, 0);
+    assert!(candidate
+        .validation
+        .validation
+        .findings
+        .iter()
+        .all(|f| f.rule_id == "spin-execution-recognition"));
+    assert_eq!(
+        candidate.assessment.request.entries,
+        request
+            .original
+            .iter()
+            .map(|o| o.entry.clone())
+            .collect::<Vec<_>>()
+    );
+}
+
 // Independent bounded combinatorial oracle: one Axel and each of the five roles
 // exactly once. No production scorer, validator, generator or solver in this oracle.
 fn permutations(items: &mut [usize], at: usize, out: &mut BTreeSet<Vec<usize>>) {

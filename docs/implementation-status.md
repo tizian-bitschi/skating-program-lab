@@ -1,5 +1,11 @@
 # Implementation status
 
+The [Senior Grand Prix parent audit (#75)](milestone-75.md) connects the six
+merged workstreams to their tests and limitations. An eleven-slot conditional
+plan preserves Ami NAKAI's source jump structure and family order, completes in
+a singleton locked domain and is revalidated/rescored at independent BV 58.30.
+Movement evidence, clean recognition and Basic roles remain hypothetical.
+
 Issue #81 adds [source-derived Senior native benchmarks](senior-grand-prix-benchmarks.md)
 for both Grand Prix events, Women/Men, three domain scales and both full/completion
 APIs. Independent small-domain oracles check all 1440 feasible words and complete

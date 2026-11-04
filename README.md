@@ -4,6 +4,10 @@ An open-source Rust library for planning technical figure skating programs. The 
 
 ## Current capabilities
 
+The [Senior Grand Prix integration audit](docs/milestone-75.md) maps the six
+workstreams to parent acceptance evidence and a source-ordered eleven-slot
+conditional completion scenario.
+
 The [Senior Grand Prix benchmark report](docs/senior-grand-prix-benchmarks.md)
 records offline source-derived domains, independent optimum/tie oracles and native
 Debug/Release limits for full optimization and immutable completion.
