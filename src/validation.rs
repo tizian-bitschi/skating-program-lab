@@ -502,13 +502,7 @@ impl<'a> Validator<'a> {
                 JumpKind::Lutz,
                 JumpKind::Axel,
             ] {
-                if self
-                    .occurrences
-                    .iter()
-                    .filter(|jump| jump.0 == kind)
-                    .count()
-                    > crate::senior::DEFINITION.max_kind_occurrences
-                {
+                if crate::senior::kind_occurrences_exceeded(&self.occurrences, &kind) {
                     self.add(
                         FindingKind::Violation,
                         Rule::Repetition,

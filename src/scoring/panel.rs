@@ -91,9 +91,11 @@ pub fn aggregate_panel_goe(
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ProtocolElementInput {
     pub recognition: PanelRecognition,
+    /// Canonical supplied official credit. Duplicate annotations are invalid.
     pub annotations: Vec<ScoringAnnotation>,
     pub judges: Option<JudgePanelGrades>,
-    /// Printed x, not independently verified movement timing.
+    /// Convenience alias for SecondHalfCredit. Either input applies printed x once;
+    /// neither establishes independently verified movement timing.
     pub printed_second_half: bool,
     pub source: SourceReference,
     pub execution: Option<ElementExecutionEvidence>,
@@ -123,10 +125,22 @@ fn replay_row(
     input: &ProtocolElementInput,
     contextual: Option<&PanelRecognition>,
 ) -> Result<ProtocolElementScore, PanelScoreError> {
-    if !input.annotations.is_empty() {
+    if input.annotations.len() > 1 {
         return Err(PanelScoreError::InvalidInput);
     }
     let panel = contextual.ok_or(PanelScoreError::UnresolvedContext)?;
+    let second_half = input.printed_second_half
+        || input
+            .annotations
+            .contains(&ScoringAnnotation::SecondHalfCredit);
+    if second_half
+        && !panel
+            .details
+            .as_ref()
+            .is_some_and(|d| d.components()[0].as_str().starts_with(char::is_numeric))
+    {
+        return Err(PanelScoreError::InvalidInput);
+    }
     if let Some(evidence) = &input.execution {
         // Execution evidence cannot silently override supplied official recognition.
         execution_evidence::resolve(panel, None, Some(evidence))
@@ -145,26 +159,18 @@ fn replay_row(
         lookup_base_value(table, &table_panel, &[]).map_err(PanelScoreError::BaseValue)?;
     let (base, goe, credit_sources) = match row {
         ResolvedRow::Value(row) => {
-            if input.printed_second_half
-                && !panel
-                    .details
-                    .as_ref()
-                    .is_some_and(|d| d.components()[0].as_str().starts_with(char::is_numeric))
-            {
-                return Err(PanelScoreError::InvalidInput);
-            }
             let goe = input
                 .judges
                 .as_ref()
                 .map(|grades| aggregate(&row, grades))
                 .transpose()?;
-            let base = if input.printed_second_half {
+            let base = if second_half {
                 factored_base(row.hundredths)
             } else {
                 row.hundredths
             };
             let mut sources = vec![row.source("credited BASE")];
-            if input.printed_second_half {
+            if second_half {
                 sources.push(rule(
                     "pp. 9–10, Rule 353.1(h)(iii); supplied printed x, start time unverified",
                 ));
@@ -197,7 +203,7 @@ fn replay_row(
         credited_base_hundredths: base,
         panel_goe: goe,
         score_hundredths: total,
-        supplied_second_half: input.printed_second_half,
+        supplied_second_half: second_half,
         source: input.source.clone(),
         credit_sources,
     })

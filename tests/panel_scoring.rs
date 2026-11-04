@@ -377,3 +377,126 @@ fn reduced_and_original_references_and_call_applicability_are_catalog_backed() {
         400
     );
 }
+
+#[test]
+fn senior_solo_rep_rejects_single_double_credit_but_preserves_legacy_and_special_compounds() {
+    for code in ["1A+REP", "2T+REP", "2Aq+REP"] {
+        let r = recognition(code);
+        assert_eq!(
+            lookup_base_value(TABLE, &r, &[]),
+            Err(BaseValueError::Unsupported)
+        );
+        assert_eq!(
+            aggregate_panel_goe(TABLE, &r, &[], &panel(&[-5; 9])),
+            Err(PanelScoreError::BaseValue(BaseValueError::Unsupported))
+        );
+        let report = replay(&[input(code)]);
+        assert_eq!(
+            report.elements[0],
+            Err(PanelScoreError::BaseValue(BaseValueError::Unsupported))
+        );
+        assert_eq!(report.tes_hundredths, None);
+    }
+    // Existing Adult supplied-REP contract is intentionally unchanged by #78.
+    let mut adult = recognition("2T+REP");
+    adult.ruleset = RulesetId::IsuAdult2026_27July16;
+    assert!(
+        matches!(lookup_base_value(TABLE, &adult, &[]), Ok(BaseValueOutcome::Value(v)) if v.hundredths == 104)
+    );
+    // TPH p. 33: excess compounds retain only their first jump with REP;
+    // this is separate from Rule 612's second-identical-solo consequence.
+    let report = replay(&[input("2T+2Lo*+REP")]);
+    assert_eq!(
+        report.elements[0]
+            .as_ref()
+            .unwrap()
+            .credited_base_hundredths,
+        104
+    );
+}
+
+#[test]
+fn printed_credit_is_validated_for_every_outcome_and_aliases_apply_once() {
+    for code in ["CSp4", "StSq4", "ChSp1", "ChSq1"] {
+        for outcome in [
+            RecognitionOutcome::Recognized,
+            RecognitionOutcome::NoValue,
+            RecognitionOutcome::Ignored,
+        ] {
+            let mut row = input(code);
+            row.recognition.outcome = outcome;
+            row.judges = None;
+            row.printed_second_half = true;
+            let report = replay(&[row]);
+            assert_eq!(
+                report.elements[0],
+                Err(PanelScoreError::InvalidInput),
+                "{code} {outcome:?}"
+            );
+            assert_eq!(report.tes_hundredths, None);
+        }
+    }
+    for code in ["2A*", "3A<*"] {
+        let mut row = input(code);
+        row.judges = None;
+        row.printed_second_half = true;
+        let report = replay(&[row]);
+        assert_eq!(report.tes_hundredths, Some(0));
+        assert!(report.elements[0].as_ref().unwrap().supplied_second_half);
+    }
+    let mut scores = vec![];
+    for (flag, annotations) in [
+        (true, vec![]),
+        (false, vec![ScoringAnnotation::SecondHalfCredit]),
+        (true, vec![ScoringAnnotation::SecondHalfCredit]),
+    ] {
+        let mut row = input("4T");
+        row.printed_second_half = flag;
+        row.annotations = annotations;
+        scores.push(replay(&[row]).elements.remove(0).unwrap());
+    }
+    assert!(scores.windows(2).all(|pair| pair[0] == pair[1]));
+    assert_eq!(scores[0].credited_base_hundredths, 1045);
+    let mut duplicate = input("4T");
+    duplicate.annotations = vec![ScoringAnnotation::SecondHalfCredit; 2];
+    assert_eq!(
+        replay(&[duplicate]).elements[0],
+        Err(PanelScoreError::InvalidInput)
+    );
+    let mut row = input("CSp4");
+    row.annotations.push(ScoringAnnotation::SecondHalfCredit);
+    assert_eq!(
+        replay(&[row]).elements[0],
+        Err(PanelScoreError::InvalidInput)
+    );
+}
+
+#[test]
+fn component_stars_use_only_retained_catalog_rows_for_bv_and_panel_reference() {
+    // Independent SOV expectations plus TPH p. 29 / Q&A 3: excluded components
+    // do not supply BV or the numerical reference, but their calls remain supplied.
+    for (code, base, goe) in [
+        ("4T+3T*", 950, -475),
+        ("3T*+2T", 130, -65),
+        ("3Lz+2T<*", 590, -295),
+        ("3Lz+Eu+3S*", 590, -295),
+    ] {
+        let mut row = input(code);
+        row.judges = Some(panel(&[-5; 9]));
+        let report = replay(&[row]);
+        let score = report.elements[0].as_ref().unwrap();
+        assert_eq!(score.credited_base_hundredths, base, "{code}");
+        assert_eq!(
+            score.panel_goe.as_ref().unwrap().goe_hundredths,
+            goe,
+            "{code}"
+        );
+        assert_eq!(
+            score.score_hundredths,
+            Some(i32::from(base) + i32::from(goe))
+        );
+    }
+    let mut row = input("3T*+2T*");
+    row.judges = None;
+    assert_eq!(replay(&[row]).tes_hundredths, Some(0));
+}

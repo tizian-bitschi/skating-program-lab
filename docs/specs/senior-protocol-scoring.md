@@ -40,8 +40,12 @@ contribute a known zero. Submitted numerical grades on these rows are rejected.
 No final printed GOE is reverse-engineered into judge grades.
 
 Replay requires typed recognition. There is no new production notation parser.
-`printed_second_half` supplies official x credit; `annotations` stays empty to
-avoid two conflicting representations of x. `table_base` excludes REP and x;
+`annotations: [SecondHalfCredit]` is the canonical supplied official x input.
+`printed_second_half` is a convenience alias. Either or both apply credit once
+and produce identical output/provenance; duplicate annotations are invalid.
+Both forms are validated for every recognition outcome, including NoValue and
+Ignored: known non-jumps cannot receive x, while starred jumps can.
+`table_base` excludes REP and x;
 credited BV applies supplied REP and x, with their separate sources. Technical
 call rows already contain their source-defined BV reductions. Whole stars return
 NoValue. No timestamp, fall or motion evidence is invented.
@@ -51,7 +55,12 @@ It reuses profile resolution and the shared SOV/scoring resolver. Its result is
 replay of official recognition, not an independent repetition-eligibility or
 timing verdict. Ordered profile scoring and manual assessment separately derive
 second-solo credit through `senior::repetition_context`. They share advanced
-repeat limits with plan validation. A supplied REP alone proves no eligibility.
+repeat and jump-kind limits with plan validation. A supplied REP alone proves no
+eligibility. Senior solo REP is limited to triple/quad/quint recognition; single
+and double solo REP return Unsupported. The TPH p. 33 excess-compound consequence
+is distinct and can retain a first single/double jump with REP and a starred tail.
+Legacy Adult supplied-REP behavior remains unchanged under #78's compatibility
+requirement; it is not a Senior repetition-eligibility ruling.
 
 Each replay row retains its `SourceReference` even on error. Any unresolved row
 or missing nonzero-row panel prevents exact TES. PCS, deductions and complete
@@ -80,3 +89,7 @@ independently transcribed BV, GOE and element totals, and sums per-program TES.
 Focused SOV tests cover edge marks absent from the selected protocol snapshot,
 numerical trimming/rounding, reduced and missing panels, and repeated-solo versus
 compound and forbidden-repeat boundaries. Existing Adult fixtures are unchanged.
+Review regressions cover invalid solo REP, x on zero-value non-jumps, credit
+alias normalization, and component-star reference selection. Component-star
+expectations use independent SOV values and the handbook/Q&A deletion rule;
+the selected #76 snapshot contains no such component-star observation.

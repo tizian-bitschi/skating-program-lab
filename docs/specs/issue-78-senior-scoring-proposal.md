@@ -26,6 +26,10 @@ Add these separately exported types and entry points:
   optional `JudgePanelGrades`, explicitly supplied printed second-half credit,
   protocol row `SourceReference`, and optional existing execution evidence.
   It has no fabricated start timestamp or hypothetical GOE field.
+  Review clarification: `annotations` is the canonical supplied x representation;
+  `printed_second_half` is a convenience alias. Either form, or both together,
+  normalizes to one supplied official credit and one provenance result. Repeated
+  annotations are invalid. Neither form claims independent timing verification.
 - `ProtocolElementScore`: separate table BV, credited BV, optional panel GOE
   and optional element total, all in hundredths; credit provenance distinguishes
   supplied official second-half credit from independently verified timing.

@@ -281,6 +281,16 @@ fn repetition_row(
     {
         return Err(BaseValueError::Unsupported);
     }
+    // Rule 612: solo repetition credit is limited to triple/quad/quint jumps.
+    // TPH p. 33 separately permits REP on an excess compound's retained first jump.
+    if senior
+        && details.components().len() == 1
+        && !details.components()[0]
+            .as_str()
+            .starts_with(['3', '4', '5'])
+    {
+        return Err(BaseValueError::Unsupported);
+    }
     let original = without_repetition(details)?;
     let original_notation = original.notation().ok_or(BaseValueError::UnknownCalls)?;
     let mut resolved = if original.components().len() == 1 {

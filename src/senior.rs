@@ -39,6 +39,10 @@ pub(crate) fn advanced_repeat_limit_exceeded<T: Eq>(occurrences: &[(T, u8)]) -> 
             > DEFINITION.max_repeated_quad_or_quint
 }
 
+pub(crate) fn kind_occurrences_exceeded<T: Eq>(occurrences: &[(T, u8)], kind: &T) -> bool {
+    occurrences.iter().filter(|jump| &jump.0 == kind).count() > DEFINITION.max_kind_occurrences
+}
+
 pub(crate) fn source(location: &str) -> SourceReference {
     SourceReference {
         document: "ISU Sports Rules — Figure Skating".into(),
@@ -259,8 +263,7 @@ pub(crate) fn repetition_context(
     let invalid_repetition = advanced_repeat_limit_exceeded(&all_jumps)
         || all_jumps.iter().any(|jump| {
             (jump.1 >= 2 && all_jumps.iter().filter(|other| *other == jump).count() > 2)
-                || all_jumps.iter().filter(|other| other.0 == jump.0).count()
-                    > DEFINITION.max_kind_occurrences
+                || kind_occurrences_exceeded(&all_jumps, &jump.0)
         });
     let mut adjusted = panels.to_vec();
     if uncertain || invalid_repetition {
