@@ -83,6 +83,10 @@ states are Exact, Mismatch, Unsupported and Unreproducible. Extra rows and
 missing reference positions produce structured gaps while preserving all
 individually verified subtotal contributions.
 Missing judge positions remain missing, never zero or a smaller panel.
+Missing or invalid marks produce Unreproducible, with expected GOE/score and
+absent actual results. A BV-only retry through the same public API retains
+independently verified table/credited BASE. Unsupported recognition or rules
+retain Unsupported; invalid input and unresolved context remain Unreproducible.
 
 Mutation tests alter published GOE, individual grades, code (including Pair-only
 `ChPLi1`), printed x, chronological order, missing/extra rows and missing manifest

@@ -71,6 +71,7 @@ struct RowReport {
     outcome: Option<BaseValueOutcome>,
     differences: Vec<Difference>,
     missing: Vec<String>,
+    credited_base: Option<i64>,
     score: Option<i64>,
 }
 
@@ -166,6 +167,7 @@ fn replay_with_manifest(program: &Record, elements: &[Record], manifest: &str) -
             outcome: None,
             differences: vec![],
             missing: vec![],
+            credited_base: None,
             score: None,
         };
         let expected = reviewed_element(manifest, program, &row["row"]);
@@ -246,10 +248,48 @@ fn replay_with_manifest(program: &Record, elements: &[Record], manifest: &str) -
         &inputs,
     )
     .unwrap();
-    for ((row, report), actual) in elements.iter().zip(&mut reports).zip(scored.elements) {
+    for (index, ((row, report), actual)) in elements
+        .iter()
+        .zip(&mut reports)
+        .zip(scored.elements)
+        .enumerate()
+    {
+        let actual = match actual {
+            Err(
+                error @ (PanelScoreError::InvalidGrade
+                | PanelScoreError::UnsupportedPanelConfiguration),
+            ) => {
+                report.missing.push(format!(
+                    "GOE/score: {error:?}; supplied judge grades are missing or invalid"
+                ));
+                // Request BV through the same public API; a broken panel must
+                // not discard independently reproducible supplied credit.
+                let mut bv_input = inputs[index].clone();
+                bv_input.judges = None;
+                score_protocol_program(
+                    &ProfileRegistry::senior(),
+                    &senior_profile(category).id,
+                    TABLE,
+                    &[bv_input],
+                )
+                .unwrap()
+                .elements
+                .remove(0)
+            }
+            other => other,
+        };
         match actual {
             Err(e) => {
-                report.support = SupportState::Unsupported;
+                report.support = match e {
+                    PanelScoreError::InvalidInput
+                    | PanelScoreError::InvalidGrade
+                    | PanelScoreError::UnsupportedPanelConfiguration
+                    | PanelScoreError::UnresolvedContext
+                    | PanelScoreError::BaseValue(
+                        BaseValueError::UnknownDetails | BaseValueError::UnknownCalls,
+                    ) => SupportState::Unreproducible,
+                    _ => SupportState::Unsupported,
+                };
                 report.missing.push(format!("BV/GOE/score: {e:?}"));
                 for (field, printed) in [
                     ("credited BASE", "base"),
@@ -262,6 +302,7 @@ fn replay_with_manifest(program: &Record, elements: &[Record], manifest: &str) -
             Ok(score) => {
                 report.support = SupportState::Exact;
                 report.outcome = Some(score.table_base.clone());
+                report.credited_base = Some(i64::from(score.credited_base_hundredths));
                 // Each component's table BASE comes from the independently extracted SOV.
                 // Whole stars remain NoValue; zero is not a fabricated table row.
                 if let BaseValueOutcome::Value(base) = &score.table_base {
@@ -523,5 +564,34 @@ fn absent_reference_and_unknown_positions_keep_verified_subtotals() {
             .differences
             .iter()
             .any(|d| d.field == field && d.actual.is_none() && !d.expected.is_empty()));
+    }
+}
+
+#[test]
+fn missing_and_invalid_judge_marks_preserve_independent_base_values() {
+    let program = records(PROGRAMS).remove(0);
+    for grade in ["-", "6"] {
+        let mut elements = program_elements(&program);
+        elements[0].insert("j3".into(), grade.into());
+        let report = replay(&program, &elements);
+        let row = &report.rows[0];
+        assert_eq!(row.support, SupportState::Unreproducible, "{row:#?}");
+        assert!(
+            matches!(&row.outcome,Some(BaseValueOutcome::Value(base)) if base.hundredths == 1080)
+        );
+        assert_eq!(row.credited_base, Some(1080));
+        assert!(!row.table_rows.is_empty());
+        assert!(row.score.is_none() && report.exact_tes.is_none());
+        assert_eq!(report.verified_subtotal, report.published_tes - 1270);
+        assert!(!row
+            .differences
+            .iter()
+            .any(|d| d.field == "credited BASE" || d.field == "table BASE"));
+        for field in ["GOE", "score"] {
+            assert!(row
+                .differences
+                .iter()
+                .any(|d| d.field == field && d.actual.is_none()));
+        }
     }
 }
