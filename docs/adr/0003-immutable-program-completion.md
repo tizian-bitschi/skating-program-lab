@@ -15,7 +15,9 @@ Preserve every original entry, including unlocked entries; editing/deletion is a
 separate caller action. Addition exclusions cannot remove originals. Whole-plan
 validation governs repetitions and ordered feature use. Reassessment through #64
 checks numerical consistency. Deduplicate by visible ordered entry semantics,
-including recognition and scenarios, before applying the result cap.
+including recognition, scenarios and fixed original provenance, before applying
+the result cap. Issue #68 corrects the earlier collapse of identical additions
+and originals: different fixed placements remain distinct.
 
 The finite-domain and supported-rule limits of the existing optimizer remain.
 Unknown original evidence prevents a proof; it is not a fabricated infeasibility.

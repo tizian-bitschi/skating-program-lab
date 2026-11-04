@@ -1,0 +1,13 @@
+category,variants,slots,solution_cap,generation_us,search_us,proposals,status,enumeration_complete,returned,best_bv,termination
+Bronze,19,6,1,5404,250587,30,Incomplete,false,0,0,Interrupted
+Bronze,19,6,10,5404,251106,30,Incomplete,false,0,0,Interrupted
+Bronze,19,6,100,5404,250597,30,Incomplete,false,0,0,Interrupted
+Silver,24,6,1,5663,250647,13,Incomplete,false,0,0,Interrupted
+Silver,24,6,10,5663,251013,13,Incomplete,false,0,0,Interrupted
+Silver,24,6,100,5663,250888,13,Incomplete,false,0,0,Interrupted
+Gold,49,6,1,6340,250342,6,Incomplete,false,0,0,Interrupted
+Gold,49,6,10,6340,250497,7,Incomplete,false,0,0,Interrupted
+Gold,49,6,100,6340,251866,5,Incomplete,false,0,0,Interrupted
+Masters,64,6,1,7027,250948,4,Incomplete,false,0,0,Interrupted
+Masters,64,6,10,7027,250567,4,Incomplete,false,0,0,Interrupted
+Masters,64,6,100,7027,250619,4,Incomplete,false,0,0,Interrupted

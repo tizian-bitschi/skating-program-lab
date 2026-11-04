@@ -436,8 +436,8 @@ fn budgets_caps_unsupported_domains_and_visible_solution_identity() {
     req.min_additions = 1;
     req.max_additions = 1;
     let r = result(&req);
-    // Two indistinguishable Axels yield two visible words, not three anchor assignments.
-    assert_eq!(r.candidates.len(), 2);
+    // Original Axel provenance distinguishes all three insertion boundaries.
+    assert_eq!(r.candidates.len(), 3);
     assert!(r.enumeration_complete);
 }
 
