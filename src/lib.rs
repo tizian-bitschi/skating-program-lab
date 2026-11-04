@@ -9,7 +9,11 @@ pub use execution::*;
 
 mod plan;
 mod plan_recognition;
+mod senior;
 pub use plan::*;
+pub use senior::{
+    senior_profile, senior_program_policy, senior_regular_spin_policy, SeniorCategory,
+};
 mod assessment;
 pub use assessment::*;
 mod program_validation;
@@ -45,6 +49,10 @@ impl SourceReference {
     /// Resolve known source editions to their official ISU documents; unknown editions have no URL.
     pub fn official_url(&self) -> Option<&'static str> {
         match (self.document.as_str(), self.version.as_str()) {
+            ("ISU Technical Panel Handbook, Single Skating" | "Technical Panel Handbook, Single Skating", "2026-07-15") => Some("https://isu-d8g8b4b7ece7aphs.a03.azurefd.net/isudamcontainer/CMS/Corporate-Site/Sports-Rules/Figure-Skating-Rules/Handbooks-Single-%26-Pair-Skating/TP-HandbookSingles-26-27-15-July-2026-1784641784-3364.pdf"),
+            ("Technical Committee Q&A 1", "2026-04-21") => Some("https://isu-d8g8b4b7ece7aphs.a03.azurefd.net/isudamcontainer/CMS/Corporate-Site/Sports-Rules/Figure-Skating-Rules/Handbooks-Single-%26-Pair-Skating/QA1-SPTC-Choreoelements-1776773178-2054.pdf"),
+            ("Technical Committee Q&A 2", "2026-05-19") => Some("https://isu-d8g8b4b7ece7aphs.a03.azurefd.net/isudamcontainer/CMS/Corporate-Site/Sports-Rules/Figure-Skating-Rules/Handbooks-Single-%26-Pair-Skating/QA2-SPTC-1779180084-8133.pdf"),
+            ("Technical Committee Q&A 3", "2026-10-08") => Some("https://isu-d8g8b4b7ece7aphs.a03.azurefd.net/isudamcontainer/uploads/isunewrevamp/document/original/f0e21d6e25df4e42395cb70a6c06b269b590597e823034cbd94476e1ea6dd502.pdf"),
             ("ISU Handbook for Referees and Judges", "2026-05-19") => Some("https://isu-d8g8b4b7ece7aphs.a03.azurefd.net/isudamcontainer/CMS/Corporate-Site/Sports-Rules/Figure-Skating-Rules/Handbooks-Single-%26-Pair-Skating/Handbook-for-Referees-and-Judges-2026-27-1779278300-9402.pdf"),
             ("ISU Communication 2786", "2026-06-02") => Some("https://isu-d8g8b4b7ece7aphs.a03.azurefd.net/isudamcontainer/CMS/Corporate-Site/Governance/Transparency/ISU-Communications/2786-SinglesPairs-SOV-Update-260602-1780481099-6311.pdf"),
             ("ISU Communication 2788", "2026-05-19") => Some("https://isu-d8g8b4b7ece7aphs.a03.azurefd.net/isudamcontainer/CMS/Corporate-Site/Governance/Transparency/ISU-Communications/2788-SP-Levels-and-GOE-2026-Updated-MAY-19-1779351385-9626.pdf"),
@@ -70,6 +78,7 @@ impl std::error::Error for UnknownVersion {}
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RulesetId {
     IsuAdult2026_27July16,
+    IsuSenior2026_27June12,
     /// Synthetic identity used only to exercise version mismatch handling.
     #[cfg(test)]
     TestOther,
@@ -79,6 +88,7 @@ impl RulesetId {
     pub fn as_str(self) -> &'static str {
         match self {
             Self::IsuAdult2026_27July16 => "isu-adult-2026-27-2026-07-16",
+            Self::IsuSenior2026_27June12 => "isu-senior-2026-27-2026-06-12",
             #[cfg(test)]
             Self::TestOther => "test-other",
         }
@@ -90,6 +100,7 @@ impl FromStr for RulesetId {
     fn from_str(value: &str) -> Result<Self, Self::Err> {
         match value {
             "isu-adult-2026-27-2026-07-16" => Ok(Self::IsuAdult2026_27July16),
+            "isu-senior-2026-27-2026-06-12" => Ok(Self::IsuSenior2026_27June12),
             _ => Err(UnknownVersion(value.to_owned())),
         }
     }

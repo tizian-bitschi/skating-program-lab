@@ -175,12 +175,20 @@ impl TableRow {
 }
 
 // Catalog presence alone does not expand the supported jump recognition subset.
-fn jump_row(table: ScoringTableId, notation: &str) -> Option<&'static crate::CatalogRow> {
+fn jump_row(
+    table: ScoringTableId,
+    notation: &str,
+    senior: bool,
+) -> Option<&'static crate::CatalogRow> {
     let unmarked = notation.trim_end_matches(['q', '<', '!', 'e']);
-    if !matches!(
-        unmarked,
-        "1T" | "1S" | "1Lo" | "1F" | "1Lz" | "1A" | "2T" | "2S" | "2Lo" | "2F" | "2Lz" | "2A"
-    ) {
+    if !(senior
+        && unmarked == notation
+        && matches!(unmarked.as_bytes().first(), Some(b'3' | b'4' | b'5')))
+        && !matches!(
+            unmarked,
+            "1T" | "1S" | "1Lo" | "1F" | "1Lz" | "1A" | "2T" | "2S" | "2Lo" | "2F" | "2Lz" | "2A"
+        )
+    {
         return None;
     }
     crate::catalog_row(table, notation)
@@ -190,6 +198,7 @@ fn single_row(
     table: ScoringTableId,
     details: &crate::RecognitionDetails,
     notation: String,
+    senior: bool,
 ) -> Result<TableRow, BaseValueError> {
     if details.components().len() != 1 {
         return Err(BaseValueError::Unsupported);
@@ -204,7 +213,7 @@ fn single_row(
     }
     let legacy_section = match row.family {
         CatalogFamily::Jump if details.level().is_none() => {
-            jump_row(table, &notation).ok_or(BaseValueError::Unsupported)?;
+            jump_row(table, &notation, senior).ok_or(BaseValueError::Unsupported)?;
             Some(match row.source.page {
                 2 => "p. 2, Jumps",
                 3 => "p. 3, Jumps",
@@ -238,6 +247,7 @@ fn repetition_row(
     table: ScoringTableId,
     details: &crate::RecognitionDetails,
     notation: String,
+    senior: bool,
 ) -> Result<ResolvedRow, BaseValueError> {
     if details.level().is_some()
         || !details.components()[0]
@@ -262,9 +272,9 @@ fn repetition_row(
     .map_err(|_| BaseValueError::Unsupported)?;
     let original_notation = original.notation().ok_or(BaseValueError::UnknownCalls)?;
     let mut resolved = if original.components().len() == 1 {
-        single_row(table, &original, original_notation)?
+        single_row(table, &original, original_notation, senior)?
     } else {
-        match jump_unit_row(table, &original, original_notation)? {
+        match jump_unit_row(table, &original, original_notation, senior)? {
             ResolvedRow::Value(row) => row,
             outcome => return Ok(outcome),
         }
@@ -397,6 +407,7 @@ fn jump_unit_row(
     table: ScoringTableId,
     details: &crate::RecognitionDetails,
     notation: String,
+    senior: bool,
 ) -> Result<ResolvedRow, BaseValueError> {
     let shape = jump_unit_kind(details)?;
     let calls = details.calls().ok_or(BaseValueError::UnknownCalls)?;
@@ -424,7 +435,7 @@ fn jump_unit_row(
         let row = if component_notation == "Eu" {
             crate::catalog_row(table, "Eu")
         } else {
-            jump_row(table, &component_notation)
+            jump_row(table, &component_notation, senior)
         }
         .ok_or(BaseValueError::Unsupported)?;
         if code.as_str() == "Eu"
@@ -476,6 +487,7 @@ fn table_row(
     table: ScoringTableId,
     recognition: &PanelRecognition,
 ) -> Result<ResolvedRow, BaseValueError> {
+    let senior = recognition.ruleset == crate::RulesetId::IsuSenior2026_27June12;
     let details = recognition
         .details
         .as_ref()
@@ -486,11 +498,11 @@ fn table_row(
         .iter()
         .any(|entry| entry.call == PanelCall::Repetition)
     {
-        repetition_row(table, details, notation)
+        repetition_row(table, details, notation, senior)
     } else if details.components().len() > 1 {
-        jump_unit_row(table, details, notation)
+        jump_unit_row(table, details, notation, senior)
     } else {
-        single_row(table, details, notation).map(ResolvedRow::Value)
+        single_row(table, details, notation, senior).map(ResolvedRow::Value)
     }
 }
 

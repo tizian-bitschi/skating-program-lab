@@ -1,5 +1,13 @@
 # Requirements
 
+Senior Women and Men Free Skating 2026/27 are explicit profile selections under
+Rule 612, with a separate recognition ruleset and shared technical policies.
+They use maxima and required roles, not an exact completed-performance element
+count. Plans, supplied recognition, qualified levels, contextual scoring and
+deductions remain separate. The [Senior coverage matrix](rules/isu-senior-2026-27.md)
+defines supported cases and uncertainty; marked advanced scoring and protocol
+replay remain follow-up workstreams #78 and #80.
+
 ## Purpose and scope
 
 

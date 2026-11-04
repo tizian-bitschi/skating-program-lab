@@ -28,6 +28,8 @@ pub enum ProfileProvenance {
 pub enum RuleMechanism {
     JumpPlanV1,
     AdultScoringV1,
+    SeniorJumpPlanV1,
+    SeniorScoringV1,
     Unsupported(String),
 }
 
@@ -114,7 +116,8 @@ pub struct FamilyPolicy {
     pub required: Vec<ProfileElementFamily>,
 }
 
-/// Limits have the semantics of the named JumpPlanV1 evaluator.
+/// Limits use the selected named jump evaluator. Senior singles use the
+/// across-rotations kind cap instead of the identical-double/advanced cap.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct JumpPolicy {
     pub allowed: Vec<JumpPermission>,
@@ -301,6 +304,15 @@ fn citation_valid(source: &SourceReference) -> bool {
         .all(|s| !s.trim().is_empty())
 }
 impl ProfileRegistry {
+    pub fn senior() -> Self {
+        let mut registry = Self::default();
+        for category in [SeniorCategory::Women, SeniorCategory::Men] {
+            registry
+                .register(senior_profile(category))
+                .expect("built-in Senior profile");
+        }
+        registry
+    }
     pub fn adult() -> Self {
         let mut registry = Self::default();
         for category in [
@@ -471,6 +483,14 @@ impl ProfileRegistry {
             return Err(fail("invalid scoring or unsupported-policy metadata"));
         }
         let required = ProfileRule::ALL;
+        if profile.bindings.iter().any(|b| {
+            b.rule == ProfileRule::Scoring && b.mechanism == RuleMechanism::SeniorScoringV1
+        }) && profile.scoring.recognition_ruleset != RulesetId::IsuSenior2026_27June12
+        {
+            return Err(fail(
+                "Senior scoring requires the source-bound Senior recognition ruleset",
+            ));
+        }
         if profile.bindings.len() != required.len()
             || required
                 .iter()
@@ -483,8 +503,12 @@ impl ProfileRegistry {
                 && citation_valid(&b.source)
                 && profile.sources.contains(&b.source)
                 && match b.mechanism {
-                    RuleMechanism::JumpPlanV1 => b.rule != ProfileRule::Scoring,
-                    RuleMechanism::AdultScoringV1 => b.rule == ProfileRule::Scoring,
+                    RuleMechanism::JumpPlanV1 | RuleMechanism::SeniorJumpPlanV1 => {
+                        b.rule != ProfileRule::Scoring
+                    }
+                    RuleMechanism::AdultScoringV1 | RuleMechanism::SeniorScoringV1 => {
+                        b.rule == ProfileRule::Scoring
+                    }
                     RuleMechanism::Unsupported(_) => true,
                 }
         };
@@ -599,17 +623,47 @@ pub fn score_profile_program(
             "recognition ruleset does not match profile compatibility binding",
         ));
     }
+    let senior = profile.binding(ProfileRule::Scoring).mechanism == RuleMechanism::SeniorScoringV1;
+    let panels = elements
+        .iter()
+        .map(|e| Some(e.recognition.clone()))
+        .collect::<Vec<_>>();
+    let contextual = if senior {
+        crate::senior::repetition_context(&panels)
+    } else {
+        panels
+    };
+    let adjusted: Vec<_> = elements
+        .iter()
+        .enumerate()
+        .map(|(i, e)| {
+            let mut e = e.clone();
+            if let Some(panel) = &contextual[i] {
+                e.recognition = panel.clone();
+            }
+            e
+        })
+        .collect();
+    let mut score = crate::scoring::score_program_internal(
+        profile.scoring.recognition_ruleset,
+        &profile.scoring,
+        table,
+        &adjusted,
+        outside_falls,
+        timing,
+        execution,
+    );
+    for (index, panel) in contextual.iter().enumerate() {
+        if panel.is_none() {
+            score.elements[index] = Err(ProgramScoreError::Element(
+                ElementScoreError::UnsupportedMarks,
+            ));
+            score.tes_hundredths = None;
+        }
+    }
     Ok(ProfileProgramScore {
         profile: id.clone(),
-        score: crate::scoring::score_program_internal(
-            profile.scoring.recognition_ruleset,
-            &profile.scoring,
-            table,
-            elements,
-            outside_falls,
-            timing,
-            execution,
-        ),
+        score,
     })
 }
 
@@ -955,4 +1009,64 @@ pub fn adult_profile(category: AdultCategory) -> RuleProfile {
         scoring: ProfileScoringPolicy { recognition_ruleset: RulesetId::IsuAdult2026_27July16, duration_seconds: duration, duration_source, time_deduction_source: time_source, fall_hundredths: if bronze {Some(50)} else {None}, fall_source },
         unsupported_policies: vec![],
     }
+}
+
+/// Sole built-in identity-to-policy adapter; consumers do not identify categories.
+pub(crate) fn built_in_program_policy(profile: &RuleProfile) -> Option<ProgramPolicy> {
+    [
+        AdultCategory::Bronze,
+        AdultCategory::Silver,
+        AdultCategory::Gold,
+        AdultCategory::Masters,
+    ]
+    .into_iter()
+    .find(|c| adult_profile(*c) == *profile)
+    .map(adult_program_policy)
+    .or_else(|| {
+        [SeniorCategory::Women, SeniorCategory::Men]
+            .into_iter()
+            .find(|c| senior_profile(*c) == *profile)
+            .map(senior_program_policy)
+    })
+}
+
+#[cfg(feature = "optimizer")]
+pub(crate) fn program_search_limit(profile: &RuleProfile) -> usize {
+    if crate::senior::selected(profile, ProfileRule::Count) {
+        crate::senior::DEFINITION.max_elements
+    } else {
+        10
+    }
+}
+
+fn check_builtin_override<T: PartialEq>(
+    profile: &RuleProfile,
+    expected: Option<&T>,
+    supplied: Option<&T>,
+) -> Result<(), ProfileSelectionError> {
+    if expected.zip(supplied).is_some_and(|(a, b)| a != b) {
+        return Err(profile.error(
+            ProfileErrorKind::Invalid,
+            "built-in profile policies cannot be overridden; register an explicit custom profile",
+        ));
+    }
+    Ok(())
+}
+
+pub(crate) fn resolve_program_policy(
+    profile: &RuleProfile,
+    supplied: Option<&ProgramPolicy>,
+) -> Result<Option<ProgramPolicy>, ProfileSelectionError> {
+    let expected = built_in_program_policy(profile);
+    check_builtin_override(profile, expected.as_ref(), supplied)?;
+    Ok(supplied.cloned().or(expected))
+}
+
+pub(crate) fn resolve_spin_policy(
+    profile: &RuleProfile,
+    supplied: Option<&RegularSpinPolicy>,
+) -> Result<Option<RegularSpinPolicy>, ProfileSelectionError> {
+    let expected = built_in_program_policy(profile).map(|p| p.spins);
+    check_builtin_override(profile, expected.as_ref(), supplied)?;
+    Ok(supplied.cloned().or(expected))
 }

@@ -387,16 +387,8 @@ pub(crate) fn validate_profile_program_with_assumptions(
     feature_credit: FeatureCreditEvaluation,
 ) -> Result<EvidenceValidationReport, ProfileSelectionError> {
     let profile = registry.resolve(&program.profile, program.scoring_table)?;
-    let built_in = [
-        AdultCategory::Bronze,
-        AdultCategory::Silver,
-        AdultCategory::Gold,
-        AdultCategory::Masters,
-    ]
-    .into_iter()
-    .find(|c| adult_profile(*c) == *profile);
-    let default = built_in.map(adult_regular_spin_policy);
-    let policy = policy.or(default.as_ref());
+    let resolved = crate::profiles::resolve_spin_policy(profile, policy)?;
+    let policy = resolved.as_ref();
     if let Some(p) = policy {
         let sources = std::iter::once(&p.source)
             .chain(p.positions.as_ref().map(|r| &r.source))
@@ -438,6 +430,7 @@ pub(crate) fn validate_profile_program_with_assumptions(
             &indexed,
             policy,
             profile.scoring.recognition_ruleset,
+            crate::senior::selected(profile, ProfileRule::Eligibility),
         );
     } else {
         check.add(
@@ -559,6 +552,7 @@ impl SpinValidator {
         evidence: &[Option<&RegularSpinEvidence>],
         policy: &RegularSpinPolicy,
         recognition_ruleset: RulesetId,
+        senior: bool,
     ) {
         self.apply("spin-count", None, &policy.source);
         let mut known = vec![];
@@ -613,7 +607,13 @@ impl SpinValidator {
                 } else {
                     unknown = true;
                 }
-                self.spin(index, spin, data, policy, recognition_ruleset);
+                let mut effective = policy.clone();
+                if senior && abbreviation.is_some_and(|a| a.kind == RegularSpinKind::Combination) {
+                    effective.min_revolutions = crate::senior::DEFINITION.combination_revolutions;
+                    effective.min_change_foot_revolutions =
+                        crate::senior::DEFINITION.combination_revolutions;
+                }
+                self.spin(index, spin, data, &effective, recognition_ruleset);
             }
         }
         for required in &policy.required {
