@@ -31,8 +31,8 @@ Equivalent assignments with the same provenance and evidence appear once (#68).
 Proof and tie completeness cover only the supplied finite domain and supported
 conditional rules. Attached generation audits retain omissions and domain caps;
 they never expand proof scope. Time/proposal/output caps retain the existing
-optimizer semantics. Total slots are bounded at eleven for Senior Rule 612 profiles and ten for other profiles, original plus addition
-definitions at 1,000, and validator proposals at 100,000. An empty request with
+optimizer semantics. Total slots, original plus addition definitions and validator
+proposals follow the [current bounds](#current-bounds). An empty request with
 zero maximum total slots is rejected. Evidence requiring unsupported panel paths
 remains indeterminate rather than being converted into a proven optimum.
 
@@ -142,7 +142,10 @@ or interruption cannot do so. Unknown requested semantics produce an error befor
 search rather than a false infeasibility proof. Per-program insufficiency of a
 known feature-credit rule rejects that scenario without claiming a panel call.
 
-Bounds are at most 1,000 candidate definitions, 10 element slots and 100,000
+## Current bounds
+
+Current bounds are at most 1,000 candidate definitions, **eleven element slots
+for Senior Rule 612 profiles and ten for other supported profiles**, and 100,000
 validator proposals. Time starts before candidate preparation and includes model
 construction and both search stages; validation/scoring of one bounded proposal
 is not preemptible. Large domains can still reach the proposal/time cap: no
@@ -292,8 +295,8 @@ normalized equivalent step sets and diagnostic-prose-independent classification.
 ## Acceptance and measured limits (#68)
 
 See the [integration matrix and native measurements](../milestone-68.md) and
-`examples/workflow_bounds.rs`. Hard input ceilings (1000 definitions, eleven Senior / ten other slots,
-100000 validator proposals) are not latency guarantees. Six-slot generated
+`examples/workflow_bounds.rs`. The [current input ceilings](#current-bounds)
+are not latency guarantees. Six-slot generated
 Bronze/Silver/Gold/Masters domains exceed the measured 250 ms useful-result budget.
 No solver pruning or public API change is included in this acceptance audit.
 A result cap can leave `OptimalProven` with `enumeration_complete=false`: further

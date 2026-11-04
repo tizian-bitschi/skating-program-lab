@@ -4,6 +4,184 @@ mod domains;
 use skating_program_lab::*;
 use std::{collections::BTreeSet, time::Duration};
 
+#[path = "support/protocol_recognition.rs"]
+mod protocol_recognition;
+
+fn source_order_conditional_request() -> ProgramCompletionRequest {
+    let registry = ProfileRegistry::senior();
+    let source = "gpfra2026-W";
+    let domain = generate_program_candidates(
+        &registry,
+        &domains::generation(source, domains::Scale::Medium),
+    )
+    .unwrap();
+    let mut request = domains::completion(source, domains::Scale::Medium, domain);
+    let anchors = request.original.clone();
+    let rows = domains::source_rows(source);
+    let program = domains::records(domains::PROGRAMS)
+        .into_iter()
+        .find(|r| r["source"] == source && r["rank"] == "1")
+        .unwrap();
+    let edition = domains::records(domains::EDITIONS)
+        .into_iter()
+        .find(|r| r["source"] == source)
+        .unwrap();
+    request.original = rows
+        .iter()
+        .map(|row| {
+            let id = format!("{source}:rank1:row{}", row["row"]);
+            if !row["code"].starts_with(char::is_numeric) {
+                return anchors.iter().find(|a| a.id == id).unwrap().clone();
+            }
+            // The source supplies recognition/order; clean plans and direct steps
+            // are explicit hypothetical assumptions, not inferred movement evidence.
+            let code = row["code"].trim_end_matches('!');
+            let parts: Vec<_> = code
+                .split('+')
+                .filter(|s| *s != "SEQ")
+                .map(|s| JumpPart::Jump(domains::solo(s).unwrap()))
+                .collect();
+            let jump = if code.ends_with("+SEQ") {
+                JumpElement::Sequence(parts)
+            } else if parts.len() > 1 {
+                JumpElement::Combination(parts)
+            } else {
+                JumpElement::Solo(domains::solo(code).unwrap())
+            };
+            let mut recognition = protocol_recognition::recognition(code);
+            recognition.source = Some(SourceReference {
+                document: edition["pdf_url"].into(),
+                version: edition["sha256"].into(),
+                location: format!(
+                    "{} / page {} rank {} row {}; conditional clean plan of {}",
+                    program["name"], row["page"], row["rank"], row["row"], row["code"]
+                ),
+            });
+            CompletionEntry {
+                id,
+                locked: true,
+                entry: ManualProgramEntry {
+                    planned: PlannedElement::Jump(jump),
+                    evidence: ElementPlanEvidence::Jump {
+                        direct_transitions_assumed: code.contains('+'),
+                    },
+                    intended_recognition: Some(recognition),
+                    scenario: None,
+                },
+            }
+        })
+        .collect();
+    request.variants.clear();
+    request.generated_domain = None;
+    request.insertion.boundaries.clear();
+    request.min_additions = 0;
+    request.max_additions = 0;
+    request
+}
+
+#[test]
+fn source_order_eleven_slot_conditional_plan_is_completed_and_rescored() {
+    let registry = ProfileRegistry::senior();
+    let source = "gpfra2026-W";
+    let rows = domains::source_rows(source);
+    assert_eq!(
+        rows.iter().map(|r| r["code"]).collect::<Vec<_>>(),
+        [
+            "3A",
+            "3Lz+3T",
+            "3F!",
+            "FSSp4",
+            "ChSq1",
+            "3Lo+2A+2A+SEQ",
+            "3Lz",
+            "3Lo",
+            "CCoSp4",
+            "StSq4",
+            "ChSp1",
+        ]
+    );
+    let program = domains::records(domains::PROGRAMS)
+        .into_iter()
+        .find(|r| r["source"] == source && r["rank"] == "1")
+        .unwrap();
+    assert_eq!(
+        (program["name"], program["page"], program["nation"]),
+        ("Ami NAKAI", "1", "JPN")
+    );
+    let edition = domains::records(domains::EDITIONS)
+        .into_iter()
+        .find(|r| r["source"] == source)
+        .unwrap();
+    assert_eq!(
+        edition["sha256"],
+        "7501c3305802e0ef42a56e616d2dd709d4bd844199346746d18284e789917c9b"
+    );
+    assert_eq!(edition["segment"], "WOMEN FREE SKATING");
+    let request = source_order_conditional_request();
+    for (entry, row) in request.original.iter().zip(&rows) {
+        let recognition = entry.entry.intended_recognition.as_ref().unwrap();
+        let provenance = recognition.source.as_ref().unwrap();
+        assert_eq!(provenance.document, edition["pdf_url"]);
+        assert_eq!(provenance.version, edition["sha256"]);
+        assert!(provenance.location.contains(&format!("row {}", row["row"])));
+        assert!(provenance.location.contains("conditional"));
+        assert!(entry.entry.scenario.is_none());
+        match &entry.entry.evidence {
+            ElementPlanEvidence::Jump {
+                direct_transitions_assumed,
+            } => {
+                assert_eq!(*direct_transitions_assumed, row["code"].contains('+'));
+                assert!(recognition
+                    .details
+                    .as_ref()
+                    .unwrap()
+                    .calls()
+                    .unwrap()
+                    .iter()
+                    .all(|c| c.call == PanelCall::Sequence));
+            }
+            ElementPlanEvidence::Spin { spin, .. } => {
+                assert_eq!(spin.planned_level, Some(Level::Basic))
+            }
+            ElementPlanEvidence::Step {
+                level,
+                qualification_assumed,
+                ..
+            } => {
+                assert_eq!(*level, Level::Basic);
+                assert!(*qualification_assumed);
+            }
+            _ => {}
+        }
+    }
+    let result = complete_program(&registry, &request).unwrap();
+    assert_eq!(result.status, OptimizerStatus::OptimalProven);
+    assert!(result.enumeration_complete);
+    assert_eq!(result.candidates.len(), 1);
+    let candidate = &result.candidates[0];
+    domains::verify_originals(&request, candidate);
+    assert_eq!(candidate.program.elements.len(), 11);
+    // Independent June 2 values: jumps 800+1010+530+1150+590+490;
+    // Basic roles FSSp 200, CCoSp 200, StSq 160, ChSq 350, ChSp 350.
+    assert_eq!(candidate.total_base_hundredths, 5830);
+    assert_eq!(candidate.added_base_hundredths, 0);
+    assert!(!candidate.validation.validation.findings.is_empty());
+    assert!(candidate
+        .validation
+        .validation
+        .findings
+        .iter()
+        .all(|f| f.rule_id == "spin-execution-recognition"));
+    assert_eq!(
+        candidate.assessment.request.entries,
+        request
+            .original
+            .iter()
+            .map(|o| o.entry.clone())
+            .collect::<Vec<_>>()
+    );
+}
+
 // Independent bounded combinatorial oracle: one Axel and each of the five roles
 // exactly once. No production scorer, validator, generator or solver in this oracle.
 fn permutations(items: &mut [usize], at: usize, out: &mut BTreeSet<Vec<usize>>) {

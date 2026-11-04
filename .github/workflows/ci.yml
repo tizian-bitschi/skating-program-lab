@@ -31,3 +31,11 @@ jobs:
       - run: cargo clippy --manifest-path solver-comparison/Cargo.toml --all-targets --locked -- -D warnings
       - run: cargo test --manifest-path solver-comparison/Cargo.toml --locked
       - run: cargo run --manifest-path solver-comparison/Cargo.toml --locked
+  benchmark-reproducibility:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Check benchmark revision guards and lock restoration
+        shell: pwsh
+        run: ./benchmarks/senior-grand-prix/test-runner.ps1
