@@ -1,5 +1,10 @@
 # Implementation status
 
+Issue #78 adds table-backed Senior triple/quad call scoring and optional explicit
+multi-judge aggregation. Protocol replay reproduces all 132 independently
+transcribed #76 rows, retaining printed-credit provenance and unresolved inputs.
+See the [API, numerical coverage and limits](specs/senior-protocol-scoring.md).
+
 Issue #77 adds source-bound 2026/27 Senior Women/Men Free Skating profiles,
 Rule 612 jump constraints, distinct spin roles and shared family evidence
 validation. Clean ordered program/manual contexts apply second-solo 80%

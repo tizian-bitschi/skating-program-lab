@@ -1,5 +1,10 @@
 # Scoring
 
+The additive [Senior protocol scoring contract](senior-protocol-scoring.md)
+extends the historical single/double slice below for Senior recognition: marked
+triples/quads, compatible compounds and whole stars with additional calls. It
+adds explicit numerical panel aggregation separately from hypothetical GOE.
+
 ## Target contract
 
 
