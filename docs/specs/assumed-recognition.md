@@ -73,11 +73,20 @@ compound structures, excess Senior jump slots and uncertain repetition
 credit leave affected values unresolved. An unknown earlier jump can
 consume a repetition slot. The listed value of a known compound is
 retained even when its credit is unresolved.
-The ordered solver uses listed BV for supported assumed domains. It rejects
-Senior domains that can require 80% repetition credit, including reuse of a
-single addition variant and repetitions involving locked originals. Both search
-workflows check feasible proposals against the contextual credit calculation
-used by manual assessment before reporting an optimum.
+Both assumed-recognition search APIs maximize credited BV over the supplied
+finite domain. A second identical advanced solo can receive 80% BV, including
+when the first or second attempt is a locked original. If the repeated jump
+appears in a combination or sequence, the two-solo reduction does not apply.
+The shared validator still checks repetition and composition limits.
+The returned per-element values include the contextual notation (such as
+`3A+REP`), while the rule trace retains the catalog and Rule 612 sources.
+The original assumed selections stay unchanged. If credit cannot be resolved,
+the search reports an error rather than substituting a table value or zero.
+
+Pumpkin's listed sum is an upper bound on credited BV; it does not determine
+which validated word wins. Optimality, completeness of ordered ties, and
+coverage of the declared variant domain are separate claims. Evidence-based
+entry points retain their unfactored objective and detailed validation scope.
 
 ## Profile-filtered choices
 

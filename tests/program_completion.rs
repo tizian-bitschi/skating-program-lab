@@ -888,29 +888,234 @@ fn assumed_senior_completion_keeps_distinct_equal_bv_choices() {
     assert_eq!(found, BTreeSet::from(["FCSp4", "FLSp4"]));
 }
 
-#[test]
-fn assumed_completion_rejects_senior_repeat_credit_across_locked_original_and_addition() {
-    let category = SeniorCategory::Women;
+// Build locked originals from exactly the supplied recognition selections.
+fn senior_locked_request(
+    category: SeniorCategory,
+    codes: &[AssumedRecognition],
+) -> ProgramCompletionRequest {
     let profile = senior_profile(category);
+    let domain = generate_program_candidates_with_assumed_recognition(
+        &ProfileRegistry::senior(),
+        &generation_defaults::request(profile.clone()),
+        codes,
+    )
+    .unwrap();
     let mut q = request();
     q.profile = profile.id;
+    q.scoring_table = profile.scoring_table;
     q.policy = senior_program_policy(category);
-    let mut axel = jump(JumpKind::Axel);
-    let PlannedElement::Jump(JumpElement::Solo(jump)) = &mut axel.element else {
-        unreachable!()
-    };
-    jump.rotations = Some(3);
-    q.original.truncate(1);
-    q.original[0].entry.planned = axel.element.clone();
-    q.original[0].entry.intended_recognition = None;
-    q.variants = vec![axel];
-    q.insertion.boundaries = vec![1];
+    q.original = codes
+        .iter()
+        .zip(domain.domain.variants)
+        .map(|(code, variant)| CompletionEntry {
+            id: code.code.clone(),
+            locked: true,
+            entry: ManualProgramEntry {
+                planned: variant.element,
+                evidence: variant.evidence,
+                intended_recognition: None,
+                scenario: None,
+            },
+        })
+        .collect();
+    q
+}
+
+#[test]
+fn assumed_senior_completion_credits_the_second_axel_in_each_allowed_gap() {
+    let category = SeniorCategory::Women;
+    let registry = ProfileRegistry::senior();
+    let codes = ["3A", "CCoSp4", "FCSp4", "StSq4", "ChSq1", "ChSp1"].map(AssumedRecognition::new);
+    let mut q = senior_locked_request(category, &codes);
+    q.variants = vec![ProgramVariant {
+        element: q.original[0].entry.planned.clone(),
+        evidence: q.original[0].entry.evidence.clone(),
+        recognition_assumed: true,
+    }];
+    q.insertion.boundaries = (0..=codes.len()).collect();
     q.min_additions = 1;
     q.max_additions = 1;
-    let choices = [AssumedRecognition::new("3A")];
-    assert!(matches!(
-        complete_program_with_assumed_recognition(&ProfileRegistry::senior(), &q, &choices, &choices),
-        Err(ProgramCompletionError::Optimization(ProgramOptimizationError::InvalidRequest(reason)))
-            if reason.contains("contextual BV")
-    ));
+    let result =
+        complete_program_with_assumed_recognition(&registry, &q, &codes, &codes[..1]).unwrap();
+    assert_eq!(result.status, OptimizerStatus::OptimalProven);
+    assert!(result.enumeration_complete);
+    assert_eq!(result.candidates.len(), codes.len() + 1);
+    let mut gaps = BTreeSet::new();
+    for candidate in result.candidates {
+        let mut selected = vec![];
+        let mut original_indices = vec![];
+        let mut axels = vec![];
+        for (index, provenance) in candidate.provenance.iter().enumerate() {
+            let code = match provenance {
+                CompletionProvenance::Inserted {
+                    variant_index: 0,
+                    boundary,
+                    ordinal: 0,
+                } => {
+                    gaps.insert(*boundary);
+                    assert_eq!(
+                        candidate.added_base_hundredths,
+                        if *boundary == 0 { 800 } else { 640 }
+                    );
+                    &codes[0]
+                }
+                CompletionProvenance::Original {
+                    id,
+                    original_index,
+                    locked: true,
+                } => {
+                    assert_eq!(id, &q.original[*original_index].id);
+                    assert_eq!(
+                        candidate.assessment.request.entries[index],
+                        q.original[*original_index].entry
+                    );
+                    original_indices.push(*original_index);
+                    &codes[*original_index]
+                }
+                other => panic!("unexpected placement: {other:?}"),
+            };
+            selected.push(code.clone());
+            if code.code == "3A" {
+                axels.push((
+                    candidate.per_element[index].notation.as_str(),
+                    candidate.per_element[index].hundredths,
+                ));
+            }
+        }
+        assert_eq!(original_indices, (0..codes.len()).collect::<Vec<_>>());
+        assert_eq!(axels, [("3A", 800), ("3A+REP", 640)]);
+        assert_eq!(candidate.total_base_hundredths, 3350);
+        let manual = assess_manual_bv(
+            &registry,
+            &ManualBvRequest {
+                profile: q.profile.clone(),
+                scoring_table: q.scoring_table,
+                submission: SubmissionState::Complete,
+                elements: selected,
+            },
+        )
+        .unwrap();
+        assert_eq!(manual.total.exact_hundredths, Some(3350));
+        assert_eq!(
+            candidate.assessment.intended_base.exact_hundredths,
+            Some(3350)
+        );
+    }
+    assert_eq!(gaps, q.insertion.boundaries.iter().copied().collect());
+
+    q.max_proposals = 1;
+    let stopped =
+        complete_program_with_assumed_recognition(&registry, &q, &codes, &codes[..1]).unwrap();
+    assert_eq!(stopped.status, OptimizerStatus::FeasibleUnproven);
+    assert!(!stopped.enumeration_complete);
+    assert_eq!(stopped.candidates[0].total_base_hundredths, 3350);
+
+    q.max_proposals = 100;
+    q.max_solutions = 1;
+    let capped =
+        complete_program_with_assumed_recognition(&registry, &q, &codes, &codes[..1]).unwrap();
+    assert_eq!(capped.status, OptimizerStatus::OptimalProven);
+    assert_eq!(
+        capped.termination_reason,
+        JumpTerminationReason::SolutionLimit
+    );
+    assert!(!capped.enumeration_complete);
+    assert_eq!(capped.candidates.len(), 1);
+}
+
+#[test]
+fn assumed_senior_completion_matches_eleven_slot_credited_oracle() {
+    let registry = ProfileRegistry::senior();
+    let originals = [
+        "3A", "4T", "4S", "2T", "CCoSp4", "FCSp4", "StSq4", "ChSq1", "ChSp1",
+    ]
+    .map(AssumedRecognition::new);
+    let mut q = senior_locked_request(SeniorCategory::Men, &originals);
+    q.variants = q.original[..3]
+        .iter()
+        .map(|e| ProgramVariant {
+            element: e.entry.planned.clone(),
+            evidence: e.entry.evidence.clone(),
+            recognition_assumed: true,
+        })
+        .collect();
+    let PlannedElement::Jump(JumpElement::Solo(axel)) = &q.original[0].entry.planned else {
+        unreachable!()
+    };
+    let PlannedElement::Jump(JumpElement::Solo(toe)) = &q.original[3].entry.planned else {
+        unreachable!()
+    };
+    q.variants.push(ProgramVariant {
+        element: PlannedElement::Jump(JumpElement::Combination(vec![
+            JumpPart::Jump(axel.clone()),
+            JumpPart::Jump(toe.clone()),
+        ])),
+        evidence: q.original[0].entry.evidence.clone(),
+        recognition_assumed: true,
+    });
+    let additions = ["3A", "4T", "4S", "3A+2T"].map(AssumedRecognition::new);
+    q.insertion.boundaries = vec![0, 2, originals.len()];
+    q.min_additions = 2;
+    q.max_additions = 2;
+    // Independent literal oracle for the unordered addition pairs; all allowed
+    // placements of each legal pair have that total. Anchors sum to 4760.
+    // Pair 4T/4S repeats two quad types; 4T/3A+2T gives four Toe Loop
+    // attempts; 3A/3A+2T and all equal pairs give three identical attempts.
+    let credited = |a, b| match (a, b) {
+        (0, 1) | (1, 0) => Some(640 + 760),
+        (0, 2) | (2, 0) => Some(640 + 776),
+        (2, 3) | (3, 2) => Some(776 + 930),
+        _ => None,
+    };
+    for (exclude_combo, best_delta) in [(false, 1706), (true, 1416)] {
+        q.exclusions = if exclude_combo {
+            vec![PersonalExclusion::Variant(3)]
+        } else {
+            vec![]
+        };
+        let mut expected = BTreeSet::new();
+        for &a_gap in &q.insertion.boundaries {
+            for &b_gap in &q.insertion.boundaries {
+                for a in 0..additions.len() {
+                    for b in 0..additions.len() {
+                        if a_gap <= b_gap && !(exclude_combo && (a == 3 || b == 3)) {
+                            if let Some(value) = credited(a, b) {
+                                assert!(value <= best_delta);
+                                if value == best_delta {
+                                    expected.insert(vec![(a_gap, a), (b_gap, b)]);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        let result =
+            complete_program_with_assumed_recognition(&registry, &q, &originals, &additions)
+                .unwrap();
+        assert_eq!(result.status, OptimizerStatus::OptimalProven);
+        assert!(result.enumeration_complete);
+        assert_eq!(result.candidates.len(), expected.len());
+        let actual = result
+            .candidates
+            .iter()
+            .map(|candidate| {
+                assert_eq!(candidate.total_base_hundredths, 4760 + best_delta);
+                assert_eq!(candidate.program.elements.len(), 11);
+                candidate
+                    .provenance
+                    .iter()
+                    .filter_map(|p| match p {
+                        CompletionProvenance::Inserted {
+                            boundary,
+                            variant_index,
+                            ..
+                        } => Some((*boundary, *variant_index)),
+                        _ => None,
+                    })
+                    .collect::<Vec<_>>()
+            })
+            .collect::<BTreeSet<_>>();
+        assert_eq!(actual, expected);
+    }
 }

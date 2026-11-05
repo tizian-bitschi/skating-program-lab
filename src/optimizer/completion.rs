@@ -368,7 +368,7 @@ fn completed_candidate(
     request: &ProgramCompletionRequest,
     ruleset: RulesetId,
     candidate: ProgramCandidate,
-    assumed: bool,
+    assumed_values: Option<&[BaseValue]>,
 ) -> Result<CompletedProgramCandidate, ProgramCompletionError> {
     use ProgramCompletionError as E;
     let mut entries = vec![];
@@ -401,15 +401,22 @@ fn completed_candidate(
                 ordinal,
             });
             ordinal += 1;
-            inserted_entry(&request.variants[v], ruleset, assumed)
+            inserted_entry(&request.variants[v], ruleset, assumed_values.is_some())
         };
         entry.reindex_recognition(index);
         entries.push(entry);
     }
+    let listed_values = assumed_values.map(|values| {
+        candidate
+            .variant_indices
+            .iter()
+            .map(|&i| values[i].clone())
+            .collect::<Vec<_>>()
+    });
     let assessment = crate::assessment::assess_manual_scope(
         registry,
         &manual(request, entries, SubmissionState::Complete),
-        assumed.then_some(candidate.per_element.as_slice()),
+        listed_values.as_deref(),
     )
     .map_err(E::Profile)?;
     if assessment.intended_base.exact_hundredths != Some(i64::from(candidate.base_hundredths))
@@ -534,7 +541,7 @@ fn complete(
                 request,
                 profile.scoring.recognition_ruleset,
                 c,
-                assumed,
+                assumed_values,
             )
         })
         .collect::<Result<Vec<_>, _>>()?;
