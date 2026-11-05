@@ -15,6 +15,19 @@ fn request(profile: ProfileId, submission: SubmissionState, codes: &[&str]) -> M
 }
 
 #[test]
+fn gold_spin_draft_has_base_value_before_a_goe_request() {
+    let draft = request(
+        adult_profile(AdultCategory::Gold).id,
+        SubmissionState::Draft,
+        &["CCoSp3", "FSSp2"],
+    );
+    let result = assess_manual_bv(&ProfileRegistry::adult(), &draft).unwrap();
+    // Communication 2786 (2 June 2026), CCoSp3 3.60 and FSSp2 2.80.
+    assert_eq!(result.total.exact_hundredths, Some(640));
+    assert!(!result.legality.repairable_absences.is_empty());
+}
+
+#[test]
 fn source_values_for_complete_adult_selections() {
     use AdultCategory::*;
     // ISU 2786 (2 June 2026), pp. 2, 6, 7, 9 and 14, BASE column.

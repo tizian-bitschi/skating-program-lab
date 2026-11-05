@@ -562,9 +562,14 @@ fn optimize_gold_sov_selections_without_spin_or_step_proof() {
     let q = request(category, generated.domain.variants, 5);
     let result =
         optimize_program_with_assumed_recognition(&registry, &q, &generated.recognition).unwrap();
+    // Communication 2786, 2 June 2026. Gold requires the Axel, both spin roles,
+    // the step sequence and the choreographic spin in this five-slot fixture.
+    let expected = oracle(5, &[300, 360, 280, 270, 350, 110], |word| {
+        (2..6).all(|i| word.contains(&i)) && (word.contains(&0) || word.contains(&1))
+    });
     assert_eq!(result.status, OptimizerStatus::OptimalProven);
     assert!(result.enumeration_complete);
-    assert_eq!(result.candidates.len(), 120);
+    assert_eq!(ids(&result), expected.1);
     assert!(result.supported_rules.contains(&"program-step-level-cap"));
     assert!(result
         .supported_rules
@@ -591,8 +596,8 @@ fn optimize_gold_sov_selections_without_spin_or_step_proof() {
             },
         )
         .unwrap();
-        assert_eq!(candidate.base_hundredths, 1370);
-        assert_eq!(manual.total.exact_hundredths, Some(1370));
+        assert_eq!(candidate.base_hundredths, expected.0);
+        assert_eq!(manual.total.exact_hundredths, Some(i64::from(expected.0)));
     }
 }
 
@@ -601,25 +606,30 @@ fn assumed_senior_full_program_matches_manual_bv() {
     let category = SeniorCategory::Women;
     let profile = senior_profile(category);
     let registry = ProfileRegistry::senior();
-    let choices = ["2A", "CCoSp4", "FCSp4", "StSq4", "ChSq1", "ChSp1"].map(AssumedRecognition::new);
+    let choices =
+        ["2A", "CCoSp4", "FCSp4", "StSq4", "ChSq1", "ChSp1", "FLSp4"].map(AssumedRecognition::new);
     let generation = generation_defaults::request(profile.clone());
     let generated =
         generate_program_candidates_with_assumed_recognition(&registry, &generation, &choices)
             .unwrap();
     assert_eq!(generated.recognition, choices);
-    let mut q = request(
-        AdultCategory::Gold,
-        generated.domain.variants,
-        choices.len(),
-    );
+    let mut q = request(AdultCategory::Gold, generated.domain.variants, 6);
     q.profile = profile.id;
     q.scoring_table = profile.scoring_table;
     q.policy = senior_program_policy(category);
-    q.must_have = (0..choices.len()).map(|index| vec![index]).collect();
-    q.enumerate_equal_optima = false;
+    q.must_have = vec![vec![0], vec![1], vec![2, 6], vec![3], vec![4], vec![5]];
+    q.max_solutions = 1500;
     let result = optimize_program_with_assumed_recognition(&registry, &q, &choices).unwrap();
+    // Communication 2786: the two flying-spin choices share BV 3.80.
+    let expected = oracle(6, &[330, 420, 380, 410, 350, 350, 380], |word| {
+        [0, 1, 3, 4, 5].iter().all(|i| word.contains(i)) && (word.contains(&2) || word.contains(&6))
+    });
     assert_eq!(result.status, OptimizerStatus::OptimalProven);
+    assert!(result.enumeration_complete);
+    assert_eq!(ids(&result).len(), result.candidates.len());
+    assert_eq!(ids(&result), expected.1);
     let candidate = &result.candidates[0];
+    assert_eq!(candidate.base_hundredths, expected.0);
     let manual = assess_manual_bv(
         &registry,
         &ManualBvRequest {

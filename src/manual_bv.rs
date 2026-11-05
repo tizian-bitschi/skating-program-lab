@@ -3,6 +3,7 @@ use crate::assumed_recognition::assumed_credit;
 use crate::program_validation::{validate_program_scope_with_credit, EvaluationScope};
 use crate::selection::{clean_jump, Selection};
 use crate::*;
+use std::collections::BTreeMap;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ManualBvRequest {
@@ -40,14 +41,229 @@ pub struct ManualBvAssessment {
     pub legality: ProgramLegalityReport,
 }
 
+/// Optional changes to the hypothetical scoring inputs at a zero-based index.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct GoeScenarioOverride {
+    /// The uniform grade applies if this is absent.
+    pub final_goe: Option<i8>,
+    /// Supplied calls and outcomes. Recognized components and level must match the selection.
+    pub recognition: Option<PanelRecognition>,
+    pub fall: Option<bool>,
+    pub execution: Option<ElementExecutionEvidence>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum GoeScenarioElementError {
+    Base(ManualBvError),
+    RecognitionMismatch,
+    ContextUnavailable,
+    Scoring(ProgramScoreError),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GoeScenarioPreview {
+    pub scoring_table: ScoringTableId,
+    pub ruleset: RulesetId,
+    pub second_half_boundary: Option<usize>,
+    /// In selection order. Ok(None) means a grade was not supplied.
+    pub elements: Vec<Result<Option<ProgramElementScore>, GoeScenarioElementError>>,
+    /// Absent if no element received a grade. Explicit ignored and no-value
+    /// outcomes contribute zero and remain visible in the element results.
+    pub total: Option<AssessmentAggregate>,
+}
+
+/// Preview final numeric GOE for an already selected program. An absent uniform
+/// grade leaves elements without overrides ungraded. Without supplied
+/// recognition or execution evidence the scenario assumes clean execution
+/// and no fall, unless an explicit fall assumption is supplied.
+///
+/// The optional boundary is the first element assumed to be in the second half.
+/// It does not establish actual timing. This preview never applies deductions.
+pub fn preview_goe_scenario(
+    registry: &ProfileRegistry,
+    program: &ManualBvRequest,
+    uniform_goe: Option<i8>,
+    overrides: &BTreeMap<usize, GoeScenarioOverride>,
+    second_half_boundary: Option<usize>,
+) -> Result<GoeScenarioPreview, ProfileSelectionError> {
+    use GoeScenarioElementError as Error;
+
+    let len = program.elements.len();
+    if second_half_boundary.is_some_and(|boundary| boundary > len)
+        || overrides
+            .last_key_value()
+            .is_some_and(|(&index, _)| index >= len)
+    {
+        return Err(ProfileSelectionError {
+            profile: program.profile.clone(),
+            kind: ProfileErrorKind::Invalid,
+            reason: "GOE override index or second-half boundary is outside the program".into(),
+        });
+    }
+    let table = program.scoring_table;
+    let profile = registry.resolve(&program.profile, table)?;
+    let ruleset = profile.scoring.recognition_ruleset;
+    let (assessment, resolved_program, evidence) = assess_selections(registry, profile, program)?;
+    let panels: Vec<_> = resolved_program
+        .elements
+        .iter()
+        .zip(&evidence)
+        .zip(assessment.elements)
+        .enumerate()
+        .map(|(index, ((planned, evidence), assessment))| {
+            let base = assessment.credited_base;
+            if let Some(panel) = overrides.get(&index).and_then(|o| o.recognition.as_ref()) {
+                if matches!(base, Err(ManualBvError::Selection { .. }))
+                    || panel.outcome == RecognitionOutcome::Recognized
+                {
+                    base.map_err(Error::Base)?;
+                }
+                if panel.ruleset != ruleset
+                    || panel.planned_element.is_some_and(|i| i != index)
+                    || (panel.outcome == RecognitionOutcome::Recognized
+                        && panel.details.is_some()
+                        && !crate::plan_recognition::matches_intended(planned, evidence, panel))
+                {
+                    return Err(Error::RecognitionMismatch);
+                }
+                return Ok(panel.clone());
+            }
+            Ok(PanelRecognition {
+                ruleset,
+                source: None,
+                planned_element: Some(index),
+                observed_element: None,
+                outcome: match base.map_err(Error::Base)? {
+                    BaseValueOutcome::Value(_) => RecognitionOutcome::Recognized,
+                    BaseValueOutcome::Ignored => RecognitionOutcome::Ignored,
+                    BaseValueOutcome::NoValue => RecognitionOutcome::NoValue,
+                },
+                details: crate::plan_recognition::intended_details(planned, evidence),
+            })
+        })
+        .collect();
+    let contextual = (profile.binding(ProfileRule::Scoring).mechanism
+        == RuleMechanism::SeniorScoringV1)
+        .then(|| {
+            crate::senior::repetition_context(
+                &panels
+                    .iter()
+                    .map(|p| p.as_ref().ok().cloned())
+                    .collect::<Vec<_>>(),
+            )
+        });
+    let panels: Vec<_> = panels
+        .into_iter()
+        .enumerate()
+        .map(|(index, panel)| match &contextual {
+            Some(contextual) if panel.is_ok() => {
+                contextual[index].clone().ok_or(Error::ContextUnavailable)
+            }
+            _ => panel,
+        })
+        .collect();
+    let bases: Vec<_> = panels
+        .iter()
+        .map(|panel| {
+            lookup_base_value(table, panel.as_ref().map_err(Clone::clone)?, &[]).map_err(|error| {
+                Error::Scoring(ProgramScoreError::Element(ElementScoreError::BaseValue(
+                    error,
+                )))
+            })
+        })
+        .collect();
+    let eligibility: Vec<_> = panels
+        .iter()
+        .zip(&bases)
+        .map(|(panel, base)| {
+            if matches!(base, Ok(BaseValueOutcome::Ignored)) {
+                return Some(false);
+            }
+            let panel = panel.as_ref().ok()?;
+            if panel.outcome == RecognitionOutcome::Unknown {
+                return None;
+            }
+            let details = panel.details.as_ref()?;
+            let jump = details
+                .components()
+                .iter()
+                .any(|c| c.as_str().starts_with(char::is_numeric));
+            (!jump || matches!(base, Ok(BaseValueOutcome::Value(_)))).then_some(jump)
+        })
+        .collect();
+    let mut has_grade = false;
+    let elements: Vec<_> = panels
+        .iter()
+        .zip(bases)
+        .zip(crate::scoring::planning_credit(
+            &eligibility,
+            second_half_boundary,
+        ))
+        .enumerate()
+        .map(|(index, ((panel, base), second_half))| {
+            let inputs = overrides.get(&index);
+            let grade = inputs.and_then(|inputs| inputs.final_goe).or(uniform_goe);
+            has_grade |= grade.is_some();
+            let scoring_error = |error| Error::Scoring(ProgramScoreError::Element(error));
+            match base? {
+                BaseValueOutcome::Ignored => return Err(scoring_error(ElementScoreError::Ignored)),
+                BaseValueOutcome::NoValue => return Err(scoring_error(ElementScoreError::NoValue)),
+                BaseValueOutcome::Value(_) => {}
+            }
+            let Some(grade) = grade else { return Ok(None) };
+            let panel = panel.as_ref().map_err(Clone::clone)?;
+            let fall = inputs.and_then(|inputs| inputs.fall).or_else(|| {
+                inputs
+                    .is_none_or(|inputs| inputs.recognition.is_none() && inputs.execution.is_none())
+                    .then_some(false)
+            });
+            let score = match inputs.and_then(|inputs| inputs.execution.as_ref()) {
+                Some(execution) => {
+                    score_element_with_execution(table, panel, &[], grade, fall, execution)
+                }
+                None => score_element(table, panel, &[], grade, fall),
+            }
+            .map_err(scoring_error)?;
+            Ok(Some(crate::scoring::apply_credit(
+                score,
+                second_half.map_err(Error::Scoring)?,
+            )))
+        })
+        .collect();
+    let total = has_grade.then(|| {
+        crate::assessment::aggregate(elements.iter().map(|element| match element {
+            Ok(Some(score)) => Some(i64::from(score.score_hundredths)),
+            Err(Error::Scoring(ProgramScoreError::Element(
+                ElementScoreError::Ignored | ElementScoreError::NoValue,
+            ))) => Some(0),
+            _ => None,
+        }))
+    });
+    Ok(GoeScenarioPreview {
+        scoring_table: table,
+        ruleset,
+        second_half_boundary,
+        elements,
+        total,
+    })
+}
+
 /// Assess base value and covered composition rules from exact selections.
 /// A calculable value does not make a program legal. GOE and timing are absent.
 pub fn assess_manual_bv(
     registry: &ProfileRegistry,
     request: &ManualBvRequest,
 ) -> Result<ManualBvAssessment, ProfileSelectionError> {
-    let selection = Selection::new(registry, &request.profile, request.scoring_table)?;
     let profile = registry.resolve(&request.profile, request.scoring_table)?;
+    assess_selections(registry, profile, request).map(|(assessment, _, _)| assessment)
+}
+
+fn assess_selections(
+    registry: &ProfileRegistry,
+    profile: &RuleProfile,
+    request: &ManualBvRequest,
+) -> Result<(ManualBvAssessment, ProfileProgram, Vec<ElementPlanEvidence>), ProfileSelectionError> {
+    let selection = Selection::new(registry, &request.profile, request.scoring_table)?;
     let mut program = ProfileProgram {
         profile: request.profile.clone(),
         scoring_table: request.scoring_table,
@@ -130,11 +346,15 @@ pub fn assess_manual_bv(
         validation,
         scope,
     )?;
-    Ok(ManualBvAssessment {
-        elements,
-        total,
-        legality,
-    })
+    Ok((
+        ManualBvAssessment {
+            elements,
+            total,
+            legality,
+        },
+        program,
+        evidence,
+    ))
 }
 
 // Preserve the listed sum even when the compound shape cannot be credited.

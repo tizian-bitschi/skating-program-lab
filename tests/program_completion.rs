@@ -806,7 +806,8 @@ fn assumed_senior_completion_keeps_distinct_equal_bv_choices() {
     let profile = senior_profile(category);
     let registry = ProfileRegistry::senior();
     let generation = generation_defaults::request(profile.clone());
-    let original_codes = ["2A", "CCoSp4", "StSq4", "ChSq1", "ChSp1"].map(AssumedRecognition::new);
+    let original_codes =
+        ["2A", "3T", "CCoSp4", "StSq4", "ChSq1", "ChSp1"].map(AssumedRecognition::new);
     let addition_codes = ["FCSp4", "FLSp4"].map(AssumedRecognition::new);
     let originals = generate_program_candidates_with_assumed_recognition(
         &registry,
@@ -854,6 +855,16 @@ fn assumed_senior_completion_keeps_distinct_equal_bv_choices() {
     assert_eq!(result.candidates.len(), 2);
     let mut found = BTreeSet::new();
     for candidate in &result.candidates {
+        for (index, original) in q.original.iter().enumerate() {
+            assert!(matches!(
+                &candidate.provenance[index],
+                CompletionProvenance::Original { original_index, id, locked, .. }
+                    if *original_index == index && id == &original.id && *locked
+            ));
+            assert_eq!(candidate.assessment.request.entries[index], original.entry);
+        }
+        // Communication 2786: 2A, 3T, CCoSp4, StSq4, ChSq1, ChSp1 and either flying spin.
+        assert_eq!(candidate.total_base_hundredths, 2660);
         let manual = assess_manual_bv(
             &registry,
             &ManualBvRequest {

@@ -1078,7 +1078,7 @@ fn second_half_selection(
     Ok(indices[first..].to_vec())
 }
 
-fn apply_credit(score: ElementScore, second_half: bool) -> ProgramElementScore {
+pub(crate) fn apply_credit(score: ElementScore, second_half: bool) -> ProgramElementScore {
     let credited_base_hundredths = if second_half {
         factored_base(score.base.hundredths)
     } else {
@@ -1097,6 +1097,37 @@ fn apply_credit(score: ElementScore, second_half: bool) -> ProgramElementScore {
         score_hundredths,
         second_half_source,
     }
+}
+
+// Some(true) is an eligible jump, Some(false) cannot take a slot, and None
+// can take a slot only under unresolved recognition or scoring consequences.
+pub(crate) fn planning_credit(
+    eligibility: &[Option<bool>],
+    boundary: Option<usize>,
+) -> Vec<Result<bool, ProgramScoreError>> {
+    let mut credit = vec![Ok(false); eligibility.len()];
+    let mut certain_later = 0;
+    let mut possible_later = 0;
+    if let Some(boundary) = boundary {
+        for i in (boundary..eligibility.len()).rev() {
+            match eligibility[i] {
+                Some(true) => {
+                    credit[i] = if certain_later >= 3 {
+                        Ok(false)
+                    } else if possible_later < 3 {
+                        Ok(true)
+                    } else {
+                        Err(ProgramScoreError::TimingUnknown)
+                    };
+                    certain_later += 1;
+                    possible_later += 1;
+                }
+                Some(false) => {}
+                None => possible_later += 1,
+            }
+        }
+    }
+    credit
 }
 
 /// Timestamp-free single-judge what-if calculation. A boundary is an assumption, not timing evidence.
@@ -1167,43 +1198,30 @@ fn score_planning_internal(
             )
         })
         .collect();
-    let mut certain_later = 0usize;
-    let mut possible_later = 0usize;
-    let mut credit = vec![Ok(false); elements.len()];
-    if let Some(boundary) = second_half_boundary {
-        for i in (boundary..elements.len()).rev() {
-            let element = &elements[i];
-            let score = &preliminary[i];
+    let eligibility: Vec<_> = elements
+        .iter()
+        .zip(&preliminary)
+        .map(|(element, score)| {
             if matches!(
                 score,
                 Err(ProgramScoreError::Element(ElementScoreError::Ignored))
             ) {
-                continue;
+                return Some(false);
             }
-            if score.is_ok() && is_jump(element) == Some(true) {
-                credit[i] = if certain_later >= 3 {
-                    Ok(false)
-                } else if possible_later < 3 {
-                    Ok(true)
-                } else {
-                    Err(ProgramScoreError::TimingUnknown)
-                };
-                certain_later += 1;
-                possible_later += 1;
-            } else if score.is_err() && is_jump(element) != Some(false) {
-                // A no-value or unresolved element can affect selection unless known to be a non-jump.
-                let known_nonjump = element.recognition.details.as_ref().is_some_and(|details| {
-                    details
-                        .components()
-                        .iter()
-                        .all(|c| !c.as_str().starts_with(char::is_numeric))
-                });
-                if !known_nonjump || element.recognition.outcome == RecognitionOutcome::Unknown {
-                    possible_later += 1;
-                }
+            if score.is_ok() || is_jump(element) == Some(false) {
+                return Some(is_jump(element) == Some(true));
             }
-        }
-    }
+            let known_nonjump = element.recognition.details.as_ref().is_some_and(|details| {
+                details
+                    .components()
+                    .iter()
+                    .all(|c| !c.as_str().starts_with(char::is_numeric))
+            });
+            (known_nonjump && element.recognition.outcome != RecognitionOutcome::Unknown)
+                .then_some(false)
+        })
+        .collect();
+    let credit = planning_credit(&eligibility, second_half_boundary);
     let results: Vec<_> = preliminary
         .into_iter()
         .zip(credit)

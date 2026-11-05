@@ -51,6 +51,12 @@ The implemented bounded mixed-element scenario contract, finite domains, persona
 
 ## Product acceptance evidence
 
+The [milestone #89 matrix](milestone-89.md) covers the four BV-first
+workflows under assumed recognition in Adult and Senior profiles. Calculate
+BV and composition independently of any GOE request. An explicit GOE preview
+uses the selected program and published table, with indexed errors and an
+exact subtotal for resolved elements when the full scenario is incomplete.
+
 The [milestone #68 matrix](milestone-68.md) maps all four product workflows to
 shared public entry points, independent reference cases, negative scenarios and
 remaining coverage limits. A proven finite BV objective, complete declared
