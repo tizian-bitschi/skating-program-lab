@@ -353,3 +353,80 @@ fn manual_base_at_each_level_boundary_uses_the_exact_selection_source() {
         );
     }
 }
+
+#[test]
+fn explicit_policy_supports_registered_profiles_without_overriding_builtins() {
+    let mut registry = ProfileRegistry::adult();
+    let mut profile = adult_profile(AdultCategory::Silver);
+    let builtin = profile.id.clone();
+    profile.id.name = "test-custom-singles-free".into();
+    profile.provenance = ProfileProvenance::Synthetic;
+    profile.category = "Test custom singles".into();
+    let id = profile.id.clone();
+    registry.register(profile.clone()).unwrap();
+    let mut policy = adult_program_policy(AdultCategory::Silver);
+    policy.spins.profile = id.clone();
+    policy.spins.max_level = Level::Three;
+
+    assert!(selectable_elements(&registry, &id, TABLE).is_err());
+    let selected =
+        check_selectable_element_with_policy(&registry, &id, TABLE, "CCoSp3", &policy).unwrap();
+    assert!(
+        selectable_elements_with_policy(&registry, &id, TABLE, &policy)
+            .unwrap()
+            .contains(&selected)
+    );
+    assert!(matches!(
+        check_selectable_element_with_policy(&registry, &id, TABLE, "CCoSp4", &policy),
+        Err(ElementSelectionError::LevelNotSelectable(_))
+    ));
+    let plan = ProfileProgram {
+        profile: id.clone(),
+        scoring_table: TABLE,
+        elements: vec![PlannedElement::RegularSpin(RegularSpin {
+            entry: None,
+            steps: None,
+        })],
+    };
+    let assessment = assess_manual_program_with_assumed_recognition(
+        &registry,
+        &plan,
+        &[AssumedRecognition::new("CCoSp3")],
+        &policy,
+        SubmissionState::Draft,
+    )
+    .unwrap();
+    assert_eq!(
+        assessment.unfactored_base[0].source,
+        selected.row.source.reference("CCoSp3")
+    );
+
+    policy.spins.profile = builtin.clone();
+    assert!(selectable_elements_with_policy(&registry, &builtin, TABLE, &policy).is_err());
+    assert!(selectable_elements_with_policy(&registry, &id, TABLE, &policy).is_err());
+
+    profile.id.name = "test-custom-singles-short".into();
+    profile.segment = ProgramSegment::ShortProgram;
+    registry.register(profile.clone()).unwrap();
+    policy.spins.profile = profile.id.clone();
+    assert!(selectable_elements_with_policy(&registry, &profile.id, TABLE, &policy).is_err());
+    profile.id.name = "test-unsupported-official-free".into();
+    profile.segment = ProgramSegment::FreeSkating;
+    profile.provenance = ProfileProvenance::Official;
+    profile.bindings[0].mechanism = RuleMechanism::Unsupported("unimplemented".into());
+    registry.register(profile.clone()).unwrap();
+    policy.spins.profile = profile.id.clone();
+    assert!(matches!(
+        selectable_elements_with_policy(&registry, &profile.id, TABLE, &policy),
+        Err(ProfileSelectionError {
+            kind: ProfileErrorKind::Unsupported,
+            ..
+        })
+    ));
+    let mut unknown = id;
+    unknown.version = "unknown".into();
+    assert!(
+        check_selectable_element_with_policy(&registry, &unknown, TABLE, "CCoSp3", &policy)
+            .is_err()
+    );
+}

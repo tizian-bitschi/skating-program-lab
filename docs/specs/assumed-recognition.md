@@ -78,3 +78,9 @@ legality report still reports construction findings for a supplied plan.
 An available choice does not reserve a slot or satisfy any required role;
 those checks need the whole program. Compound jump units continue through
 the existing compound scoring and validation path.
+
+For a registered profile that uses supported rule mechanisms and supplies
+its own program policy, use `selectable_elements_with_policy` and
+`check_selectable_element_with_policy`. Both use the same checks as manual BV
+assessment. The explicit policy must be bound to that profile; it cannot
+override a built-in policy.

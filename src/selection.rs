@@ -55,16 +55,17 @@ pub fn selectable_elements(
     profile: &ProfileId,
     table: ScoringTableId,
 ) -> Result<Vec<SelectableElement>, ProfileSelectionError> {
-    let selection = Selection::new(registry, profile, table)?;
-    let mut options = Vec::new();
-    for row in crate::catalog::shared_rows(table) {
-        match selection.check_row(row) {
-            Ok(option) => options.push(option),
-            Err(ElementSelectionError::Profile(error)) => return Err(error),
-            Err(_) => {}
-        }
-    }
-    Ok(options)
+    Selection::new(registry, profile, table)?.list()
+}
+
+/// List choices for a registered profile with an explicit, profile-bound policy.
+pub fn selectable_elements_with_policy(
+    registry: &ProfileRegistry,
+    profile: &ProfileId,
+    table: ScoringTableId,
+    policy: &ProgramPolicy,
+) -> Result<Vec<SelectableElement>, ProfileSelectionError> {
+    Selection::for_policy(registry, registry.resolve(profile, table)?, table, policy)?.list()
 }
 
 /// Explain why an exact code is unavailable, without substituting another code.
@@ -75,6 +76,22 @@ pub fn check_selectable_element(
     code: &str,
 ) -> Result<SelectableElement, ElementSelectionError> {
     Selection::new(registry, profile, table)
+        .map_err(ElementSelectionError::Profile)?
+        .check(code)
+}
+
+/// Check an exact choice using an explicit, profile-bound policy.
+pub fn check_selectable_element_with_policy(
+    registry: &ProfileRegistry,
+    profile: &ProfileId,
+    table: ScoringTableId,
+    code: &str,
+    policy: &ProgramPolicy,
+) -> Result<SelectableElement, ElementSelectionError> {
+    let profile = registry
+        .resolve(profile, table)
+        .map_err(ElementSelectionError::Profile)?;
+    Selection::for_policy(registry, profile, table, policy)
         .map_err(ElementSelectionError::Profile)?
         .check(code)
 }
@@ -109,6 +126,13 @@ impl<'a> Selection<'a> {
         {
             return Err(unsupported_profile(profile));
         }
+        if policy.spins.profile != profile.id {
+            return Err(ProfileSelectionError {
+                profile: profile.id.clone(),
+                kind: ProfileErrorKind::Invalid,
+                reason: "Selection requires a program policy bound to the selected profile.".into(),
+            });
+        }
         crate::profiles::resolve_program_policy(profile, Some(policy))?;
         Ok(Self {
             registry,
@@ -116,6 +140,18 @@ impl<'a> Selection<'a> {
             table,
             policy: policy.clone(),
         })
+    }
+
+    fn list(&self) -> Result<Vec<SelectableElement>, ProfileSelectionError> {
+        let mut options = Vec::new();
+        for row in crate::catalog::shared_rows(self.table) {
+            match self.check_row(row) {
+                Ok(option) => options.push(option),
+                Err(ElementSelectionError::Profile(error)) => return Err(error),
+                Err(_) => {}
+            }
+        }
+        Ok(options)
     }
 
     pub(crate) fn check_assumption(
