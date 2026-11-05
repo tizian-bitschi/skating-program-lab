@@ -12,13 +12,21 @@ index references are rebound to their new completed positions.
 
 Completion extends the shared ordered Pumpkin model: each original has one
 channelled position, positions increase, and forbidden gaps exclude additions.
-It optimizes the full completed catalog BV and uses the existing whole-program
-validator for every proposal. It reports separate existing/added/total BV and
-reassesses each completion with the manual assessment API. GOE is preserved as
+The evidence-based `complete_program` API optimizes the completed unfactored
+catalog BV. `complete_program_with_assumed_recognition` optimizes the completed
+credited BV over the explicit SOV selections, with the proof limits described
+below. Both use the shared whole-program validator, report separate
+existing/added/total BV, and reassess each completion with the manual API. GOE is preserved as
 an optional scenario and never enters the objective. Unknown or unsupported
 original recognition is an explicit error with its draft assessment; immutable
 violations are a different error. Missing required draft elements can be repaired.
 Unsupported requested addition definitions fail even when excluded.
+
+For assumed recognition, the returned request retains the caller's original
+entries and their full evidence. The draft and completed assessments contain
+the separate evidence resolved from the selected SOV codes. Completion
+provenance links each assessed original to its unchanged request entry by ID
+and original index.
 
 Personal predicates filter additions only. Explicit global predicates also
 check originals and report conflicting IDs; global variant indices are invalid.
@@ -130,7 +138,11 @@ jump optimizer. It does not enumerate the full cross-product up front. Whole
 proposals pass the shared validator; rejected assignments are blocked lazily.
 Every proposal that can become a candidate is checked against the shared
 validator and scored independently of solver values. The evidence-based APIs
-retain their unfactored table-BV objective. Their technical evidence and
+retain their unfactored BV objective. The entry point determines the
+reported `effective_objective`. Candidate `listed_per_element` values are the
+ordered scoring inputs before program-context credit. In evidence-based
+completion they can include explicitly supplied calls. Candidate `per_element`
+values are the ordered values used by the objective. Their technical evidence and
 validation do not prove a contextual BV maximum.
 
 The assumed-recognition APIs use the same credited BV resolver as manual

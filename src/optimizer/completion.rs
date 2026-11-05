@@ -61,6 +61,9 @@ pub struct CompletedProgramCandidate {
     pub program: ProfileProgram,
     pub evidence: Vec<ElementPlanEvidence>,
     pub provenance: Vec<CompletionProvenance>,
+    /// Ordered input values before program-context credit.
+    pub listed_per_element: Vec<BaseValue>,
+    /// Ordered values used for the objective.
     pub per_element: Vec<BaseValue>,
     pub existing_base_hundredths: u32,
     pub added_base_hundredths: u32,
@@ -72,6 +75,7 @@ pub struct CompletedProgramCandidate {
 #[derive(Debug, Clone)]
 pub struct ProgramCompletionResult {
     pub request: ProgramCompletionRequest,
+    pub effective_objective: ProgramSearchObjective,
     pub original_assessment: ManualProgramAssessment,
     pub status: OptimizerStatus,
     pub enumeration_complete: bool,
@@ -368,7 +372,7 @@ fn completed_candidate(
     request: &ProgramCompletionRequest,
     ruleset: RulesetId,
     candidate: ProgramCandidate,
-    assumed_values: Option<&[BaseValue]>,
+    assumed: bool,
 ) -> Result<CompletedProgramCandidate, ProgramCompletionError> {
     use ProgramCompletionError as E;
     let mut entries = vec![];
@@ -401,22 +405,15 @@ fn completed_candidate(
                 ordinal,
             });
             ordinal += 1;
-            inserted_entry(&request.variants[v], ruleset, assumed_values.is_some())
+            inserted_entry(&request.variants[v], ruleset, assumed)
         };
         entry.reindex_recognition(index);
         entries.push(entry);
     }
-    let listed_values = assumed_values.map(|values| {
-        candidate
-            .variant_indices
-            .iter()
-            .map(|&i| values[i].clone())
-            .collect::<Vec<_>>()
-    });
     let assessment = crate::assessment::assess_manual_scope(
         registry,
         &manual(request, entries, SubmissionState::Complete),
-        listed_values.as_deref(),
+        assumed.then_some(candidate.listed_per_element.as_slice()),
     )
     .map_err(E::Profile)?;
     if assessment.intended_base.exact_hundredths != Some(i64::from(candidate.base_hundredths))
@@ -428,6 +425,7 @@ fn completed_candidate(
         program: candidate.program,
         evidence: candidate.evidence,
         provenance,
+        listed_per_element: candidate.listed_per_element,
         per_element: candidate.per_element,
         existing_base_hundredths,
         added_base_hundredths: candidate.base_hundredths - existing_base_hundredths,
@@ -541,13 +539,14 @@ fn complete(
                 request,
                 profile.scoring.recognition_ruleset,
                 c,
-                assumed_values,
+                assumed,
             )
         })
         .collect::<Result<Vec<_>, _>>()?;
     Ok(ProgramCompletionResult {
         request: request.clone(),
         original_assessment,
+        effective_objective: search.effective_objective,
         status: search.status,
         enumeration_complete: search.enumeration_complete,
         termination_reason: search.termination_reason,

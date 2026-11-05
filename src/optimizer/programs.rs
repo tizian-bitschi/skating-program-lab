@@ -67,11 +67,21 @@ pub enum ProgramEquivalence {
     OrderedVariants,
 }
 
+/// The scoring objective selected by the program search entry point.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ProgramSearchObjective {
+    UnfactoredBaseValueHundredths,
+    CreditedBaseValueHundredths,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ProgramCandidate {
     pub program: ProfileProgram,
     pub variant_indices: Vec<usize>,
     pub evidence: Vec<ElementPlanEvidence>,
+    /// Ordered input values before program-context credit.
+    pub listed_per_element: Vec<BaseValue>,
+    /// Ordered values used for the objective.
     pub per_element: Vec<BaseValue>,
     pub base_hundredths: u32,
     pub validation: EvidenceValidationReport,
@@ -80,6 +90,7 @@ pub struct ProgramCandidate {
 #[derive(Debug, Clone)]
 pub struct ProgramOptimizationResult {
     pub request: ProgramOptimizationRequest,
+    pub effective_objective: ProgramSearchObjective,
     pub universe: Vec<usize>,
     pub excluded_variants: Vec<usize>,
     pub unmodeled_variants: &'static str,
@@ -316,6 +327,57 @@ pub(super) fn prepare_with_base(
     })
 }
 
+fn credited_values(
+    profile: &RuleProfile,
+    program: &ProfileProgram,
+    evidence: &[ElementPlanEvidence],
+    credit_blocks: &crate::validation::JumpCreditBlocks,
+    listed_values: &[BaseValue],
+    validation: &mut EvidenceValidationReport,
+) -> Result<Vec<BaseValue>, ProgramOptimizationError> {
+    crate::assumed_recognition::assumed_credit(
+        profile,
+        &program.elements,
+        evidence,
+        credit_blocks,
+        listed_values.iter().map(Some),
+    )
+    .into_iter()
+    .zip(listed_values)
+    .enumerate()
+    .map(|(index, (credit, listed))| {
+        let credited = match credit {
+            Ok(BaseValueOutcome::Value(value)) => value,
+            Err(error) => return Err(ProgramOptimizationError::Scoring(error)),
+            _ => {
+                return Err(ProgramOptimizationError::Scoring(
+                    BaseValueError::Unsupported,
+                ))
+            }
+        };
+        // Assumed recognition resolves exact clean table values. The only
+        // supported contextual adjustment is a non-increasing repetition credit.
+        if credited.hundredths > listed.hundredths {
+            return Err(ProgramOptimizationError::InconsistentSolverResult);
+        }
+        if credited != *listed {
+            let repetition = profile.binding(ProfileRule::Repetition);
+            crate::validation::record_rule(
+                &mut validation.applied_rules,
+                repetition.id,
+                Some(index),
+                None,
+                &repetition.source,
+            );
+            if !validation.sources.contains(&repetition.source) {
+                validation.sources.push(repetition.source.clone());
+            }
+        }
+        Ok(credited)
+    })
+    .collect()
+}
+
 fn checked(
     registry: &ProfileRegistry,
     request: &ProgramOptimizationRequest,
@@ -392,47 +454,14 @@ fn checked(
         let profile = registry
             .resolve(&request.profile, request.scoring_table)
             .map_err(ProgramOptimizationError::Profile)?;
-        crate::assumed_recognition::assumed_credit(
+        credited_values(
             profile,
-            &program.elements,
+            &program,
             &evidence,
             &credit_blocks,
-            listed_values.iter().map(Some),
-        )
-        .into_iter()
-        .zip(&listed_values)
-        .enumerate()
-        .map(|(index, (credit, listed))| {
-            let credited = match credit {
-                Ok(BaseValueOutcome::Value(value)) => value,
-                Err(error) => return Err(ProgramOptimizationError::Scoring(error)),
-                _ => {
-                    return Err(ProgramOptimizationError::Scoring(
-                        BaseValueError::Unsupported,
-                    ))
-                }
-            };
-            // Assumed recognition resolves exact clean table values. The only
-            // supported contextual adjustment is a non-increasing repetition credit.
-            if credited.hundredths > listed.hundredths {
-                return Err(ProgramOptimizationError::InconsistentSolverResult);
-            }
-            if credited != *listed {
-                let repetition = profile.binding(ProfileRule::Repetition);
-                crate::validation::record_rule(
-                    &mut validation.applied_rules,
-                    repetition.id,
-                    Some(index),
-                    None,
-                    &repetition.source,
-                );
-                if !validation.sources.contains(&repetition.source) {
-                    validation.sources.push(repetition.source.clone());
-                }
-            }
-            Ok(credited)
-        })
-        .collect::<Result<Vec<_>, _>>()?
+            &listed_values,
+            &mut validation,
+        )?
     } else {
         listed_values.clone()
     };
@@ -456,6 +485,7 @@ fn checked(
         program,
         variant_indices: indices.to_vec(),
         evidence,
+        listed_per_element: listed_values,
         per_element,
         base_hundredths,
         validation,
@@ -616,7 +646,11 @@ pub(super) fn optimize_anchored(
             }
         }
     }
-    let mut result = ProgramOptimizationResult { request: request.clone(), universe, excluded_variants,
+    let effective_objective = match scope {
+        EvaluationScope::AssumedRecognition => ProgramSearchObjective::CreditedBaseValueHundredths,
+        EvaluationScope::EvidenceBased => ProgramSearchObjective::UnfactoredBaseValueHundredths,
+    };
+    let mut result = ProgramOptimizationResult { request: request.clone(), effective_objective, universe, excluded_variants,
         unmodeled_variants: "Unlisted variants, Euler consequences, difficult-variation categories, unsupported feature prerequisites, Pair rules and physical skateability are outside this model.",
         equivalence: "Identical ordered candidate variants including evidence; duplicate variants are rejected.",
         proof_scope: "Finite supplied recognized Single Free Skating scenarios and implemented applicable rules only; never full real-world ISU compliance or an official/global maximum.",

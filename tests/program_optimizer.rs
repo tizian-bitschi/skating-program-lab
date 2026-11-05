@@ -470,6 +470,14 @@ fn assumed_silver_axel_sequence_reaches_optimizer_scoring_and_shared_validation(
     assert_eq!(simple.status, OptimizerStatus::OptimalProven);
     assert_eq!(simple.candidates[0].base_hundredths, 280);
     let r = result(&req);
+    assert_eq!(
+        r.effective_objective,
+        ProgramSearchObjective::UnfactoredBaseValueHundredths
+    );
+    assert_eq!(
+        r.candidates[0].listed_per_element,
+        r.candidates[0].per_element
+    );
     assert_eq!(r.status, OptimizerStatus::OptimalProven);
     assert!(r.enumeration_complete);
     assert_eq!(ids(&r), BTreeSet::from([vec![0, 1], vec![1, 0]]));
@@ -727,11 +735,25 @@ fn assumed_senior_credited_optima_match_literal_ordered_oracle() {
         assert_ne!(raw.0, best);
         let result = optimize_program_with_assumed_recognition(&registry, &q, &choices).unwrap();
         assert_eq!(result.status, OptimizerStatus::OptimalProven);
+        assert_eq!(
+            result.effective_objective,
+            ProgramSearchObjective::CreditedBaseValueHundredths
+        );
         assert!(result.enumeration_complete);
         assert_eq!(ids(&result), ties);
         assert_eq!(result.candidates.len(), ties.len());
         for candidate in result.candidates {
             assert_eq!(candidate.base_hundredths, best);
+            let listed_axels: Vec<_> = candidate
+                .listed_per_element
+                .iter()
+                .filter(|v| v.notation == "3A")
+                .map(|v| v.hundredths)
+                .collect();
+            assert_eq!(
+                listed_axels,
+                if excluded { vec![800, 800] } else { vec![800] }
+            );
             let axels = candidate
                 .per_element
                 .iter()

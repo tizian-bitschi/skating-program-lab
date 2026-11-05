@@ -651,10 +651,6 @@ fn assumed_completion_keeps_original_plan_and_uses_no_panel_outcomes() {
     for original in &mut q.original {
         original.entry.intended_recognition = None;
     }
-    q.original[1].entry.planned = PlannedElement::RegularSpin(RegularSpin {
-        entry: None,
-        steps: None,
-    });
     let originals = ["1A", "SSp2"].map(AssumedRecognition::new);
     let additions = ["1T", "1S"].map(AssumedRecognition::new);
     let result = complete_program_with_assumed_recognition(
@@ -666,6 +662,13 @@ fn assumed_completion_keeps_original_plan_and_uses_no_panel_outcomes() {
     .unwrap();
     assert_eq!(result.status, OptimizerStatus::OptimalProven);
     assert_eq!(result.request.original[1].entry, q.original[1].entry);
+    assert!(matches!(
+        &result.request.original[1].entry.evidence,
+        ElementPlanEvidence::Spin {
+            spin: RegularSpinEvidence { feature_attempts: Some(attempts), .. },
+            local_feature_qualification_assumed: true,
+        } if !attempts.is_empty()
+    ));
     let resolved_spin = &result.original_assessment.request.entries[1].evidence;
     assert_ne!(resolved_spin, &q.original[1].entry.evidence);
     assert!(matches!(
@@ -682,7 +685,17 @@ fn assumed_completion_keeps_original_plan_and_uses_no_panel_outcomes() {
     for (index, provenance) in candidate.provenance.iter().enumerate() {
         let entry = &candidate.assessment.request.entries[index];
         assert!(entry.intended_recognition.is_none() && entry.scenario.is_none());
-        if let CompletionProvenance::Original { original_index, .. } = provenance {
+        if let CompletionProvenance::Original {
+            id,
+            original_index,
+            locked,
+        } = provenance
+        {
+            let original = &result.request.original[*original_index];
+            assert_eq!(id, &original.id);
+            assert!(*locked && original.locked);
+            assert_eq!(entry.planned, original.entry.planned);
+            assert_eq!(entry.evidence, candidate.evidence[index]);
             assert_eq!(
                 entry,
                 &result.original_assessment.request.entries[*original_index]
@@ -938,6 +951,10 @@ fn assumed_senior_completion_credits_the_second_axel_in_each_allowed_gap() {
     let result =
         complete_program_with_assumed_recognition(&registry, &q, &codes, &codes[..1]).unwrap();
     assert_eq!(result.status, OptimizerStatus::OptimalProven);
+    assert_eq!(
+        result.effective_objective,
+        ProgramSearchObjective::CreditedBaseValueHundredths
+    );
     assert!(result.enumeration_complete);
     assert_eq!(result.candidates.len(), codes.len() + 1);
     let mut gaps = BTreeSet::new();
@@ -976,6 +993,8 @@ fn assumed_senior_completion_credits_the_second_axel_in_each_allowed_gap() {
             };
             selected.push(code.clone());
             if code.code == "3A" {
+                assert_eq!(candidate.listed_per_element[index].notation, "3A");
+                assert_eq!(candidate.listed_per_element[index].hundredths, 800);
                 axels.push((
                     candidate.per_element[index].notation.as_str(),
                     candidate.per_element[index].hundredths,
