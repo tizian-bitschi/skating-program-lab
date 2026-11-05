@@ -1,5 +1,7 @@
 # Implementation status
 
+[Assumed recognition](specs/assumed-recognition.md) supports explicit SOV selections in manual assessment, legality, finite candidate generation, optimization and locked completion. The coverage contract lists the execution checks outside that mode and the Senior repetition limit of the solver.
+
 The [Senior Grand Prix parent audit (#75)](milestone-75.md) connects the six
 merged workstreams to their tests and limitations. An eleven-slot conditional
 plan preserves Ami NAKAI's source jump structure and family order, completes in

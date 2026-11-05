@@ -14,6 +14,8 @@ pub use plan::*;
 pub use senior::{
     senior_profile, senior_program_policy, senior_regular_spin_policy, SeniorCategory,
 };
+mod assumed_recognition;
+pub use assumed_recognition::*;
 mod assessment;
 pub use assessment::*;
 mod program_validation;

@@ -1,4 +1,5 @@
 //! Deterministic finite generation; the common validator owns skating rules.
+use crate::program_validation::EvaluationScope;
 use crate::*;
 
 /// A finite plan/evidence contract, not an inferred panel decision.
@@ -106,6 +107,7 @@ struct Generator<'a> {
     request: &'a CandidateGenerationRequest,
     policy: ProgramPolicy,
     result: CandidateGenerationResult,
+    assumed_values: Option<&'a [BaseValue]>,
 }
 impl Generator<'_> {
     /// false stops expansion; true includes omissions and duplicates.
@@ -126,7 +128,7 @@ impl Generator<'_> {
         } else {
             self.result.audit.attempted_definitions += 1;
         }
-        let reason = self.check(&variant)?;
+        let reason = self.check(&variant, manual)?;
         if let Some(reason) = reason {
             if let Some(index) = manual {
                 return Err(CandidateGenerationError::InvalidManualVariant { index, reason });
@@ -137,13 +139,15 @@ impl Generator<'_> {
                 .push(CandidateOmission { variant, reason });
             return Ok(true);
         }
-        if self
-            .request
-            .exclusions
-            .iter()
-            .any(|x| super::programs::excluded(&variant, x, usize::MAX))
-            || exceeds_skill(&variant, &self.request.skill_limits)
-            || spin_filtered(&variant, self.request)
+        if self.request.exclusions.iter().any(|x| {
+            super::programs::excluded_in_scope(
+                &variant,
+                x,
+                usize::MAX,
+                self.assumed_values.is_some(),
+            )
+        }) || exceeds_skill(&variant, &self.request.skill_limits)
+            || spin_filtered(&variant, self.request, self.assumed_values.is_some())
         {
             self.result.audit.omissions.push(CandidateOmission {
                 variant,
@@ -179,14 +183,29 @@ impl Generator<'_> {
     fn check(
         &mut self,
         variant: &ProgramVariant,
+        manual: Option<usize>,
     ) -> Result<Option<String>, CandidateGenerationError> {
-        let prepared = match super::programs::prepare_variant(
-            self.registry,
-            &self.request.profile,
-            self.request.scoring_table,
-            &self.policy,
-            variant,
-        ) {
+        let prepared = if let Some(values) = self.assumed_values {
+            let index = manual.expect("assumed domain contains explicit selections only");
+            super::programs::prepare_with_base(
+                self.registry,
+                &self.request.profile,
+                self.request.scoring_table,
+                &self.policy,
+                variant,
+                values[index].clone(),
+                EvaluationScope::AssumedRecognition,
+            )
+        } else {
+            super::programs::prepare_variant(
+                self.registry,
+                &self.request.profile,
+                self.request.scoring_table,
+                &self.policy,
+                variant,
+            )
+        };
+        let prepared = match prepared {
             Ok(prepared) => prepared,
             Err(ProgramOptimizationError::Profile(e)) => {
                 return Err(CandidateGenerationError::Profile(e))
@@ -217,11 +236,18 @@ impl Generator<'_> {
     }
 }
 
-fn spin_filtered(variant: &ProgramVariant, request: &CandidateGenerationRequest) -> bool {
+fn spin_filtered(
+    variant: &ProgramVariant,
+    request: &CandidateGenerationRequest,
+    assumed: bool,
+) -> bool {
     let PlannedElement::RegularSpin(spin) = &variant.element else {
         return false;
     };
-    spin.entry.is_some_and(|entry| request.excluded_spin_entries.contains(&entry))
+    spin.entry.or_else(|| match &variant.evidence {
+        ElementPlanEvidence::Spin { spin, .. } if assumed => spin.abbreviation.map(|a| a.entry),
+        _ => None,
+    }).is_some_and(|entry| request.excluded_spin_entries.contains(&entry))
         || spin.steps.iter().flatten().any(|step| matches!(step, SpinStep::Position { position: Some(p), .. } if request.excluded_spin_positions.contains(p)))
 }
 
@@ -269,6 +295,96 @@ fn jump_variant(
 pub fn generate_program_candidates(
     registry: &ProfileRegistry,
     request: &CandidateGenerationRequest,
+) -> Result<CandidateGenerationResult, CandidateGenerationError> {
+    generate_candidates(registry, request, None)
+}
+
+/// Generated domain plus SOV provenance in returned variant order.
+#[derive(Debug, Clone)]
+pub struct AssumedCandidateGenerationResult {
+    pub domain: CandidateGenerationResult,
+    pub input_indices: Vec<usize>,
+    pub recognition: Vec<AssumedRecognition>,
+}
+
+/// Generate a finite domain from explicit SOV selections for the manual variants.
+/// Automatic evidence templates and automatic jump expansion belong to the detailed API.
+pub fn generate_program_candidates_with_assumed_recognition(
+    registry: &ProfileRegistry,
+    request: &CandidateGenerationRequest,
+    recognition: &[AssumedRecognition],
+) -> Result<AssumedCandidateGenerationResult, CandidateGenerationError> {
+    use CandidateGenerationError as E;
+    if request.solo_jumps
+        || request.direct_combinations
+        || request.axel_sequences
+        || !request.base_spins.is_empty()
+        || !request.spin_plans.is_empty()
+        || !request.movement_plans.is_empty()
+    {
+        return Err(E::InvalidRequest(
+            "assumed generation requires an explicit SOV selection for each variant",
+        ));
+    }
+    if !request.excluded_spin_positions.is_empty()
+        || request.skill_limits.max_position_revolutions.is_some()
+        || request
+            .exclusions
+            .iter()
+            .any(|e| matches!(e, PersonalExclusion::SpinFeature(_)))
+    {
+        return Err(E::InvalidRequest(
+            "position, revolution and feature filters require detailed spin evidence",
+        ));
+    }
+    let mut request = request.clone();
+    let ruleset = registry
+        .resolve(&request.profile, request.scoring_table)
+        .map_err(E::Profile)?
+        .scoring
+        .recognition_ruleset;
+    let values = super::programs::resolve_variants(
+        request.scoring_table,
+        &mut request.manual_variants,
+        recognition,
+        ruleset,
+    )
+    .map_err(|error| match error {
+        ProgramOptimizationError::UnsupportedVariant(index) => E::InvalidManualVariant {
+            index,
+            reason: "SOV code is unsupported or does not match the plan".into(),
+        },
+        _ => E::InvalidRequest("supply one SOV selection per variant"),
+    })?;
+    request.recognition_assumed = true;
+    let mut result = generate_candidates(registry, &request, Some(&values))?;
+    result.audit.assumptions = super::programs::ASSUMED_SCOPE;
+    result.audit.declared_domain = "Explicit finite SOV selections in input order.";
+    let input_indices: Vec<_> = result
+        .variants
+        .iter()
+        .map(|variant| {
+            request
+                .manual_variants
+                .iter()
+                .position(|input| super::programs::normalize_variant(input.clone()) == *variant)
+                .expect("generated assumed variants originate from explicit inputs")
+        })
+        .collect();
+    Ok(AssumedCandidateGenerationResult {
+        recognition: input_indices
+            .iter()
+            .map(|&i| recognition[i].clone())
+            .collect(),
+        domain: result,
+        input_indices,
+    })
+}
+
+fn generate_candidates(
+    registry: &ProfileRegistry,
+    request: &CandidateGenerationRequest,
+    assumed_values: Option<&[BaseValue]>,
 ) -> Result<CandidateGenerationResult, CandidateGenerationError> {
     use CandidateGenerationError as E;
     let profile = registry
@@ -350,6 +466,7 @@ pub fn generate_program_candidates(
         registry,
         request,
         policy,
+        assumed_values,
         result: CandidateGenerationResult {
             variants: vec![],
             audit: CandidateGenerationAudit {

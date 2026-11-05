@@ -123,12 +123,12 @@ fn variant(entry: &ManualProgramEntry) -> ProgramVariant {
     }
 }
 
-fn inserted_entry(v: &ProgramVariant, ruleset: RulesetId) -> ManualProgramEntry {
+fn inserted_entry(v: &ProgramVariant, ruleset: RulesetId, assumed: bool) -> ManualProgramEntry {
     ManualProgramEntry {
         planned: v.element.clone(),
         evidence: v.evidence.clone(),
         scenario: None,
-        intended_recognition: Some(PanelRecognition {
+        intended_recognition: (!assumed).then(|| PanelRecognition {
             ruleset,
             source: None,
             planned_element: None,
@@ -218,6 +218,7 @@ fn validate_request(
 
 fn check_global_conflicts(
     request: &ProgramCompletionRequest,
+    assumed: bool,
 ) -> Result<(), ProgramCompletionError> {
     use ProgramCompletionError as E;
     let conflicts: Vec<_> = request
@@ -227,7 +228,7 @@ fn check_global_conflicts(
             request
                 .global_exclusions
                 .iter()
-                .any(|x| programs::excluded(&variant(&e.entry), x, usize::MAX))
+                .any(|x| programs::excluded_in_scope(&variant(&e.entry), x, usize::MAX, assumed))
         })
         .map(|e| e.id.clone())
         .collect();
@@ -241,15 +242,17 @@ fn prepare_originals(
     registry: &ProfileRegistry,
     request: &ProgramCompletionRequest,
     profile: &RuleProfile,
+    assumed_values: Option<&[BaseValue]>,
 ) -> Result<(ManualProgramAssessment, Vec<BaseValue>), ProgramCompletionError> {
     use ProgramCompletionError as E;
-    let assessment = assess_manual_program(
+    let assessment = crate::assessment::assess_manual_scope(
         registry,
         &manual(
             request,
             request.original.iter().map(|e| e.entry.clone()).collect(),
             SubmissionState::Draft,
         ),
+        assumed_values,
     )
     .map_err(E::Profile)?;
     if assessment.status == AssessmentStatus::ConfirmedViolation {
@@ -280,6 +283,7 @@ fn prepare_search(
     original_values: Vec<BaseValue>,
     absolute: Vec<(usize, usize)>,
     start: Instant,
+    assumed: bool,
 ) -> (ProgramOptimizationRequest, AnchoredPlacement) {
     let n = request.original.len();
     // Exclusions select additions only. Original variants use separate solver identities.
@@ -287,7 +291,10 @@ fn prepare_search(
     let mut exclusions = request.exclusions.clone();
     exclusions.extend(request.global_exclusions.clone());
     for (i, v) in request.variants.iter().enumerate() {
-        if exclusions.iter().any(|x| programs::excluded(v, x, i)) {
+        if exclusions
+            .iter()
+            .any(|x| programs::excluded_in_scope(v, x, i, assumed))
+        {
             // Convert predicates to addition-only indices before appending originals.
             if !exclusions.contains(&PersonalExclusion::Variant(i)) {
                 exclusions.push(PersonalExclusion::Variant(i));
@@ -324,7 +331,7 @@ fn prepare_search(
     let mut identities: Vec<_> = request
         .variants
         .iter()
-        .map(|v| inserted_entry(v, profile.scoring.recognition_ruleset))
+        .map(|v| inserted_entry(v, profile.scoring.recognition_ruleset, assumed))
         .collect();
     identities.extend(request.original.iter().map(|e| e.entry.clone()));
     for entry in &mut identities {
@@ -361,6 +368,7 @@ fn completed_candidate(
     request: &ProgramCompletionRequest,
     ruleset: RulesetId,
     candidate: ProgramCandidate,
+    assumed: bool,
 ) -> Result<CompletedProgramCandidate, ProgramCompletionError> {
     use ProgramCompletionError as E;
     let mut entries = vec![];
@@ -393,14 +401,15 @@ fn completed_candidate(
                 ordinal,
             });
             ordinal += 1;
-            inserted_entry(&request.variants[v], ruleset)
+            inserted_entry(&request.variants[v], ruleset, assumed)
         };
         entry.reindex_recognition(index);
         entries.push(entry);
     }
-    let assessment = assess_manual_program(
+    let assessment = crate::assessment::assess_manual_scope(
         registry,
         &manual(request, entries, SubmissionState::Complete),
+        assumed.then_some(candidate.per_element.as_slice()),
     )
     .map_err(E::Profile)?;
     if assessment.intended_base.exact_hundredths != Some(i64::from(candidate.base_hundredths))
@@ -426,21 +435,130 @@ pub fn complete_program(
     registry: &ProfileRegistry,
     request: &ProgramCompletionRequest,
 ) -> Result<ProgramCompletionResult, ProgramCompletionError> {
+    complete(registry, request, None)
+}
+
+/// Complete the ordered program with explicit SOV selections for originals and
+/// addition variants, each in the same order as the corresponding input list.
+pub fn complete_program_with_assumed_recognition(
+    registry: &ProfileRegistry,
+    request: &ProgramCompletionRequest,
+    original_recognition: &[AssumedRecognition],
+    variant_recognition: &[AssumedRecognition],
+) -> Result<ProgramCompletionResult, ProgramCompletionError> {
+    use ProgramCompletionError as E;
+    if request.original.len() != original_recognition.len() {
+        return Err(E::InvalidRequest("supply one SOV selection per original"));
+    }
+    if request
+        .exclusions
+        .iter()
+        .chain(&request.global_exclusions)
+        .any(|e| matches!(e, PersonalExclusion::SpinFeature(_)))
+    {
+        return Err(E::InvalidRequest(
+            "spin feature exclusions require detailed evidence",
+        ));
+    }
+    let original_request = request;
+    let mut request = request.clone();
+    let ruleset = registry
+        .resolve(&request.profile, request.scoring_table)
+        .map_err(E::Profile)?
+        .scoring
+        .recognition_ruleset;
+    let mut values = programs::resolve_variants(
+        request.scoring_table,
+        &mut request.variants,
+        variant_recognition,
+        ruleset,
+    )
+    .map_err(E::Optimization)?;
+    for (original, recognition) in request.original.iter_mut().zip(original_recognition) {
+        if original.entry.recognitions().next().is_some() {
+            return Err(E::InvalidRequest(
+                "assumed completion originals cannot carry panel recognition",
+            ));
+        }
+        let (evidence, value) = recognition
+            .resolve(
+                request.scoring_table,
+                &original.entry.planned,
+                ruleset,
+                Some(&original.entry.evidence),
+            )
+            .ok_or(E::InvalidRequest(
+                "original SOV code is unsupported or does not match the plan",
+            ))?;
+        original.entry.evidence = evidence;
+        values.push(value);
+    }
+    let mut result = complete(registry, &request, Some(&values))?;
+    result.assumptions = programs::ASSUMED_SCOPE;
+    result.request = original_request.clone();
+    for (entry, original) in result
+        .original_assessment
+        .request
+        .entries
+        .iter_mut()
+        .zip(&original_request.original)
+    {
+        *entry = original.entry.clone();
+    }
+    for candidate in &mut result.candidates {
+        for (entry, provenance) in candidate
+            .assessment
+            .request
+            .entries
+            .iter_mut()
+            .zip(&candidate.provenance)
+        {
+            if let CompletionProvenance::Original { original_index, .. } = provenance {
+                *entry = original_request.original[*original_index].entry.clone();
+            }
+        }
+    }
+    Ok(result)
+}
+
+fn complete(
+    registry: &ProfileRegistry,
+    request: &ProgramCompletionRequest,
+    assumed_values: Option<&[BaseValue]>,
+) -> Result<ProgramCompletionResult, ProgramCompletionError> {
     use ProgramCompletionError as E;
     let start = Instant::now();
     let profile = registry
         .resolve(&request.profile, request.scoring_table)
         .map_err(E::Profile)?;
     let absolute = validate_request(request, profile)?;
-    check_global_conflicts(request)?;
-    let (original_assessment, values) = prepare_originals(registry, request, profile)?;
-    let (search_request, placement) = prepare_search(request, profile, values, absolute, start);
-    let search = programs::optimize_anchored(registry, &search_request, false, Some(&placement))
-        .map_err(E::Optimization)?;
+    let assumed = assumed_values.is_some();
+    check_global_conflicts(request, assumed)?;
+    let original_values = assumed_values.map(|values| &values[request.variants.len()..]);
+    let (original_assessment, values) =
+        prepare_originals(registry, request, profile, original_values)?;
+    let (search_request, placement) =
+        prepare_search(request, profile, values, absolute, start, assumed);
+    let search = programs::optimize_anchored(
+        registry,
+        &search_request,
+        false,
+        Some(&placement),
+        assumed_values,
+    )
+    .map_err(E::Optimization)?;
     let candidates = search
         .candidates
         .into_iter()
-        .map(|c| completed_candidate(registry, request, profile.scoring.recognition_ruleset, c))
+        .map(|c| {
+            completed_candidate(
+                registry,
+                request,
+                profile.scoring.recognition_ruleset,
+                c,
+                assumed,
+            )
+        })
         .collect::<Result<Vec<_>, _>>()?;
     Ok(ProgramCompletionResult {
         request: request.clone(),

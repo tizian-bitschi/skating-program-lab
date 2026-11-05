@@ -640,3 +640,68 @@ fn fixed_repetition_call_preserves_recognition_and_reduced_objective() {
     // Supplied solo +REP uses the existing 80% BV path, not an inferred call.
     fixed_call_case(PanelCall::Repetition, CallTarget::Element, 88);
 }
+
+#[test]
+fn assumed_completion_keeps_original_plan_and_uses_no_panel_outcomes() {
+    let mut q = request();
+    for original in &mut q.original {
+        original.entry.intended_recognition = None;
+    }
+    q.original[1].entry.planned = PlannedElement::RegularSpin(RegularSpin {
+        entry: None,
+        steps: None,
+    });
+    let originals = ["1A", "SSp2"].map(AssumedRecognition::new);
+    let additions = ["1T", "1S"].map(AssumedRecognition::new);
+    let result = complete_program_with_assumed_recognition(
+        &ProfileRegistry::adult(),
+        &q,
+        &originals,
+        &additions,
+    )
+    .unwrap();
+    assert_eq!(result.status, OptimizerStatus::OptimalProven);
+    let candidate = &result.candidates[0];
+    for (index, provenance) in candidate.provenance.iter().enumerate() {
+        let entry = &candidate.assessment.request.entries[index];
+        assert!(entry.intended_recognition.is_none() && entry.scenario.is_none());
+        if let CompletionProvenance::Original { original_index, .. } = provenance {
+            assert_eq!(*entry, q.original[*original_index].entry);
+            assert_eq!(
+                candidate.per_element[index].notation,
+                originals[*original_index].code
+            );
+        }
+    }
+    assert_eq!(
+        candidate.assessment.intended_base.exact_hundredths,
+        Some(i64::from(candidate.total_base_hundredths))
+    );
+}
+
+#[test]
+fn assumed_completion_rejects_senior_repeat_credit_across_locked_original_and_addition() {
+    let category = SeniorCategory::Women;
+    let profile = senior_profile(category);
+    let mut q = request();
+    q.profile = profile.id;
+    q.policy = senior_program_policy(category);
+    let mut axel = jump(JumpKind::Axel);
+    let PlannedElement::Jump(JumpElement::Solo(jump)) = &mut axel.element else {
+        unreachable!()
+    };
+    jump.rotations = Some(3);
+    q.original.truncate(1);
+    q.original[0].entry.planned = axel.element.clone();
+    q.original[0].entry.intended_recognition = None;
+    q.variants = vec![axel];
+    q.insertion.boundaries = vec![1];
+    q.min_additions = 1;
+    q.max_additions = 1;
+    let choices = [AssumedRecognition::new("3A")];
+    assert!(matches!(
+        complete_program_with_assumed_recognition(&ProfileRegistry::senior(), &q, &choices, &choices),
+        Err(ProgramCompletionError::Optimization(ProgramOptimizationError::InvalidRequest(reason)))
+            if reason.contains("contextual BV")
+    ));
+}

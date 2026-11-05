@@ -268,6 +268,10 @@ fn without_repetition(
     .map_err(|_| BaseValueError::Unsupported)
 }
 
+pub(crate) fn repetition_hundredths(hundredths: u16) -> u16 {
+    ((u32::from(hundredths) * 8 + 5) / 10) as u16
+}
+
 fn repetition_row(
     table: ScoringTableId,
     details: &crate::RecognitionDetails,
@@ -324,7 +328,7 @@ fn repetition_row(
         }
         RowOrigin::Repetition { .. } => unreachable!("unrepeated input"),
     };
-    resolved.hundredths = ((u32::from(resolved.hundredths) * 8 + 5) / 10) as u16;
+    resolved.hundredths = repetition_hundredths(resolved.hundredths);
     resolved.origin = RowOrigin::Repetition {
         rows,
         reference,
@@ -534,6 +538,23 @@ fn table_row(
         jump_unit_row(table, details, notation, senior)
     } else {
         single_row(table, details, notation, senior).map(ResolvedRow::Value)
+    }
+}
+
+/// Score an explicitly selected jump unit without constructing a panel outcome.
+pub(crate) fn assumed_jump_unit_value(
+    table: ScoringTableId,
+    details: &crate::RecognitionDetails,
+    code: &str,
+    senior: bool,
+) -> Option<BaseValue> {
+    let notation = details.notation()?;
+    if notation != code {
+        return None;
+    }
+    match jump_unit_row(table, details, notation, senior).ok()? {
+        ResolvedRow::Value(row) => Some(row.base()),
+        _ => None,
     }
 }
 

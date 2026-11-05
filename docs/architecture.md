@@ -1,5 +1,7 @@
 # Architecture
 
+[Assumed recognition](specs/assumed-recognition.md) resolves exact SOV selections before invoking the shared program validator. The evaluation scope keeps structural checks common and runs technical evidence qualification only for the detailed path.
+
 ## Current state
 
 The repository contains a Rust library and a separate solver-comparison executable. It accepts caller-provided plans, observations and panel recognition. It returns partial validation findings, scoring scenarios and bounded optimization results. It has no UI, network service, persistence, rule database or automatic panel inference. [Implementation status](implementation-status.md) defines current support.

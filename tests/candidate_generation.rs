@@ -525,3 +525,68 @@ fn equivalent_step_feature_sets_deduplicate_before_consuming_capacity() {
     }];
     assert_eq!(generate(&q).variants.len(), 1);
 }
+
+#[test]
+fn generation_admits_assumed_gold_levels_and_applies_semantic_filters() {
+    let mut q = request(AdultCategory::Gold);
+    q.solo_jumps = false;
+    q.manual_variants = vec![ProgramVariant {
+        element: PlannedElement::RegularSpin(RegularSpin {
+            entry: None,
+            steps: None,
+        }),
+        evidence: ElementPlanEvidence::Spin {
+            spin: RegularSpinEvidence::default(),
+            local_feature_qualification_assumed: false,
+        },
+        recognition_assumed: false,
+    }];
+    let choices = [AssumedRecognition::new("FSSp2")];
+    let registry = ProfileRegistry::adult();
+    let result =
+        generate_program_candidates_with_assumed_recognition(&registry, &q, &choices).unwrap();
+    assert_eq!(result.domain.variants.len(), 1);
+    assert_eq!(result.input_indices, [0]);
+    assert_eq!(result.recognition, choices);
+    assert_eq!(
+        result.domain.variants[0].element,
+        q.manual_variants[0].element
+    );
+    q.exclusions.push(PersonalExclusion::FlyingEntry);
+    let result =
+        generate_program_candidates_with_assumed_recognition(&registry, &q, &choices).unwrap();
+    assert!(result.domain.variants.is_empty());
+    assert_eq!(result.domain.audit.omissions.len(), 1);
+}
+
+#[test]
+fn generation_preserves_explicit_axel_transition_assumptions() {
+    let mut q = request(AdultCategory::Silver);
+    q.solo_jumps = false;
+    let jump = |kind| {
+        JumpPart::Jump(ListedJump {
+            kind: Some(kind),
+            rotations: Some(1),
+        })
+    };
+    q.manual_variants.push(ProgramVariant {
+        element: PlannedElement::Jump(JumpElement::Sequence(vec![
+            jump(JumpKind::ToeLoop),
+            jump(JumpKind::Axel),
+        ])),
+        evidence: ElementPlanEvidence::Jump {
+            direct_transitions_assumed: true,
+        },
+        recognition_assumed: false,
+    });
+    let result = generate_program_candidates_with_assumed_recognition(
+        &ProfileRegistry::adult(),
+        &q,
+        &[AssumedRecognition::new("1T+1A+SEQ")],
+    )
+    .unwrap();
+    assert_eq!(
+        result.domain.variants[0].evidence,
+        q.manual_variants[0].evidence
+    );
+}

@@ -4,38 +4,49 @@ use crate::*;
 pub(crate) const SPIN_REQUIRED_ROLE_RULE: &str = "spin-required-role";
 pub(crate) const SPIN_EXECUTION_RULE: &str = "spin-execution-recognition";
 
-pub(crate) const RULE_IDS: &[&str] = &[
-    "spin-abbreviation",
-    "spin-basic-position",
-    "spin-combination-positions",
-    "spin-count",
-    "spin-distinct-abbreviation",
-    "spin-eligibility",
-    "spin-entry",
-    "spin-evidence-entry",
-    "spin-evidence-foot-change",
-    "spin-evidence-target",
-    SPIN_EXECUTION_RULE,
-    "spin-feature-credit",
-    "spin-feature-evidence",
-    "spin-feature-target",
-    "spin-layback-position",
-    "spin-level-cap",
-    "spin-minimum-revolutions",
-    "spin-multiple-foot-changes",
-    "spin-panel-reconciliation",
-    "spin-panel-target",
-    "spin-per-foot-policy",
-    "spin-per-foot-revolutions",
-    "spin-policy",
-    "spin-position-evidence",
-    "spin-position-policy",
-    "spin-position-type",
-    "spin-recognition-minimum",
-    SPIN_REQUIRED_ROLE_RULE,
-    "spin-rotations",
-    "spin-wind-up-target",
+#[cfg(feature = "optimizer")]
+const RULES: &[(&str, bool)] = &[
+    ("spin-abbreviation", true),
+    ("spin-basic-position", false),
+    ("spin-combination-positions", false),
+    ("spin-count", true),
+    ("spin-distinct-abbreviation", true),
+    ("spin-eligibility", true),
+    ("spin-entry", true),
+    ("spin-evidence-entry", true),
+    ("spin-evidence-foot-change", false),
+    ("spin-evidence-target", true),
+    (SPIN_EXECUTION_RULE, false),
+    ("spin-feature-credit", false),
+    ("spin-feature-evidence", false),
+    ("spin-feature-target", false),
+    ("spin-layback-position", false),
+    ("spin-level-cap", true),
+    ("spin-minimum-revolutions", false),
+    ("spin-multiple-foot-changes", false),
+    ("spin-panel-reconciliation", false),
+    ("spin-panel-target", false),
+    ("spin-per-foot-policy", false),
+    ("spin-per-foot-revolutions", false),
+    ("spin-policy", true),
+    ("spin-position-evidence", false),
+    ("spin-position-policy", false),
+    ("spin-position-type", false),
+    ("spin-recognition-minimum", false),
+    (SPIN_REQUIRED_ROLE_RULE, true),
+    ("spin-rotations", false),
+    ("spin-wind-up-target", false),
 ];
+
+#[cfg(feature = "optimizer")]
+pub(crate) fn supported_rules(
+    scope: crate::program_validation::EvaluationScope,
+) -> impl Iterator<Item = &'static str> {
+    RULES.iter().filter_map(move |&(id, structural)| {
+        (structural || scope == crate::program_validation::EvaluationScope::EvidenceBased)
+            .then_some(id)
+    })
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RegularSpinKind {
@@ -376,6 +387,7 @@ pub fn validate_profile_program_with_evidence(
 pub(crate) enum FeatureCreditEvaluation {
     Deferred,
     ProgramWide,
+    AssumedRecognition,
 }
 
 pub(crate) fn validate_profile_program_with_assumptions(
@@ -607,6 +619,10 @@ impl SpinValidator {
                 } else {
                     unknown = true;
                 }
+                if self.feature_credit == FeatureCreditEvaluation::AssumedRecognition {
+                    self.check_abbreviation(index, spin, data, policy);
+                    continue;
+                }
                 let mut effective = policy.clone();
                 if senior && abbreviation.is_some_and(|a| a.kind == RegularSpinKind::Combination) {
                     effective.min_revolutions = crate::senior::DEFINITION.combination_revolutions;
@@ -732,15 +748,41 @@ impl SpinValidator {
                 }
             }
         }
-        if spin.entry.is_none() {
+        if spin.entry.is_none()
+            && self.feature_credit != FeatureCreditEvaluation::AssumedRecognition
+        {
             self.add(FindingKind::Unknown, "spin-entry", Some(index), None,
                 "The planned entry is unspecified; abbreviation alone does not supply movement evidence.", source);
         }
         match data.and_then(|d| d.planned_level) {
-            None => self.add(FindingKind::Unknown, "spin-level-cap", Some(index), None,
-                "The target level is unspecified; no recognized level is inferred.", source),
-            Some(level) if level.number() > policy.max_level.number() => self.add(FindingKind::Unknown, "spin-level-cap", Some(index), None,
-                "The target exceeds the profile level cap; additional features are ignored, not a prohibition of the spin.", source),
+            None => self.add(
+                FindingKind::Unknown,
+                "spin-level-cap",
+                Some(index),
+                None,
+                "The target level is unspecified; no recognized level is inferred.",
+                source,
+            ),
+            Some(level) if level.number() > policy.max_level.number() => {
+                let (kind, explanation) = if self.feature_credit
+                    == FeatureCreditEvaluation::AssumedRecognition
+                {
+                    (
+                        FindingKind::Violation,
+                        "The selected SOV level exceeds the profile cap.",
+                    )
+                } else {
+                    (FindingKind::Unknown, "The target exceeds the profile level cap; additional features are ignored, not a prohibition of the spin.")
+                };
+                self.add(
+                    kind,
+                    "spin-level-cap",
+                    Some(index),
+                    None,
+                    explanation,
+                    source,
+                );
+            }
             _ => {}
         }
     }
