@@ -320,57 +320,128 @@ pub(crate) fn has_repeated_advanced_solo<'a>(
     })
 }
 
-/// Reuse the Senior scorer's repetition decisions with clean intended details.
-pub(crate) fn senior_context(
+/// Resolve credit from the shared construction trace and ordered SOV values.
+pub(crate) fn assumed_credit<'a>(
+    profile: &RuleProfile,
     elements: &[PlannedElement],
     evidence: &[ElementPlanEvidence],
-) -> Vec<Option<PanelRecognition>> {
-    let panels: Vec<_> = elements
+    blocks: &crate::validation::JumpCreditBlocks,
+    values: impl Iterator<Item = Option<&'a BaseValue>>,
+) -> Vec<Result<BaseValueOutcome, BaseValueError>> {
+    use crate::senior::{RepetitionCredit, RepetitionInput};
+
+    let blocked: Vec<_> = elements
         .iter()
         .zip(evidence)
-        .map(|(element, evidence)| {
-            if matches!(element, PlannedElement::Jump(JumpElement::Sequence(_)))
-                && matches!(
-                    evidence,
-                    ElementPlanEvidence::Jump {
-                        direct_transitions_assumed: false
-                    }
+        .enumerate()
+        .map(|(index, (element, evidence))| {
+            blocks.blocks(index, element)
+                || matches!(
+                    (element, evidence),
+                    (
+                        PlannedElement::Jump(JumpElement::Sequence(_)),
+                        ElementPlanEvidence::Jump {
+                            direct_transitions_assumed: false
+                        }
+                    )
                 )
-            {
-                return None;
-            }
-            Some(PanelRecognition {
-                ruleset: RulesetId::IsuSenior2026_27June12,
-                source: None,
-                planned_element: None,
-                observed_element: None,
-                outcome: RecognitionOutcome::Recognized,
-                details: Some(crate::plan_recognition::intended_details(
-                    element, evidence,
-                )?),
-            })
         })
         .collect();
-    crate::senior::repetition_context(&panels)
+    let senior = profile.binding(ProfileRule::Scoring).mechanism == RuleMechanism::SeniorScoringV1;
+    let details: Vec<_> = if senior {
+        elements
+            .iter()
+            .zip(evidence)
+            .zip(&blocked)
+            .map(|((element, evidence), blocked)| {
+                if *blocked {
+                    None
+                } else {
+                    crate::plan_recognition::intended_details(element, evidence)
+                }
+            })
+            .collect()
+    } else {
+        vec![]
+    };
+    let repetition = senior.then(|| {
+        let inputs: Vec<_> = elements
+            .iter()
+            .zip(&details)
+            .map(|(element, details)| match element {
+                PlannedElement::Jump(_) | PlannedElement::Unspecified => details
+                    .as_ref()
+                    .map_or(RepetitionInput::Unknown, RepetitionInput::Recognized),
+                _ => RepetitionInput::NonJump,
+            })
+            .collect();
+        crate::senior::repetition_credit(&inputs)
+    });
+    let uncertain =
+        senior.then(|| ordered_repeat_uncertainty(elements, profile.jumps.max_compound_length));
+    values
+        .enumerate()
+        .map(|(index, value)| {
+            let base = value.ok_or(BaseValueError::Unsupported)?;
+            if blocked[index] || uncertain.as_ref().is_some_and(|indices| indices[index]) {
+                return Err(BaseValueError::Unsupported);
+            }
+            match repetition.as_ref().map(|credits| credits[index]) {
+                Some(RepetitionCredit::Unresolved) => Err(BaseValueError::Unsupported),
+                Some(RepetitionCredit::Reduced) => crate::scoring::assumed_repetition_value(
+                    base.table,
+                    details[index]
+                        .as_ref()
+                        .expect("repetition requires known details"),
+                ),
+                _ => Ok(BaseValueOutcome::Value(base.clone())),
+            }
+        })
+        .collect()
 }
 
-pub(crate) fn contextual_base(
-    table: &BaseValue,
-    senior: Option<&Option<PanelRecognition>>,
-) -> Result<BaseValueOutcome, BaseValueError> {
-    match senior {
-        Some(Some(panel))
-            if panel
-                .details
-                .as_ref()
-                .and_then(RecognitionDetails::calls)
-                .is_some_and(|calls| {
-                    calls.iter().any(|call| call.call == PanelCall::Repetition)
-                }) =>
-        {
-            lookup_base_value(table.table, panel, &[])
-        }
-        Some(None) => Err(BaseValueError::Unsupported),
-        _ => Ok(BaseValueOutcome::Value(table.clone())),
-    }
+/// A previous unknown component can consume a jump occurrence without changing
+/// the listed value of any component whose credit still fits both limits.
+fn ordered_repeat_uncertainty(
+    elements: &[PlannedElement],
+    max_compound_length: usize,
+) -> Vec<bool> {
+    let mut known = Vec::new();
+    let mut unknown = 0usize;
+    elements
+        .iter()
+        .map(|element| {
+            let mut unresolved = false;
+            let mut visit = |jump: &ListedJump| {
+                let (Some(kind), Some(rotations)) = (jump.kind, jump.rotations) else {
+                    unknown += 1;
+                    return;
+                };
+                if unknown > 0 {
+                    let matching_kind = known.iter().filter(|(k, _)| *k == kind).count();
+                    let identical = known.iter().filter(|&&j| j == (kind, rotations)).count();
+                    unresolved |= matching_kind + unknown
+                        >= crate::senior::DEFINITION.max_kind_occurrences
+                        || (rotations >= 2
+                            && identical + unknown >= crate::senior::MAX_IDENTICAL_DOUBLE_OR_ABOVE);
+                }
+                known.push((kind, rotations));
+            };
+            match element {
+                PlannedElement::Unspecified => unknown += max_compound_length,
+                PlannedElement::Jump(JumpElement::Solo(jump)) => visit(jump),
+                PlannedElement::Jump(
+                    JumpElement::Combination(parts) | JumpElement::Sequence(parts),
+                ) => {
+                    for part in parts {
+                        if let JumpPart::Jump(jump) = part {
+                            visit(jump);
+                        }
+                    }
+                }
+                _ => {}
+            }
+            unresolved
+        })
+        .collect()
 }

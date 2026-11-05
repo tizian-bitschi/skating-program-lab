@@ -558,6 +558,15 @@ pub(crate) fn assumed_jump_unit_value(
     }
 }
 
+pub(crate) fn assumed_repetition_value(
+    table: ScoringTableId,
+    details: &crate::RecognitionDetails,
+) -> Result<BaseValueOutcome, BaseValueError> {
+    let details = crate::senior::with_repetition_call(details);
+    let notation = details.notation().ok_or(BaseValueError::UnknownCalls)?;
+    repetition_row(table, &details, notation, true).map(base_outcome)
+}
+
 enum ResolvedRow {
     Value(TableRow),
     Ignored,
@@ -604,11 +613,15 @@ pub fn lookup_base_value(
     recognition: &PanelRecognition,
     annotations: &[ScoringAnnotation],
 ) -> Result<BaseValueOutcome, BaseValueError> {
-    Ok(match resolve_row(table, recognition, annotations)? {
+    resolve_row(table, recognition, annotations).map(base_outcome)
+}
+
+fn base_outcome(row: ResolvedRow) -> BaseValueOutcome {
+    match row {
         ResolvedRow::Value(row) => BaseValueOutcome::Value(row.base()),
         ResolvedRow::Ignored => BaseValueOutcome::Ignored,
         ResolvedRow::NoValue => BaseValueOutcome::NoValue,
-    })
+    }
 }
 
 /// A single hypothetical judge's unfactored element score, in hundredths.

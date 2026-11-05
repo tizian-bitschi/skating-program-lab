@@ -152,9 +152,31 @@ struct Compound {
     length: usize,
     euler: bool,
 }
+#[derive(Default)]
+pub(crate) struct JumpCreditBlocks {
+    jumps: bool,
+    compounds: bool,
+    elements: Vec<usize>,
+}
+
+impl JumpCreditBlocks {
+    pub(crate) fn blocks(&self, index: usize, element: &PlannedElement) -> bool {
+        match element {
+            PlannedElement::Jump(JumpElement::Solo(_)) => {
+                self.jumps || self.elements.contains(&index)
+            }
+            PlannedElement::Jump(JumpElement::Combination(_) | JumpElement::Sequence(_)) => {
+                self.jumps || self.compounds || self.elements.contains(&index)
+            }
+            _ => false,
+        }
+    }
+}
+
 struct Validator<'a> {
     profile: &'a crate::RuleProfile,
     applied_rules: Vec<AppliedRule>,
+    credit_blocks: JumpCreditBlocks,
     assumed_direct_sequences: &'a [usize],
     policy: &'a crate::JumpPolicy,
     findings: Vec<Finding>,
@@ -172,6 +194,7 @@ impl<'a> Validator<'a> {
         Self {
             profile,
             applied_rules: vec![],
+            credit_blocks: JumpCreditBlocks::default(),
             assumed_direct_sequences,
             policy: &profile.jumps,
             findings: vec![],
@@ -207,6 +230,22 @@ impl<'a> Validator<'a> {
         component_index: Option<usize>,
         explanation: &'static str,
     ) {
+        if kind == FindingKind::Violation {
+            match (rule, element_index) {
+                (Rule::Structure | Rule::Euler, Some(index)) => {
+                    self.credit_blocks.elements.push(index);
+                }
+                (Rule::Count, None) if crate::senior::selected(self.profile, rule) => {
+                    self.credit_blocks.jumps = true;
+                }
+                (Rule::CompoundCount | Rule::Structure | Rule::Euler, None)
+                    if crate::senior::selected(self.profile, rule) =>
+                {
+                    self.credit_blocks.compounds = true;
+                }
+                _ => {}
+            }
+        }
         self.apply(rule, element_index, component_index);
         self.findings.push(Finding {
             kind,
@@ -679,7 +718,7 @@ pub(crate) fn validate_elements_traced(
     elements: &[PlannedElement],
     profile: &crate::RuleProfile,
     assumed_direct_sequences: &[usize],
-) -> (ValidationResult, Vec<AppliedRule>) {
+) -> (ValidationResult, Vec<AppliedRule>, JumpCreditBlocks) {
     let mut validator = Validator::new(profile, assumed_direct_sequences);
     if crate::senior::selected(profile, Rule::Count) {
         validator.apply(Rule::Count, None, None);
@@ -751,5 +790,6 @@ pub(crate) fn validate_elements_traced(
             findings: validator.findings,
         },
         validator.applied_rules,
+        validator.credit_blocks,
     )
 }

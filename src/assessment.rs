@@ -1,5 +1,5 @@
 //! Ordered manual-plan orchestration. No result establishes official compliance.
-use crate::program_validation::{validate_program_scope, EvaluationScope};
+use crate::program_validation::{validate_program_scope_with_credit, EvaluationScope};
 use crate::*;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -141,7 +141,7 @@ pub(crate) fn aggregate(values: impl Iterator<Item = Option<i64>>) -> Assessment
     }
 }
 
-fn base_number(value: &BaseValueOutcome) -> Option<i64> {
+pub(crate) fn base_number(value: &BaseValueOutcome) -> Option<i64> {
     match value {
         BaseValueOutcome::Value(v) => Some(i64::from(v.hundredths)),
         // These outcomes are retained, but never invented as numeric plan values.
@@ -207,7 +207,8 @@ pub(crate) fn assess_manual_scope(
     } else {
         EvaluationScope::EvidenceBased
     };
-    let validation = validate_program_scope(registry, &program, &evidence, &request.policy, scope)?;
+    let (validation, credit_blocks) =
+        validate_program_scope_with_credit(registry, &program, &evidence, &request.policy, scope)?;
     let completion_findings = crate::program_validation::completion_findings(
         &validation,
         profile,
@@ -238,8 +239,15 @@ pub(crate) fn assess_manual_scope(
         AssessmentStatus::NoViolationInCoveredRules
     };
     let senior = profile.binding(ProfileRule::Scoring).mechanism == RuleMechanism::SeniorScoringV1;
-    let assumed_context = (senior && assumed_values.is_some())
-        .then(|| crate::assumed_recognition::senior_context(&program.elements, &evidence));
+    let assumed_credit = assumed_values.map(|values| {
+        crate::assumed_recognition::assumed_credit(
+            profile,
+            &program.elements,
+            &evidence,
+            &credit_blocks,
+            values.iter().map(Some),
+        )
+    });
     let contextual = |panels: Vec<Option<PanelRecognition>>| {
         if senior {
             crate::senior::repetition_context(&panels)
@@ -284,13 +292,11 @@ pub(crate) fn assess_manual_scope(
                 })
                 .map(|(i, _)| i)
                 .collect();
-            let intended_base = if let Some(values) = assumed_values {
+            let intended_base = if let Some(credits) = &assumed_credit {
                 if unresolved.is_empty() {
-                    crate::assumed_recognition::contextual_base(
-                        &values[index],
-                        assumed_context.as_ref().map(|context| &context[index]),
-                    )
-                    .map_err(AssessmentValueError::BaseValue)
+                    credits[index]
+                        .clone()
+                        .map_err(AssessmentValueError::BaseValue)
                 } else {
                     Err(AssessmentValueError::UnresolvedPlanEvidence(unresolved))
                 }

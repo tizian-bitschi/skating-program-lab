@@ -382,6 +382,7 @@ pub fn validate_profile_program_with_evidence(
         &[],
         FeatureCreditEvaluation::Deferred,
     )
+    .map(|(report, _)| report)
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -398,7 +399,13 @@ pub(crate) fn validate_profile_program_with_assumptions(
     policy: Option<&RegularSpinPolicy>,
     assumed_direct_sequences: &[usize],
     feature_credit: FeatureCreditEvaluation,
-) -> Result<EvidenceValidationReport, ProfileSelectionError> {
+) -> Result<
+    (
+        EvidenceValidationReport,
+        crate::validation::JumpCreditBlocks,
+    ),
+    ProfileSelectionError,
+> {
     let profile = registry.resolve(&program.profile, program.scoring_table)?;
     let resolved = crate::profiles::resolve_spin_policy(profile, policy)?;
     let policy = resolved.as_ref();
@@ -426,11 +433,12 @@ pub(crate) fn validate_profile_program_with_assumptions(
                 reason: "spin rules need the selected profile identity, complete source bindings and positive coherent recognition thresholds".into() });
         }
     }
-    let (jump_validation, applied_rules) = crate::validation::validate_elements_traced(
-        &program.elements,
-        profile,
-        assumed_direct_sequences,
-    );
+    let (jump_validation, applied_rules, credit_blocks) =
+        crate::validation::validate_elements_traced(
+            &program.elements,
+            profile,
+            assumed_direct_sequences,
+        );
     let mut check = SpinValidator {
         findings: jump_validation.findings,
         applied_rules,
@@ -469,7 +477,7 @@ pub(crate) fn validate_profile_program_with_assumptions(
             sources.push(source.clone());
         }
     }
-    Ok(EvidenceValidationReport {
+    Ok((EvidenceValidationReport {
         profile: profile.id.clone(), sources, applied_rules: check.applied_rules,
         validation: ValidationResult { coverage: Coverage::Partial, findings: check.findings },
         coverage: vec![
@@ -482,7 +490,7 @@ pub(crate) fn validate_profile_program_with_assumptions(
             ValidationCoverage { family: ValidationFamily::StepsAndChoreography, coverage: FamilyCoverage::Unsupported,
                 explanation: "Recognition, movement requirements and category caps are deferred to slice 3." },
         ],
-    })
+    }, credit_blocks))
 }
 
 struct SpinValidator {

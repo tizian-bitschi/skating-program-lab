@@ -63,9 +63,12 @@ this scope remain available through the evidence-based APIs.
 
 Senior manual totals apply the published 80% value for the second of two
 identical advanced solo jumps in an otherwise supported repetition context.
-They share repetition decisions with the detailed Senior manual scorer.
-Unsupported excess-jump and compound credit, or uncertain repetition
-context, leaves affected values unresolved.
+Both manual entry points share a credit resolver and the Rule 612
+repetition decision used by the detailed Senior scorer. Known illegal
+compound structures, excess Senior jump slots and uncertain repetition
+credit leave affected values unresolved. An unknown earlier jump can
+consume a repetition slot. The listed value of a known compound is
+retained even when its credit is unresolved.
 The current ordered solver has an unfactored objective. It rejects assumed
 domains containing repeated advanced solo choices before claiming an
 optimum, including repetitions involving locked originals.
@@ -85,8 +88,9 @@ Manual BV assessment flags unavailable selections at their original
 indices without substituting a different row. It retains known composition
 findings and the BV of independent selections. A listed row can be
 available even when its credit is unresolved. Known zero, NoValue,
-Ignored and unresolved credit have distinct representations. Clean manual
-selections do not generate panel NoValue or Ignored decisions. Actual timing,
+Ignored and unresolved credit have distinct representations. As in detailed
+manual assessment, only numeric Value outcomes enter the numeric subtotal.
+Clean manual selections do not generate panel NoValue or Ignored decisions. Actual timing,
 GOE scenarios and protocol replay use separate entry points.
 Assumed candidate generation rejects unavailable individual selections. The separate
 legality report still reports construction findings for a supplied plan.

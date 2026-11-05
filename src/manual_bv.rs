@@ -1,6 +1,6 @@
 //! Base-value assessment of ordered selections under a single profile and SOV.
-use crate::assumed_recognition::{contextual_base, resolve_individual_row, senior_context};
-use crate::program_validation::{validate_program_scope, EvaluationScope};
+use crate::assumed_recognition::{assumed_credit, resolve_individual_row};
+use crate::program_validation::{validate_program_scope_with_credit, EvaluationScope};
 use crate::selection::{clean_jump, selection_shape, Selection};
 use crate::*;
 
@@ -16,7 +16,10 @@ pub struct ManualBvRequest {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ManualBvError {
     /// The requested code or a component is outside the supported selections.
-    Selection(ElementSelectionError),
+    Selection {
+        error: ElementSelectionError,
+        component_index: Option<usize>,
+    },
     /// The selected shape has no supported calculation or lacks a required assumption.
     ContextUnavailable,
 }
@@ -65,76 +68,59 @@ pub fn assess_manual_bv(
     }
     let policy = selection.policy();
     let scope = EvaluationScope::AssumedRecognition;
-    let validation = validate_program_scope(registry, &program, &evidence, policy, scope)?;
-    let senior = (profile.binding(ProfileRule::Scoring).mechanism
-        == RuleMechanism::SeniorScoringV1)
-        .then(|| senior_context(&program.elements, &evidence));
-    let senior_jump_limit = senior.is_some()
-        && validation.validation.findings.iter().any(|f| {
-            f.kind == FindingKind::Violation && f.rule_id == profile.binding(ProfileRule::Count).id
-        });
-    let senior_compound_limit = senior.is_some()
-        && validation.validation.findings.iter().any(|f| {
-            f.kind == FindingKind::Violation
-                && f.element_index.is_none()
-                && [
-                    ProfileRule::CompoundCount,
-                    ProfileRule::Structure,
-                    ProfileRule::Euler,
-                ]
-                .iter()
-                .any(|&rule| f.rule_id == profile.binding(rule).id)
-        });
+    let (validation, credit_blocks) =
+        validate_program_scope_with_credit(registry, &program, &evidence, policy, scope)?;
+    let credits = assumed_credit(
+        profile,
+        &program.elements,
+        &evidence,
+        &credit_blocks,
+        values.iter().map(|(table_base, _)| table_base.as_ref()),
+    );
     let elements: Vec<_> = values
         .into_iter()
+        .zip(credits)
         .enumerate()
-        .map(|(element_index, (table_base, restriction))| {
+        .map(|(element_index, ((table_base, restriction), credit))| {
             let element = &program.elements[element_index];
-            let credited_base = if let Some(mut error) = restriction {
+            let credited_base = if let Some((mut error, component_index)) = restriction {
                 match &mut error {
                     ElementSelectionError::TypeNotSelectable(finding)
                     | ElementSelectionError::LevelNotSelectable(finding) => {
                         finding.element_index = Some(element_index);
+                        finding.component_index = component_index;
                     }
                     _ => {}
                 }
-                Err(ManualBvError::Selection(error))
-            } else if sequence_assumption_unresolved(element, &request.elements[element_index])
-                || (senior_jump_limit && matches!(element, PlannedElement::Jump(_)))
-                || (senior_compound_limit
-                    && matches!(
-                        element,
-                        PlannedElement::Jump(
-                            JumpElement::Combination(_) | JumpElement::Sequence(_)
-                        )
-                    ))
+                Err(ManualBvError::Selection {
+                    error,
+                    component_index,
+                })
+            } else if request.elements[element_index].direct_transitions_assumed
+                && !matches!(element, PlannedElement::Jump(JumpElement::Sequence(_)))
             {
                 Err(ManualBvError::ContextUnavailable)
             } else {
-                table_base
-                    .as_ref()
-                    .ok_or(ManualBvError::ContextUnavailable)
-                    .and_then(|base| {
-                        contextual_base(
-                            base,
-                            senior.as_ref().map(|context| &context[element_index]),
-                        )
-                        .map_err(|_| ManualBvError::ContextUnavailable)
-                    })
+                credit.map_err(|_| ManualBvError::ContextUnavailable)
             };
             ManualBvElement {
                 element_index,
-                table_base,
+                table_base: table_base.or_else(|| {
+                    listed_compound_sum(
+                        request.scoring_table,
+                        &request.elements[element_index].code,
+                        element,
+                    )
+                }),
                 credited_base,
             }
         })
         .collect();
-    let total = crate::assessment::aggregate(elements.iter().map(|element| {
-        match element.credited_base.as_ref().ok()? {
-            BaseValueOutcome::Value(base) => Some(i64::from(base.hundredths)),
-            BaseValueOutcome::Ignored | BaseValueOutcome::NoValue => Some(0),
-        }
-    }));
+    let total = crate::assessment::aggregate(
+        elements
+            .iter()
+            .map(|element| crate::assessment::base_number(element.credited_base.as_ref().ok()?)),
+    );
     let legality = crate::legality::report_program_legality(
         registry,
         &program,
@@ -151,16 +137,48 @@ pub fn assess_manual_bv(
     })
 }
 
-fn sequence_assumption_unresolved(element: &PlannedElement, choice: &AssumedRecognition) -> bool {
-    matches!(element, PlannedElement::Jump(JumpElement::Sequence(_)))
-        != choice.direct_transitions_assumed
+// Preserve the listed sum even when the compound shape cannot be credited.
+fn listed_compound_sum(
+    table: ScoringTableId,
+    code: &str,
+    element: &PlannedElement,
+) -> Option<BaseValue> {
+    let PlannedElement::Jump(JumpElement::Combination(parts) | JumpElement::Sequence(parts)) =
+        element
+    else {
+        return None;
+    };
+    let rows: Option<Vec<_>> = parts
+        .iter()
+        .map(|part| match part {
+            JumpPart::Euler => catalog_row(table, "Eu"),
+            JumpPart::Jump(jump) => catalog_row(
+                table,
+                crate::plan_recognition::jump_component(jump)?.as_str(),
+            ),
+            _ => None,
+        })
+        .collect();
+    let rows = rows?;
+    let locations: Vec<_> = rows
+        .iter()
+        .map(|row| row.source.reference(row.notation).location)
+        .collect();
+    Some(BaseValue {
+        hundredths: rows
+            .iter()
+            .try_fold(0u16, |sum, row| sum.checked_add(row.base_hundredths))?,
+        table,
+        notation: code.into(),
+        source: table.source_reference(format!("Listed component rows: {}", locations.join("; "))),
+    })
 }
 
 type ResolvedSelection = (
     PlannedElement,
     ElementPlanEvidence,
     Option<BaseValue>,
-    Option<ElementSelectionError>,
+    Option<(ElementSelectionError, Option<usize>)>,
 );
 
 fn resolve_selection(
@@ -174,7 +192,7 @@ fn resolve_selection(
         direct_transitions_assumed: false,
     };
     if let Some(row) = catalog_row(table, code) {
-        let error = selection.check_row(row).err();
+        let error = selection.check_row(row).err().map(|error| (error, None));
         if let Some((_, element)) = selection_shape(row) {
             if let Some((evidence, base)) = resolve_individual_row(row, &element, None) {
                 return (element, evidence, Some(base), error);
@@ -192,7 +210,7 @@ fn resolve_selection(
             PlannedElement::Unspecified,
             jump_evidence,
             None,
-            selection.check(code).err(),
+            selection.check(code).err().map(|error| (error, None)),
         );
     }
     let mut restriction = None;
@@ -204,14 +222,16 @@ fn resolve_selection(
                 return JumpPart::Euler;
             }
             let jump = clean_jump(component);
-            if let Err(mut error) = selection.check(component) {
-                if let ElementSelectionError::TypeNotSelectable(finding) = &mut error {
-                    finding.component_index = Some(index);
-                }
-                restriction.get_or_insert(error);
+            if let Err(error) = selection.check(component) {
+                restriction.get_or_insert((error, Some(index)));
             } else if jump.is_none() {
-                restriction.get_or_insert_with(|| ElementSelectionError::UnsupportedCode {
-                    source: table.source_reference(format!("Jump component: {component}")),
+                restriction.get_or_insert_with(|| {
+                    (
+                        ElementSelectionError::UnsupportedCode {
+                            source: table.source_reference(format!("Jump component: {component}")),
+                        },
+                        Some(index),
+                    )
                 });
             }
             let (kind, rotations) = jump.unzip();
