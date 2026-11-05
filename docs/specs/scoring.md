@@ -85,10 +85,13 @@ See [implementation status](../implementation-status.md#scoring) for supported r
 
 ### GOE preview for selected programs
 
-Call `preview_goe_scenario` with the selected `ManualBvRequest`, an optional
-uniform final grade from −5 through +5, and overrides keyed by zero-based
-element index. For an optimized or completed program, use its ordered
-selections and direct-transition assumptions with the same profile and table.
+Prepare a `GoeScenarioPlan` from the selected `ManualBvRequest`. Its
+`assessment()` contains BV and composition findings. Pass the prepared plan
+to `preview_goe_scenario` with an optional uniform final grade from −5 through
++5 and overrides keyed by zero-based element index. Reuse the prepared plan
+when changing grades. For an optimized or completed program, prepare its
+ordered selections and direct-transition assumptions with the same profile
+and table.
 An override grade takes precedence. With neither grade, a supported element
 remains ungraded. An explicit zero yields a numeric element score. The
 preview uses the published columns and call limits of `score_element`,

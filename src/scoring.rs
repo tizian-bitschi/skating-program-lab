@@ -765,9 +765,7 @@ fn score_element_internal(
     fall: Option<bool>,
     execution: Option<&execution_evidence::Adjustment>,
 ) -> Result<ElementScore, ElementScoreError> {
-    if !(-5..=5).contains(&goe) {
-        return Err(ElementScoreError::InvalidGoe);
-    }
+    validate_final_goe(goe)?;
     let row =
         match resolve_row(table, recognition, annotations).map_err(ElementScoreError::BaseValue)? {
             ResolvedRow::Ignored => return Err(ElementScoreError::Ignored),
@@ -826,6 +824,14 @@ fn score_element_internal(
         goe_source,
         consistency_source,
     })
+}
+
+pub(crate) fn validate_final_goe(goe: i8) -> Result<(), ElementScoreError> {
+    if (-5..=5).contains(&goe) {
+        Ok(())
+    } else {
+        Err(ElementScoreError::InvalidGoe)
+    }
 }
 
 /// Facts required for the supported, uninterrupted timing scenario.

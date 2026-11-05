@@ -24,15 +24,25 @@ fn scoring_error(error: ElementScoreError) -> GoeScenarioElementError {
     GoeScenarioElementError::Scoring(ProgramScoreError::Element(error))
 }
 
+fn preview_for(
+    registry: &ProfileRegistry,
+    request: &ManualBvRequest,
+    grade: Option<i8>,
+    overrides: &BTreeMap<usize, GoeScenarioOverride>,
+    boundary: Option<usize>,
+) -> Result<GoeScenarioPreview, ProfileSelectionError> {
+    let plan = GoeScenarioPlan::prepare(registry, request)?;
+    preview_goe_scenario(&plan, grade, overrides, boundary)
+}
+
 #[test]
 fn gold_spin_preview_uses_published_columns_without_changing_the_plan() {
     let registry = ProfileRegistry::adult();
     let program = draft(adult_profile(AdultCategory::Gold), &["CCoSp3", "FSSp2"]);
     let original = program.clone();
     let base = assess_manual_bv(&registry, &program).unwrap();
-    let preview = |grade, overrides| {
-        preview_goe_scenario(&registry, &program, grade, &overrides, None).unwrap()
-    };
+    let plan = GoeScenarioPlan::prepare(&registry, &program).unwrap();
+    let preview = |grade, overrides| preview_goe_scenario(&plan, grade, &overrides, None).unwrap();
     let absent = preview(None, BTreeMap::new());
     assert_eq!(absent.total, None);
     assert_eq!(absent.elements, [Ok(None), Ok(None)]);
@@ -71,6 +81,7 @@ fn gold_spin_preview_uses_published_columns_without_changing_the_plan() {
     );
     assert_eq!(invalid.total.unwrap().unresolved_indices, [0, 1]);
     assert_eq!(program, original);
+    assert_eq!(plan.assessment(), &base);
     assert_eq!(assess_manual_bv(&registry, &program).unwrap(), base);
 }
 
@@ -115,7 +126,7 @@ fn call_and_fall_constraints_keep_independent_elements_exact() {
             },
         ),
     ]);
-    let result = preview_goe_scenario(&registry, &program, Some(2), &overrides, None).unwrap();
+    let result = preview_for(&registry, &program, Some(2), &overrides, None).unwrap();
     assert_eq!(
         result.elements[0],
         Err(scoring_error(ElementScoreError::UnsupportedMarks))
@@ -135,7 +146,7 @@ fn call_and_fall_constraints_keep_independent_elements_exact() {
         }
     );
     overrides.get_mut(&1).unwrap().final_goe = Some(-5);
-    let result = preview_goe_scenario(&registry, &program, Some(-2), &overrides, None).unwrap();
+    let result = preview_for(&registry, &program, Some(-2), &overrides, None).unwrap();
     assert_eq!(score(&result, 0).unfactored.base.notation, "1Lzq");
     assert_eq!(score(&result, 0).score_hundredths, 48);
     assert_eq!(result.total.unwrap().exact_hundredths, Some(438));
@@ -145,8 +156,7 @@ fn call_and_fall_constraints_keep_independent_elements_exact() {
 fn senior_preview_preserves_repeat_credit_and_assumes_second_half_explicitly() {
     let registry = ProfileRegistry::senior();
     let program = draft(senior_profile(SeniorCategory::Men), &["4T", "4T", "ChSp1"]);
-    let result =
-        preview_goe_scenario(&registry, &program, Some(2), &BTreeMap::new(), Some(1)).unwrap();
+    let result = preview_for(&registry, &program, Some(2), &BTreeMap::new(), Some(1)).unwrap();
     // 4T: BV 9.50, +2 column 1.90. Rule 612: second solo at 80%.
     // An explicitly assumed second-half factor changes 7.60 to 8.36.
     assert_eq!(score(&result, 1).unfactored.base.hundredths, 760);
@@ -177,7 +187,7 @@ fn ungraded_jumps_still_occupy_assumed_second_half_slots() {
             ..Default::default()
         },
     )]);
-    let result = preview_goe_scenario(&registry, &program, None, &overrides, Some(0)).unwrap();
+    let result = preview_for(&registry, &program, None, &overrides, Some(0)).unwrap();
     assert!(!score(&result, 0).second_half);
     assert_eq!(
         result.total.unwrap(),
@@ -187,6 +197,53 @@ fn ungraded_jumps_still_occupy_assumed_second_half_slots() {
             exact_hundredths: None,
         }
     );
+}
+
+#[test]
+fn unscored_senior_spin_does_not_obscure_jump_repetition_credit() {
+    let registry = ProfileRegistry::senior();
+    let profile = senior_profile(SeniorCategory::Men);
+    let ruleset = profile.scoring.recognition_ruleset;
+    let program = draft(profile, &["4T", "CCoSp4", "4T"]);
+    for (outcome, error) in [
+        (RecognitionOutcome::Ignored, ElementScoreError::Ignored),
+        (RecognitionOutcome::NoValue, ElementScoreError::NoValue),
+    ] {
+        let mut overrides = BTreeMap::from([(
+            1,
+            GoeScenarioOverride {
+                recognition: Some(PanelRecognition {
+                    ruleset,
+                    source: None,
+                    planned_element: Some(1),
+                    observed_element: None,
+                    outcome,
+                    details: None,
+                }),
+                ..Default::default()
+            },
+        )]);
+        let result = preview_for(&registry, &program, Some(0), &overrides, None).unwrap();
+        assert_eq!(result.elements[1], Err(scoring_error(error)));
+        assert_eq!(score(&result, 0).credited_base_hundredths, 950);
+        assert_eq!(score(&result, 2).credited_base_hundredths, 760);
+        assert_eq!(result.total.unwrap().exact_hundredths, Some(1710));
+
+        overrides.get_mut(&1).unwrap().final_goe = Some(6);
+        let invalid = preview_for(&registry, &program, Some(0), &overrides, None).unwrap();
+        assert_eq!(
+            invalid.elements[1],
+            Err(scoring_error(ElementScoreError::InvalidGoe))
+        );
+        assert_eq!(
+            invalid.total.unwrap(),
+            AssessmentAggregate {
+                resolved_hundredths: 1710,
+                unresolved_indices: vec![1],
+                exact_hundredths: None,
+            }
+        );
+    }
 }
 
 #[test]
@@ -211,7 +268,7 @@ fn known_zero_outcomes_and_unavailable_selections_stay_distinct() {
         (0, outcome(0, RecognitionOutcome::Ignored)),
         (1, outcome(1, RecognitionOutcome::NoValue)),
     ]);
-    let result = preview_goe_scenario(&registry, &program, Some(0), &overrides, None).unwrap();
+    let result = preview_for(&registry, &program, Some(0), &overrides, None).unwrap();
     assert_eq!(
         result.elements[0],
         Err(scoring_error(ElementScoreError::Ignored))
