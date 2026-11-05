@@ -307,8 +307,9 @@ pub struct AssumedCandidateGenerationResult {
     pub recognition: Vec<AssumedRecognition>,
 }
 
-/// Generate a finite domain from explicit SOV selections for the manual variants.
-/// Automatic evidence templates and automatic jump expansion belong to the detailed API.
+/// Generate a finite domain from exact SOV selections. With no manual variants,
+/// selections are expanded directly into individual elements. Compound jump
+/// units still require a matching manual variant.
 pub fn generate_program_candidates_with_assumed_recognition(
     registry: &ProfileRegistry,
     request: &CandidateGenerationRequest,
@@ -338,22 +339,73 @@ pub fn generate_program_candidates_with_assumed_recognition(
         ));
     }
     let mut request = request.clone();
-    if request.manual_variants.len() != recognition.len() {
+    let codes_only = request.manual_variants.is_empty();
+    if recognition.len() > 1000
+        || (!codes_only && request.manual_variants.len() != recognition.len())
+    {
         return Err(E::InvalidRequest("supply one SOV selection per variant"));
     }
     let selection =
         crate::selection::Selection::new(registry, &request.profile, request.scoring_table)
             .map_err(E::Profile)?;
-    for (index, (variant, assumption)) in
-        request.manual_variants.iter().zip(recognition).enumerate()
-    {
-        selection
-            .check_assumption(&variant.element, assumption)
-            .map_err(|error| E::InvalidManualVariant {
+    let mut indices = Vec::new();
+    let mut omissions = Vec::new();
+    if codes_only {
+        for (index, assumption) in recognition.iter().enumerate() {
+            let invalid = || E::InvalidManualVariant {
                 index,
-                reason: error.reason(&assumption.code),
-            })?;
+                reason: format!("Unsupported individual SOV selection: {}", assumption.code),
+            };
+            let row = catalog_row(request.scoring_table, &assumption.code).ok_or_else(invalid)?;
+            let (_, element) = crate::selection::selection_shape(row).ok_or_else(invalid)?;
+            let (evidence, _) =
+                crate::assumed_recognition::resolve_individual_row(row, &element, None)
+                    .ok_or_else(invalid)?;
+            let variant = ProgramVariant {
+                element,
+                evidence,
+                recognition_assumed: true,
+            };
+            match selection.check_row(row) {
+                Ok(_) => {
+                    request.manual_variants.push(variant);
+                    indices.push(index);
+                }
+                Err(
+                    error @ (ElementSelectionError::TypeNotSelectable(_)
+                    | ElementSelectionError::LevelNotSelectable(_)),
+                ) => {
+                    omissions.push(CandidateOmission {
+                        variant,
+                        reason: error.reason(&assumption.code),
+                    });
+                }
+                Err(ElementSelectionError::Profile(error)) => return Err(E::Profile(error)),
+                Err(error) => {
+                    return Err(E::InvalidManualVariant {
+                        index,
+                        reason: error.reason(&assumption.code),
+                    })
+                }
+            }
+        }
+    } else {
+        for (index, (variant, assumption)) in
+            request.manual_variants.iter().zip(recognition).enumerate()
+        {
+            selection
+                .check_assumption(&variant.element, assumption)
+                .map_err(|error| E::InvalidManualVariant {
+                    index,
+                    reason: error.reason(&assumption.code),
+                })?;
+            indices.push(index);
+        }
     }
+    let selected: Vec<_> = indices
+        .iter()
+        .map(|&index| recognition[index].clone())
+        .collect();
     let ruleset = registry
         .resolve(&request.profile, request.scoring_table)
         .map_err(E::Profile)?
@@ -362,29 +414,31 @@ pub fn generate_program_candidates_with_assumed_recognition(
     let values = super::programs::resolve_variants(
         request.scoring_table,
         &mut request.manual_variants,
-        recognition,
+        &selected,
         ruleset,
     )
     .map_err(|error| match error {
         ProgramOptimizationError::UnsupportedVariant(index) => E::InvalidManualVariant {
-            index,
+            index: indices[index],
             reason: "SOV code is unsupported or does not match the plan".into(),
         },
         _ => E::InvalidRequest("supply one SOV selection per variant"),
     })?;
     request.recognition_assumed = true;
     let mut result = generate_candidates(registry, &request, Some(&values))?;
+    result.audit.omissions.extend(omissions);
     result.audit.assumptions = super::programs::ASSUMED_SCOPE;
     result.audit.declared_domain = "Explicit finite SOV selections in input order.";
     let input_indices: Vec<_> = result
         .variants
         .iter()
         .map(|variant| {
-            request
+            let index = request
                 .manual_variants
                 .iter()
                 .position(|input| super::programs::normalize_variant(input.clone()) == *variant)
-                .expect("generated assumed variants originate from explicit inputs")
+                .expect("generated assumed variants originate from explicit inputs");
+            indices[index]
         })
         .collect();
     Ok(AssumedCandidateGenerationResult {

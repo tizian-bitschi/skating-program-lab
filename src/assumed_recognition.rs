@@ -299,6 +299,7 @@ pub fn assess_program_legality_with_assumed_recognition(
 }
 
 #[cfg(feature = "optimizer")]
+#[cfg(feature = "optimizer")]
 fn advanced_solo(element: &PlannedElement) -> Option<&ListedJump> {
     match element {
         PlannedElement::Jump(JumpElement::Solo(jump)) if jump.rotations.is_some_and(|r| r >= 3) => {

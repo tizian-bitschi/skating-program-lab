@@ -3,7 +3,9 @@ use super::{
     solver_common::{self, Deadline},
     OptimizerObjective, OptimizerStatus,
 };
-use crate::program_validation::{validate_program_scope, EvaluationScope};
+use crate::program_validation::{
+    validate_program_scope, validate_program_scope_with_credit, EvaluationScope,
+};
 use crate::*;
 use pumpkin_solver::{
     conflict_resolvers::resolvers::ResolutionResolver,
@@ -341,8 +343,8 @@ fn checked(
         .iter()
         .map(|i| request.variants[*i].evidence.clone())
         .collect();
-    let mut validation =
-        validate_program_scope(registry, &program, &evidence, &request.policy, scope)
+    let (mut validation, credit_blocks) =
+        validate_program_scope_with_credit(registry, &program, &evidence, &request.policy, scope)
             .map_err(ProgramOptimizationError::Profile)?;
     if validation
         .validation
@@ -371,6 +373,25 @@ fn checked(
             .clone()
         })
         .collect::<Vec<_>>();
+    if scope == EvaluationScope::AssumedRecognition {
+        let profile = registry
+            .resolve(&request.profile, request.scoring_table)
+            .map_err(ProgramOptimizationError::Profile)?;
+        let credits = crate::assumed_recognition::assumed_credit(
+            profile,
+            &program.elements,
+            &evidence,
+            &credit_blocks,
+            per_element.iter().map(Some),
+        );
+        if credits.into_iter().zip(&per_element).any(|(credit, listed)| {
+            !matches!(credit, Ok(BaseValueOutcome::Value(value)) if value == *listed)
+        }) {
+            return Err(ProgramOptimizationError::InvalidRequest(
+                "domain requires contextual BV unsupported by the solver objective",
+            ));
+        }
+    }
     for (index, value) in per_element.iter().enumerate() {
         crate::validation::record_rule(
             &mut validation.applied_rules,
@@ -542,14 +563,22 @@ pub(super) fn optimize_anchored(
         }
     }
     if scope == EvaluationScope::AssumedRecognition
-        && ruleset == RulesetId::IsuSenior2026_27June12
-        && crate::assumed_recognition::has_repeated_advanced_solo(
-            universe.iter().map(|&i| &request.variants[i].element),
-        )
+        && profile.binding(ProfileRule::Scoring).mechanism == RuleMechanism::SeniorScoringV1
+        && request.max_elements >= 2
     {
-        return Err(E::InvalidRequest(
-            "Senior repeated advanced solos require contextual BV in the solver objective",
-        ));
+        let addition_count = anchors.map_or(request.variants.len(), |a| a.first_anchor);
+        let reusable = request.max_elements - anchors.map_or(0, |a| a.count) >= 2;
+        // Originals occupy unique slots. The same addition code can occupy two slots.
+        let possible_occurrences = universe
+            .iter()
+            .chain(universe.iter().filter(|&&i| reusable && i < addition_count));
+        if crate::assumed_recognition::has_repeated_advanced_solo(
+            possible_occurrences.map(|&i| &request.variants[i].element),
+        ) {
+            return Err(E::InvalidRequest(
+                "Senior repeated advanced solos require contextual BV in the solver objective",
+            ));
+        }
     }
     if assumed_values.is_some() {
         let addition_count = anchors.map_or(request.variants.len(), |a| a.first_anchor);

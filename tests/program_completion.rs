@@ -2,6 +2,10 @@
 use skating_program_lab::*;
 use std::{collections::BTreeSet, time::Duration};
 
+#[path = "support/generation_defaults.rs"]
+#[allow(dead_code)]
+mod generation_defaults;
+
 fn pos(position: SpinPosition, n: u16) -> SpinStep {
     SpinStep::Position {
         position: Some(position),
@@ -677,6 +681,107 @@ fn assumed_completion_keeps_original_plan_and_uses_no_panel_outcomes() {
         candidate.assessment.intended_base.exact_hundredths,
         Some(i64::from(candidate.total_base_hundredths))
     );
+}
+
+#[test]
+fn gold_code_domain_completion_matches_manual_bv_and_order_oracle() {
+    let registry = ProfileRegistry::adult();
+    let category = AdultCategory::Gold;
+    let generation = generation_defaults::request(adult_profile(category));
+    let original_codes = ["1A", "CCoSp3"].map(AssumedRecognition::new);
+    let addition_codes =
+        ["CCoSp2", "FSSp2", "StSq2", "ChSp1", "FCSp3"].map(AssumedRecognition::new);
+    let originals = generate_program_candidates_with_assumed_recognition(
+        &registry,
+        &generation,
+        &original_codes,
+    )
+    .unwrap();
+    let additions = generate_program_candidates_with_assumed_recognition(
+        &registry,
+        &generation,
+        &addition_codes,
+    )
+    .unwrap();
+    let mut q = request();
+    q.profile = generation.profile;
+    q.policy = adult_program_policy(category);
+    q.original = ["axel", "combination"]
+        .into_iter()
+        .zip(originals.domain.variants)
+        .map(|(id, variant)| {
+            let mut original = entry(id, variant);
+            original.entry.intended_recognition = None;
+            original
+        })
+        .collect();
+    q.variants = additions.domain.variants.clone();
+    q.generated_domain = Some(additions.domain);
+    q.exclusions = vec![PersonalExclusion::Variant(4)];
+    q.min_additions = 3;
+    q.max_additions = 3;
+
+    let result = complete_program_with_assumed_recognition(
+        &registry,
+        &q,
+        &original_codes,
+        &additions.recognition,
+    )
+    .unwrap();
+    assert_eq!(result.status, OptimizerStatus::OptimalProven);
+    assert!(result.enumeration_complete);
+    let mut actual = BTreeSet::new();
+    for candidate in &result.candidates {
+        let mut word = Vec::new();
+        for (index, provenance) in candidate.provenance.iter().enumerate() {
+            match provenance {
+                CompletionProvenance::Original {
+                    original_index, id, ..
+                } => {
+                    assert_eq!(id, &q.original[*original_index].id);
+                    assert_eq!(
+                        candidate.assessment.request.entries[index],
+                        q.original[*original_index].entry
+                    );
+                }
+                CompletionProvenance::Inserted { boundary, .. } => {
+                    assert_eq!(
+                        *boundary,
+                        word.iter()
+                            .filter(|&&code| matches!(code, "1A" | "CCoSp3"))
+                            .count()
+                    );
+                }
+            }
+            word.push(candidate.per_element[index].notation.as_str());
+        }
+        let manual = assess_manual_bv(
+            &registry,
+            &ManualBvRequest {
+                profile: q.profile.clone(),
+                scoring_table: q.scoring_table,
+                submission: SubmissionState::Complete,
+                elements: word.iter().copied().map(AssumedRecognition::new).collect(),
+            },
+        )
+        .unwrap();
+        assert_eq!(candidate.total_base_hundredths, 1370);
+        assert_eq!(manual.total.exact_hundredths, Some(1370));
+        assert!(actual.insert(word));
+    }
+    let codes = ["1A", "CCoSp3", "FSSp2", "StSq2", "ChSp1"];
+    let expected = (0..5usize.pow(5))
+        .filter_map(|encoded| {
+            let indices: Vec<_> = (0..5)
+                .map(|place| encoded / 5usize.pow(place) % 5)
+                .collect();
+            let axel = indices.iter().position(|&i| i == 0)?;
+            let spin = indices.iter().position(|&i| i == 1)?;
+            (axel < spin && (2..5).all(|i| indices.contains(&i)))
+                .then(|| indices.iter().map(|&i| codes[i]).collect::<Vec<_>>())
+        })
+        .collect();
+    assert_eq!(actual, expected);
 }
 
 #[test]

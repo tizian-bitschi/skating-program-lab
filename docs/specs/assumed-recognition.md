@@ -21,11 +21,13 @@ or panel decisions.
   checks resolve, allowing repairable draft omissions.
 - For just construction diagnostics, call
   `assess_program_legality_with_assumed_recognition` with the same inputs.
-- In an optimizer build, pass explicit selections in manual variant order
-  to `generate_program_candidates_with_assumed_recognition`. Automatic
-  expansion and evidence templates belong to the existing generator.
-  The result returns the accepted domain, input indices and matching
-  selections in domain order.
+- In an optimizer build, pass the exact allowed individual SOV codes to
+  `generate_program_candidates_with_assumed_recognition` with an empty
+  `manual_variants` list. Each selected level is a separate choice, including
+  Basic when published. Profile-ineligible types and levels are audited as
+  omissions. The result returns the accepted domain, original selection indices
+  and matching selections in domain order. For compound jump units, supply
+  typed manual variants and their exact selections in corresponding order.
 - Use `optimize_program_with_assumed_recognition` for a finite variant
   domain and `complete_program_with_assumed_recognition` for additions to
   immutable originals. The latter receives one ordered selection list for
@@ -69,9 +71,11 @@ compound structures, excess Senior jump slots and uncertain repetition
 credit leave affected values unresolved. An unknown earlier jump can
 consume a repetition slot. The listed value of a known compound is
 retained even when its credit is unresolved.
-The current ordered solver has an unfactored objective. It rejects assumed
-domains containing repeated advanced solo choices before claiming an
-optimum, including repetitions involving locked originals.
+The ordered solver uses listed BV for supported assumed domains. It rejects
+Senior domains that can require 80% repetition credit, including reuse of a
+single addition variant and repetitions involving locked originals. Both search
+workflows check feasible proposals against the contextual credit calculation
+used by manual assessment before reporting an optimum.
 
 ## Profile-filtered choices
 
@@ -92,7 +96,7 @@ Ignored and unresolved credit have distinct representations. As in detailed
 manual assessment, only numeric Value outcomes enter the numeric subtotal.
 Clean manual selections do not generate panel NoValue or Ignored decisions. Actual timing,
 GOE scenarios and protocol replay use separate entry points.
-Assumed candidate generation rejects unavailable individual selections. The separate
+Assumed candidate generation rejects unavailable manually supplied variants. The separate
 legality report still reports construction findings for a supplied plan.
 An available choice does not reserve a slot or satisfy any required role;
 those checks need the whole program. Compound jump units continue through

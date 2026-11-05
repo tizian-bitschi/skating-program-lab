@@ -2,6 +2,10 @@
 use skating_program_lab::*;
 use std::{collections::BTreeSet, time::Duration};
 
+#[path = "support/generation_defaults.rs"]
+#[allow(dead_code)]
+mod generation_defaults;
+
 fn pos(position: SpinPosition, n: u16) -> SpinStep {
     SpinStep::Position {
         position: Some(position),
@@ -548,39 +552,19 @@ fn proposal_cap_stops_a_large_finite_domain_without_claiming_a_node_budget() {
 #[test]
 fn optimize_gold_sov_selections_without_spin_or_step_proof() {
     let category = AdultCategory::Gold;
-    let mut variants = vec![];
-    for _ in 0..2 {
-        variants.push(ProgramVariant {
-            element: PlannedElement::RegularSpin(RegularSpin {
-                entry: None,
-                steps: None,
-            }),
-            evidence: ElementPlanEvidence::Spin {
-                spin: RegularSpinEvidence::default(),
-                local_feature_qualification_assumed: false,
-            },
-            recognition_assumed: false,
-        });
-    }
-    variants.push(ProgramVariant {
-        element: PlannedElement::StepSequence,
-        evidence: ElementPlanEvidence::Step {
-            level: Level::Two,
-            clean_difficult_turns: None,
-            full_ice_coverage: None,
-            movement: None,
-            qualified_features: None,
-            qualification_assumed: false,
-        },
-        recognition_assumed: false,
-    });
-    variants.push(chsp());
-    let q = request(category, variants, 4);
-    let choices = ["CCoSp3", "FSSp2", "StSq2", "ChSp1"].map(AssumedRecognition::new);
+    let registry = ProfileRegistry::adult();
+    let generation = generation_defaults::request(adult_profile(category));
+    let choices =
+        ["CCoSp2", "CCoSp3", "FSSp2", "StSq2", "ChSp1", "1A"].map(AssumedRecognition::new);
+    let generated =
+        generate_program_candidates_with_assumed_recognition(&registry, &generation, &choices)
+            .unwrap();
+    let q = request(category, generated.domain.variants, 5);
     let result =
-        optimize_program_with_assumed_recognition(&ProfileRegistry::adult(), &q, &choices).unwrap();
+        optimize_program_with_assumed_recognition(&registry, &q, &generated.recognition).unwrap();
     assert_eq!(result.status, OptimizerStatus::OptimalProven);
-    assert_eq!(result.candidates[0].base_hundredths, 1260);
+    assert!(result.enumeration_complete);
+    assert_eq!(result.candidates.len(), 120);
     assert!(result.supported_rules.contains(&"program-step-level-cap"));
     assert!(result
         .supported_rules
@@ -589,12 +573,26 @@ fn optimize_gold_sov_selections_without_spin_or_step_proof() {
     assert!(!result
         .supported_rules
         .contains(&"program-spin-level-credit"));
-    for (value, &index) in result.candidates[0]
-        .per_element
-        .iter()
-        .zip(&result.candidates[0].variant_indices)
-    {
-        assert_eq!(value.notation, choices[index].code);
+    assert_eq!(ids(&result).len(), result.candidates.len());
+    for candidate in &result.candidates {
+        let elements = candidate
+            .variant_indices
+            .iter()
+            .map(|&index| choices[index].clone())
+            .collect::<Vec<_>>();
+        assert!(elements.iter().all(|selection| selection.code != "CCoSp2"));
+        let manual = assess_manual_bv(
+            &registry,
+            &ManualBvRequest {
+                profile: q.profile.clone(),
+                scoring_table: q.scoring_table,
+                submission: SubmissionState::Complete,
+                elements,
+            },
+        )
+        .unwrap();
+        assert_eq!(candidate.base_hundredths, 1370);
+        assert_eq!(manual.total.exact_hundredths, Some(1370));
     }
 }
 
@@ -607,10 +605,11 @@ fn assumed_optimizer_rejects_senior_repeat_credit_before_search() {
         unreachable!()
     };
     jump.rotations = Some(3);
-    let mut q = request(AdultCategory::Gold, vec![axel.clone(), axel], 2);
+    // A single addition variant can be placed more than once by the solver.
+    let mut q = request(AdultCategory::Gold, vec![axel], 2);
     q.profile = profile.id;
     q.policy = senior_program_policy(category);
-    let choices = ["3A", "3A"].map(AssumedRecognition::new);
+    let choices = [AssumedRecognition::new("3A")];
     assert!(matches!(
         optimize_program_with_assumed_recognition(&ProfileRegistry::senior(), &q, &choices),
         Err(ProgramOptimizationError::InvalidRequest(reason)) if reason.contains("contextual BV")
