@@ -197,43 +197,43 @@ pub fn senior_program_policy(category: SeniorCategory) -> ProgramPolicy {
     }
 }
 
-/// Resolve ordered repetition credit independently for each element.
-/// Definitive zero outcomes remain zero; uncertainty affects advanced jumps only.
-pub(crate) fn repetition_context(
-    panels: &[Option<PanelRecognition>],
-) -> Vec<Option<PanelRecognition>> {
-    let mut occurrences: Vec<(String, usize, bool)> = vec![];
+pub(crate) const MAX_IDENTICAL_DOUBLE_OR_ABOVE: usize = 2;
+
+#[derive(Clone, Copy)]
+pub(crate) enum RepetitionInput<'a> {
+    Recognized(&'a RecognitionDetails),
+    NonJump,
+    Unknown,
+}
+
+#[derive(Clone, Copy)]
+pub(crate) enum RepetitionCredit {
+    Unchanged,
+    Reduced,
+    Unresolved,
+}
+
+/// Resolve Rule 612 for ordered element details, including clean planning inputs.
+pub(crate) fn repetition_credit(inputs: &[RepetitionInput<'_>]) -> Vec<RepetitionCredit> {
+    let mut occurrences = vec![];
     let mut all_jumps = vec![];
     let mut uncertain = false;
-    let advanced = |panel: &PanelRecognition| {
-        panel.details.as_ref().is_some_and(|d| {
-            d.components()
-                .iter()
-                .any(|c| matches!(c.as_str().as_bytes().first(), Some(b'3' | b'4' | b'5')))
-        })
+    let advanced = |details: &RecognitionDetails| {
+        details
+            .components()
+            .iter()
+            .any(|c| matches!(c.as_str().as_bytes().first(), Some(b'3' | b'4' | b'5')))
     };
-    let nonjump = |panel: &PanelRecognition| {
-        panel.details.as_ref().is_some_and(|d| {
-            d.components()
-                .iter()
-                .all(|c| !c.as_str().starts_with(char::is_numeric) && c.as_str() != "Eu")
-        })
-    };
-    for (index, panel) in panels.iter().enumerate() {
-        let Some(panel) = panel else {
-            uncertain = true;
-            continue;
+    for (index, input) in inputs.iter().enumerate() {
+        let details = match input {
+            RepetitionInput::Recognized(details) => details,
+            RepetitionInput::NonJump => continue,
+            RepetitionInput::Unknown => {
+                uncertain = true;
+                continue;
+            }
         };
-        if panel.outcome != RecognitionOutcome::Recognized {
-            // A known non-jump cannot change jump repetition, including a no-value spin.
-            uncertain |= !nonjump(panel);
-            continue;
-        }
-        let Some(details) = panel.details.as_ref() else {
-            uncertain = true;
-            continue;
-        };
-        if advanced(panel)
+        if advanced(details)
             && details.calls().is_none_or(|calls| {
                 calls.iter().any(|call| {
                     !matches!(
@@ -253,53 +253,87 @@ pub(crate) fn repetition_context(
         }
         for code in details.components() {
             if let Some(rotation @ b'1'..=b'5') = code.as_str().as_bytes().first() {
-                all_jumps.push((code.as_str()[1..].to_string(), rotation - b'0'));
+                all_jumps.push((&code.as_str()[1..], rotation - b'0'));
             }
             if matches!(code.as_str().as_bytes().first(), Some(b'3' | b'4' | b'5')) {
-                occurrences.push((code.as_str().into(), index, details.components().len() == 1));
+                occurrences.push((code.as_str(), index, details.components().len() == 1));
             }
         }
     }
     let invalid_repetition = advanced_repeat_limit_exceeded(&all_jumps)
         || all_jumps.iter().any(|jump| {
-            (jump.1 >= 2 && all_jumps.iter().filter(|other| *other == jump).count() > 2)
+            (jump.1 >= 2
+                && all_jumps.iter().filter(|other| *other == jump).count()
+                    > MAX_IDENTICAL_DOUBLE_OR_ABOVE)
                 || kind_occurrences_exceeded(&all_jumps, &jump.0)
         });
-    let mut adjusted = panels.to_vec();
+    let mut credits = vec![RepetitionCredit::Unchanged; inputs.len()];
     if uncertain || invalid_repetition {
-        for panel in &mut adjusted {
-            if panel.as_ref().is_some_and(|p| {
-                p.outcome == RecognitionOutcome::Recognized
-                    && (advanced(p) || (invalid_repetition && !nonjump(p)))
-            }) {
-                *panel = None;
+        for (credit, input) in credits.iter_mut().zip(inputs) {
+            if let RepetitionInput::Recognized(details) = input {
+                if advanced(details) || (invalid_repetition && !known_nonjump(details)) {
+                    *credit = RepetitionCredit::Unresolved;
+                }
             }
         }
-        return adjusted;
+        return credits;
     }
     for (code, index, solo) in &occurrences {
         let matching: Vec<_> = occurrences.iter().filter(|e| e.0 == *code).collect();
         if *solo && matching.len() == 2 && matching.iter().all(|e| e.2) && matching[1].1 == *index {
-            let panel = adjusted[*index]
-                .as_mut()
-                .expect("known advanced recognition");
-            let details = panel.details.as_ref().expect("known advanced details");
-            let mut calls = details.calls().expect("known clean calls").to_vec();
-            if !calls.iter().any(|c| c.call == PanelCall::Repetition) {
-                calls.push(RecordedCall {
-                    target: CallTarget::Element,
-                    call: PanelCall::Repetition,
-                });
-                panel.details = Some(
-                    RecognitionDetails::new(
-                        details.components().to_vec(),
-                        details.level(),
-                        Some(calls),
-                    )
-                    .expect("valid repetition call"),
-                );
-            }
+            credits[*index] = RepetitionCredit::Reduced;
         }
     }
-    adjusted
+    credits
+}
+
+pub(crate) fn with_repetition_call(details: &RecognitionDetails) -> RecognitionDetails {
+    let mut calls = details.calls().expect("known repetition calls").to_vec();
+    if !calls.iter().any(|c| c.call == PanelCall::Repetition) {
+        calls.push(RecordedCall {
+            target: CallTarget::Element,
+            call: PanelCall::Repetition,
+        });
+    }
+    RecognitionDetails::new(details.components().to_vec(), details.level(), Some(calls))
+        .expect("valid repetition call")
+}
+
+fn known_nonjump(details: &RecognitionDetails) -> bool {
+    details
+        .components()
+        .iter()
+        .all(|code| !code.as_str().starts_with(char::is_numeric) && code.as_str() != "Eu")
+}
+
+/// Adapt panel outcomes to the shared repetition rule without changing source or indices.
+pub(crate) fn repetition_context(
+    panels: &[Option<PanelRecognition>],
+) -> Vec<Option<PanelRecognition>> {
+    let inputs: Vec<_> = panels
+        .iter()
+        .map(|panel| match panel {
+            Some(panel) if panel.outcome == RecognitionOutcome::Recognized => panel
+                .details
+                .as_ref()
+                .map_or(RepetitionInput::Unknown, RepetitionInput::Recognized),
+            Some(panel) if panel.details.as_ref().is_some_and(known_nonjump) => {
+                RepetitionInput::NonJump
+            }
+            _ => RepetitionInput::Unknown,
+        })
+        .collect();
+    panels
+        .iter()
+        .cloned()
+        .zip(repetition_credit(&inputs))
+        .map(|(panel, credit)| match credit {
+            RepetitionCredit::Unchanged => panel,
+            RepetitionCredit::Unresolved => None,
+            RepetitionCredit::Reduced => panel.map(|mut panel| {
+                panel.details = panel.details.as_ref().map(with_repetition_call);
+                panel
+            }),
+        })
+        .collect()
 }

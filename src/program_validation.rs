@@ -384,6 +384,23 @@ pub(crate) fn validate_program_scope(
     policy: &ProgramPolicy,
     scope: EvaluationScope,
 ) -> Result<EvidenceValidationReport, ProfileSelectionError> {
+    validate_program_scope_with_credit(registry, program, evidence, policy, scope)
+        .map(|(report, _)| report)
+}
+
+pub(crate) fn validate_program_scope_with_credit(
+    registry: &ProfileRegistry,
+    program: &ProfileProgram,
+    evidence: &[ElementPlanEvidence],
+    policy: &ProgramPolicy,
+    scope: EvaluationScope,
+) -> Result<
+    (
+        EvidenceValidationReport,
+        crate::validation::JumpCreditBlocks,
+    ),
+    ProfileSelectionError,
+> {
     let profile = registry.resolve(&program.profile, program.scoring_table)?;
     let invalid = |reason: &str| ProfileSelectionError {
         profile: program.profile.clone(),
@@ -418,6 +435,7 @@ pub(crate) fn validate_program_scope(
     let mut spin_evidence = ProgramValidationEvidence::default();
     for (index, (element, data)) in program.elements.iter().zip(evidence).enumerate() {
         match (element, data) {
+            (PlannedElement::Unspecified, _) if scope == EvaluationScope::AssumedRecognition => {}
             (PlannedElement::RegularSpin(_), ElementPlanEvidence::Spin { spin, .. }) => {
                 spin_evidence.spins.push(IndexedSpinEvidence {
                     element_index: index,
@@ -452,21 +470,22 @@ pub(crate) fn validate_program_scope(
             .then_some(i)
         })
         .collect();
-    let mut report = crate::spin_validation::validate_profile_program_with_assumptions(
-        registry,
-        program,
-        &spin_evidence,
-        Some(&policy.spins),
-        &assumed_direct_sequences,
-        match scope {
-            EvaluationScope::EvidenceBased => {
-                crate::spin_validation::FeatureCreditEvaluation::ProgramWide
-            }
-            EvaluationScope::AssumedRecognition => {
-                crate::spin_validation::FeatureCreditEvaluation::AssumedRecognition
-            }
-        },
-    )?;
+    let (mut report, credit_blocks) =
+        crate::spin_validation::validate_profile_program_with_assumptions(
+            registry,
+            program,
+            &spin_evidence,
+            Some(&policy.spins),
+            &assumed_direct_sequences,
+            match scope {
+                EvaluationScope::EvidenceBased => {
+                    crate::spin_validation::FeatureCreditEvaluation::ProgramWide
+                }
+                EvaluationScope::AssumedRecognition => {
+                    crate::spin_validation::FeatureCreditEvaluation::AssumedRecognition
+                }
+            },
+        )?;
     let mut checks = MixedChecks {
         findings: &mut report.validation.findings,
         applied_rules: &mut report.applied_rules,
@@ -881,7 +900,7 @@ pub(crate) fn validate_program_scope(
             report.sources.push(src.clone());
         }
     }
-    Ok(report)
+    Ok((report, credit_blocks))
 }
 
 /// Classification belongs to the shared validator, never to diagnostic prose.

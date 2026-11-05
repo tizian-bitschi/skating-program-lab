@@ -4,7 +4,9 @@ An open-source Rust library for planning technical figure skating programs. The 
 
 ## Current capabilities
 
-For theoretical program construction, use the [assumed-recognition API](docs/specs/assumed-recognition.md) to select exact SOV codes and check composition without supplying spin or step feature evidence.
+For theoretical program construction, use `assess_manual_bv` to calculate
+base value from ordered SOV codes and check composition without supplying
+spin or step feature evidence. See the [assumed-recognition API](docs/specs/assumed-recognition.md).
 
 The [Senior Grand Prix integration audit](docs/milestone-75.md) maps the six
 workstreams to parent acceptance evidence and a source-ordered eleven-slot
