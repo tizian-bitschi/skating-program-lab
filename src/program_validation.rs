@@ -90,8 +90,6 @@ struct RuleDescriptor {
 // One metadata declaration supplies optimizer inventory and coverage semantics.
 macro_rules! program_rules {
     ($(($id:expr, $basis:ident, $evidence:ident)),* $(,)?) => {
-        #[cfg(feature = "optimizer")]
-        pub(crate) const RULE_IDS: &[&str] = &[$($id),*];
         const RULES: &[RuleDescriptor] = &[$(RuleDescriptor { id: $id, basis: EvaluationBasis::$basis, evidence: EvidenceRequirement::$evidence }),*];
     };
 }
@@ -127,6 +125,22 @@ program_rules![
     ("program-step-level-credit", Qualification, Plan),
     ("program-step-recognition", Qualification, Plan),
 ];
+
+const ASSUMED_STEP_LEVEL_CAP: &str = "program-step-level-cap";
+
+#[cfg(feature = "optimizer")]
+pub(crate) fn supported_rules(scope: EvaluationScope) -> impl Iterator<Item = &'static str> {
+    RULES
+        .iter()
+        .filter_map(move |rule| {
+            (scope == EvaluationScope::EvidenceBased
+                || (rule.basis == EvaluationBasis::Plan
+                    && rule.evidence == EvidenceRequirement::Plan)
+                || rule.id == crate::validation::SEQUENCE_DIRECT_STEP_RULE)
+                .then_some(rule.id)
+        })
+        .chain((scope == EvaluationScope::AssumedRecognition).then_some(ASSUMED_STEP_LEVEL_CAP))
+}
 
 pub(crate) fn assumption_rule(id: &str) -> bool {
     RULES
@@ -263,6 +277,35 @@ impl MixedChecks<'_> {
             source: source.clone(),
         });
     }
+}
+
+fn check_choreographic_plan(
+    checks: &mut MixedChecks<'_>,
+    index: usize,
+    element: &PlannedElement,
+    movements: Option<&[SkatingMovement]>,
+) {
+    let PlannedElement::ChoreographicSequence {
+        movements: Some(plan),
+    } = element
+    else {
+        return;
+    };
+    let input = SourceReference {
+        document: "Skating Program Lab input contract".into(),
+        version: "issue-49".into(),
+        location: "typed ChSq evidence supplements ordered legacy movement descriptions".into(),
+    };
+    checks.apply(
+        "program-choreographic-plan-consistency",
+        Some(index),
+        &input,
+    );
+    match plan.iter().map(|m| SkatingMovement::from_description(m)).collect::<Option<Vec<_>>>() {
+                        None => checks.add(FindingKind::Unsupported,"program-choreographic-plan-consistency",Some(index),"A legacy movement description is outside the supported exact vocabulary; it cannot be silently reconciled.",&input),
+                        Some(parsed) if movements.is_some_and(|m| m != parsed) => checks.add(FindingKind::Violation,"program-choreographic-plan-consistency",Some(index),"Typed ChSq movement evidence contradicts the explicitly ordered plan movements.",&input),
+                        _ => {},
+                    }
 }
 
 impl SkatingMovement {
@@ -459,26 +502,11 @@ pub(crate) fn validate_program_scope(
     let mut unknown_attempts_seen = false;
     let mut uncertain_attempts = Vec::new();
     for (index, (element, data)) in program.elements.iter().zip(evidence).enumerate() {
-        if scope == EvaluationScope::AssumedRecognition {
-            if let ElementPlanEvidence::Step { level, .. } = data {
-                checks.apply("program-step-level-cap", Some(index), &policy.step_source);
-                if level.number() > policy.max_step_level.number() {
-                    checks.add(
-                        FindingKind::Violation,
-                        "program-step-level-cap",
-                        Some(index),
-                        "The selected SOV level exceeds the profile cap.",
-                        &policy.step_source,
-                    );
-                }
-            }
-            continue;
-        }
         match data {
             ElementPlanEvidence::Spin {
                 spin,
                 local_feature_qualification_assumed,
-            } => {
+            } if scope == EvaluationScope::EvidenceBased => {
                 let PlannedElement::RegularSpin(plan) = element else {
                     unreachable!()
                 };
@@ -683,6 +711,20 @@ pub(crate) fn validate_program_scope(
                     checks.add(FindingKind::Unknown, "program-spin-level-credit", Some(index), "The target level lacks eligible unused feature credit or a required level-four feature.", &feature_source);
                 }
             }
+            ElementPlanEvidence::Step { level, .. }
+                if scope == EvaluationScope::AssumedRecognition =>
+            {
+                checks.apply(ASSUMED_STEP_LEVEL_CAP, Some(index), &policy.step_source);
+                if level.number() > policy.max_step_level.number() {
+                    checks.add(
+                        FindingKind::Violation,
+                        ASSUMED_STEP_LEVEL_CAP,
+                        Some(index),
+                        "The selected SOV level exceeds the profile cap.",
+                        &policy.step_source,
+                    );
+                }
+            }
             ElementPlanEvidence::Step {
                 level: target,
                 clean_difficult_turns,
@@ -737,49 +779,31 @@ pub(crate) fn validate_program_scope(
                 movements,
                 clearly_visible,
             } => {
-                checks.apply(
-                    "program-choreographic-sequence",
-                    Some(index),
-                    &policy.choreography_source,
-                );
-                checks.apply(
-                    "program-choreographic-sequence",
-                    Some(index),
-                    &source("p. 6, choreographic sequence recognition"),
-                );
-                if let PlannedElement::ChoreographicSequence {
-                    movements: Some(plan),
-                } = element
-                {
-                    let input = SourceReference {
-                        document: "Skating Program Lab input contract".into(),
-                        version: "issue-49".into(),
-                        location:
-                            "typed ChSq evidence supplements ordered legacy movement descriptions"
-                                .into(),
-                    };
+                if scope == EvaluationScope::EvidenceBased {
                     checks.apply(
-                        "program-choreographic-plan-consistency",
+                        "program-choreographic-sequence",
                         Some(index),
-                        &input,
+                        &policy.choreography_source,
                     );
-                    match plan.iter().map(|m| SkatingMovement::from_description(m)).collect::<Option<Vec<_>>>() {
-                        None => checks.add(FindingKind::Unsupported,"program-choreographic-plan-consistency",Some(index),"A legacy movement description is outside the supported exact vocabulary; it cannot be silently reconciled.",&input),
-                        Some(parsed) if movements.as_ref().is_some_and(|m| *m != parsed) => checks.add(FindingKind::Violation,"program-choreographic-plan-consistency",Some(index),"Typed ChSq movement evidence contradicts the explicitly ordered plan movements.",&input),
-                        _ => {},
-                    }
+                    checks.apply(
+                        "program-choreographic-sequence",
+                        Some(index),
+                        &source("p. 6, choreographic sequence recognition"),
+                    );
                 }
-                if *clearly_visible != Some(true)
-                    || movements
-                        .as_ref()
-                        .is_none_or(|m| !m.iter().any(|a| m.iter().any(|b| a != b)))
+                check_choreographic_plan(&mut checks, index, element, movements.as_deref());
+                if scope == EvaluationScope::EvidenceBased
+                    && (*clearly_visible != Some(true)
+                        || movements
+                            .as_ref()
+                            .is_none_or(|m| !m.iter().any(|a| m.iter().any(|b| a != b))))
                 {
                     checks.add(FindingKind::Unknown, "program-choreographic-sequence", Some(index), "Recognition needs two different supported movements and a clearly visible sequence.", &source("p. 6, choreographic sequence recognition"));
                 }
             }
             ElementPlanEvidence::ChoreographicSpin {
                 consecutive_revolutions_per_foot,
-            } => {
+            } if scope == EvaluationScope::EvidenceBased => {
                 let qa = SourceReference {
                     document: "ISU Technical Committee Q&A 1".into(),
                     version: "2026-04-21".into(),
@@ -793,7 +817,7 @@ pub(crate) fn validate_program_scope(
                     checks.add(FindingKind::Unknown, "program-choreographic-spin", Some(index), "Recognition needs three consecutive revolutions on the same foot; split holds cannot be added.", &qa);
                 }
             }
-            ElementPlanEvidence::Jump { .. } => {}
+            _ => {}
         }
     }
     for coverage in &mut report.coverage {

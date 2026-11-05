@@ -85,6 +85,7 @@ pub struct ProgramOptimizationResult {
     pub proof_scope: &'static str,
     pub assumptions: &'static str,
     pub sources: Vec<SourceReference>,
+    /// Rules available in the active evaluation scope, whether or not this plan needs them.
     pub supported_rules: Vec<&'static str>,
     /// Union of source-bound checks actually evaluated for returned candidates.
     pub applied_rules: Vec<AppliedRule>,
@@ -490,7 +491,9 @@ pub(super) fn optimize_anchored(
     let mut sources = profile.sources.clone();
     // Verify all requested variants before exclusions; unsupported inputs are never hidden.
     for (i, variant) in request.variants.iter().enumerate() {
-        if request.variants[..i].contains(variant) && !anchors.is_some_and(|a| i >= a.first_anchor)
+        if assumed_values.is_none()
+            && request.variants[..i].contains(variant)
+            && !anchors.is_some_and(|a| i >= a.first_anchor)
         {
             return Err(E::InvalidRequest("duplicate candidate variants"));
         }
@@ -548,12 +551,20 @@ pub(super) fn optimize_anchored(
             "Senior repeated advanced solos require contextual BV in the solver objective",
         ));
     }
+    if assumed_values.is_some() {
+        let addition_count = anchors.map_or(request.variants.len(), |a| a.first_anchor);
+        for (i, variant) in request.variants[..addition_count].iter().enumerate() {
+            if request.variants[..i].contains(variant) {
+                return Err(E::InvalidRequest("duplicate candidate variants"));
+            }
+        }
+    }
     let mut result = ProgramOptimizationResult { request: request.clone(), universe, excluded_variants,
         unmodeled_variants: "Unlisted variants, Euler consequences, difficult-variation categories, unsupported feature prerequisites, Pair rules and physical skateability are outside this model.",
         equivalence: "Identical ordered candidate variants including evidence; duplicate variants are rejected.",
         proof_scope: "Finite supplied recognized Single Free Skating scenarios and implemented applicable rules only; never full real-world ISU compliance or an official/global maximum.",
         assumptions: "Clean recognition is explicitly assumed for every variant; successful feature qualification is separately assumed where supplied. No execution or official second-half credit is established.",
-        sources, applied_rules: vec![], supported_rules: profile.bindings.iter().filter(|b| b.rule != ProfileRule::Scoring).map(|b| profile.binding(b.rule).id).chain(crate::spin_validation::RULE_IDS.iter().copied()).chain(crate::program_validation::RULE_IDS.iter().copied()).chain(["catalog-unfactored-base-value"]).collect(),
+        sources, applied_rules: vec![], supported_rules: profile.bindings.iter().filter(|b| b.rule != ProfileRule::Scoring).map(|b| profile.binding(b.rule).id).chain(crate::spin_validation::supported_rules(scope)).chain(crate::program_validation::supported_rules(scope)).chain(["catalog-unfactored-base-value"]).collect(),
         status: OptimizerStatus::Incomplete, enumeration_complete: false, termination_reason: JumpTerminationReason::Interrupted, examined_programs: 0, candidates: vec![] };
     let (mut solver, slots, objective) =
         solver_common::ordered_slots(&values, request.max_elements, request.min_elements);
@@ -741,7 +752,7 @@ pub(super) fn resolve_variants(
         .enumerate()
         .map(|(i, (variant, assumption))| {
             let (evidence, value) = assumption
-                .resolve(table, &variant.element, ruleset)
+                .resolve(table, &variant.element, ruleset, Some(&variant.evidence))
                 .ok_or(ProgramOptimizationError::UnsupportedVariant(i))?;
             variant.evidence = evidence;
             variant.recognition_assumed = true;

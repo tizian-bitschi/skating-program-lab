@@ -40,14 +40,20 @@ Selections cover supported clean singles jump units, regular spin Basic
 and levels 1–4, StSq Basic and levels 1–4, and fixed ChSq1 and ChSp1.
 The exact catalog row must exist for the selected edition. Compound
 notation is resolved through the same component scoring path as detailed
-assessment. The sequence code does not establish a direct step into the
-Axel. Missing transition evidence remains visible.
+assessment. For a sequence, supply a direct-step assumption through
+`AssumedRecognition::direct_transitions_assumed` or the existing jump evidence
+on a variant or locked original. The sequence code alone leaves the direct
+step unresolved. Coverage reports an explicit direct-step assumption as
+conditional.
 
 Spin position holds, variation qualification, first attempts and first
 successes, actual movement and execution, timing and panel recognition
 remain outside this mode. Position, revolution and spin-feature filters
 require the detailed inputs. A report covers only the listed construction
-rules and cannot establish official ISU legality.
+rules and cannot establish official ISU legality. In optimizer results,
+`supported_rules` lists the active scope; `applied_rules` records the rules
+actually evaluated for returned candidates. Execution checks excluded by
+this scope remain available through the evidence-based APIs.
 
 Senior manual totals apply the published 80% value for the second of two
 identical advanced solo jumps in an otherwise supported repetition context.

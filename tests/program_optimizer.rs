@@ -450,6 +450,14 @@ fn assumed_silver_axel_sequence_reaches_optimizer_scoring_and_shared_validation(
         2,
     );
     req.must_have = vec![vec![0], vec![1]];
+    let simple = optimize_program_with_assumed_recognition(
+        &ProfileRegistry::adult(),
+        &req,
+        &["1T+1A+SEQ", "SSpB"].map(AssumedRecognition::new),
+    )
+    .unwrap();
+    assert_eq!(simple.status, OptimizerStatus::OptimalProven);
+    assert_eq!(simple.candidates[0].base_hundredths, 280);
     let r = result(&req);
     assert_eq!(r.status, OptimizerStatus::OptimalProven);
     assert!(r.enumeration_complete);
@@ -568,12 +576,19 @@ fn optimize_gold_sov_selections_without_spin_or_step_proof() {
     });
     variants.push(chsp());
     let q = request(category, variants, 4);
-    let choices =
-        ["CCoSp3", "FSSp2", "StSq2", "ChSp1"].map(|code| AssumedRecognition { code: code.into() });
+    let choices = ["CCoSp3", "FSSp2", "StSq2", "ChSp1"].map(AssumedRecognition::new);
     let result =
         optimize_program_with_assumed_recognition(&ProfileRegistry::adult(), &q, &choices).unwrap();
     assert_eq!(result.status, OptimizerStatus::OptimalProven);
     assert_eq!(result.candidates[0].base_hundredths, 1260);
+    assert!(result.supported_rules.contains(&"program-step-level-cap"));
+    assert!(result
+        .supported_rules
+        .contains(&"program-choreographic-plan-consistency"));
+    assert!(!result.supported_rules.contains(&"spin-minimum-revolutions"));
+    assert!(!result
+        .supported_rules
+        .contains(&"program-spin-level-credit"));
     for (value, &index) in result.candidates[0]
         .per_element
         .iter()
@@ -581,4 +596,23 @@ fn optimize_gold_sov_selections_without_spin_or_step_proof() {
     {
         assert_eq!(value.notation, choices[index].code);
     }
+}
+
+#[test]
+fn assumed_optimizer_rejects_senior_repeat_credit_before_search() {
+    let category = SeniorCategory::Women;
+    let profile = senior_profile(category);
+    let mut axel = jump(JumpKind::Axel);
+    let PlannedElement::Jump(JumpElement::Solo(jump)) = &mut axel.element else {
+        unreachable!()
+    };
+    jump.rotations = Some(3);
+    let mut q = request(AdultCategory::Gold, vec![axel.clone(), axel], 2);
+    q.profile = profile.id;
+    q.policy = senior_program_policy(category);
+    let choices = ["3A", "3A"].map(AssumedRecognition::new);
+    assert!(matches!(
+        optimize_program_with_assumed_recognition(&ProfileRegistry::senior(), &q, &choices),
+        Err(ProgramOptimizationError::InvalidRequest(reason)) if reason.contains("contextual BV")
+    ));
 }

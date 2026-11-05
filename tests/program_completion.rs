@@ -651,8 +651,8 @@ fn assumed_completion_keeps_original_plan_and_uses_no_panel_outcomes() {
         entry: None,
         steps: None,
     });
-    let originals = ["1A", "SSp2"].map(|code| AssumedRecognition { code: code.into() });
-    let additions = ["1T", "1S"].map(|code| AssumedRecognition { code: code.into() });
+    let originals = ["1A", "SSp2"].map(AssumedRecognition::new);
+    let additions = ["1T", "1S"].map(AssumedRecognition::new);
     let result = complete_program_with_assumed_recognition(
         &ProfileRegistry::adult(),
         &q,
@@ -677,4 +677,31 @@ fn assumed_completion_keeps_original_plan_and_uses_no_panel_outcomes() {
         candidate.assessment.intended_base.exact_hundredths,
         Some(i64::from(candidate.total_base_hundredths))
     );
+}
+
+#[test]
+fn assumed_completion_rejects_senior_repeat_credit_across_locked_original_and_addition() {
+    let category = SeniorCategory::Women;
+    let profile = senior_profile(category);
+    let mut q = request();
+    q.profile = profile.id;
+    q.policy = senior_program_policy(category);
+    let mut axel = jump(JumpKind::Axel);
+    let PlannedElement::Jump(JumpElement::Solo(jump)) = &mut axel.element else {
+        unreachable!()
+    };
+    jump.rotations = Some(3);
+    q.original.truncate(1);
+    q.original[0].entry.planned = axel.element.clone();
+    q.original[0].entry.intended_recognition = None;
+    q.variants = vec![axel];
+    q.insertion.boundaries = vec![1];
+    q.min_additions = 1;
+    q.max_additions = 1;
+    let choices = [AssumedRecognition::new("3A")];
+    assert!(matches!(
+        complete_program_with_assumed_recognition(&ProfileRegistry::senior(), &q, &choices, &choices),
+        Err(ProgramCompletionError::Optimization(ProgramOptimizationError::InvalidRequest(reason)))
+            if reason.contains("contextual BV")
+    ));
 }

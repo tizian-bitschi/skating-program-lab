@@ -268,6 +268,10 @@ fn without_repetition(
     .map_err(|_| BaseValueError::Unsupported)
 }
 
+pub(crate) fn repetition_hundredths(hundredths: u16) -> u16 {
+    ((u32::from(hundredths) * 8 + 5) / 10) as u16
+}
+
 fn repetition_row(
     table: ScoringTableId,
     details: &crate::RecognitionDetails,
@@ -324,7 +328,7 @@ fn repetition_row(
         }
         RowOrigin::Repetition { .. } => unreachable!("unrepeated input"),
     };
-    resolved.hundredths = ((u32::from(resolved.hundredths) * 8 + 5) / 10) as u16;
+    resolved.hundredths = repetition_hundredths(resolved.hundredths);
     resolved.origin = RowOrigin::Repetition {
         rows,
         reference,

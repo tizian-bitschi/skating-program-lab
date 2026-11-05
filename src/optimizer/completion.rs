@@ -481,7 +481,12 @@ pub fn complete_program_with_assumed_recognition(
             ));
         }
         let (evidence, value) = recognition
-            .resolve(request.scoring_table, &original.entry.planned, ruleset)
+            .resolve(
+                request.scoring_table,
+                &original.entry.planned,
+                ruleset,
+                Some(&original.entry.evidence),
+            )
             .ok_or(E::InvalidRequest(
                 "original SOV code is unsupported or does not match the plan",
             ))?;

@@ -3,9 +3,7 @@ use skating_program_lab::*;
 fn assumptions(codes: &[&str]) -> Vec<AssumedRecognition> {
     codes
         .iter()
-        .map(|code| AssumedRecognition {
-            code: (*code).into(),
-        })
+        .map(|code| AssumedRecognition::new(*code))
         .collect()
 }
 
@@ -268,10 +266,106 @@ fn assumed_mode_skips_variation_qualification_and_keeps_the_shared_level_cap() {
         FindingKind::Unsupported
     ));
     assert!(has(&strict, "spin-level-cap", FindingKind::Unknown));
+    for report in [&strict, &simple] {
+        assert!(has(report, "spin-required-role", FindingKind::Violation));
+    }
     assert!(has(&simple, "spin-level-cap", FindingKind::Violation));
     assert!(!has(
         &simple,
         "program-feature-qualification",
         FindingKind::Unsupported
     ));
+}
+
+#[test]
+fn assumed_sequence_requires_an_explicit_direct_transition() {
+    let category = AdultCategory::Silver;
+    let registry = ProfileRegistry::adult();
+    let policy = adult_program_policy(category);
+    let jump = |kind| {
+        JumpPart::Jump(ListedJump {
+            kind: Some(kind),
+            rotations: Some(1),
+        })
+    };
+    let plan = planned(
+        adult_profile(category),
+        vec![PlannedElement::Jump(JumpElement::Sequence(vec![
+            jump(JumpKind::ToeLoop),
+            jump(JumpKind::Axel),
+        ]))],
+    );
+    let mut choice = AssumedRecognition::new("1T+1A+SEQ");
+    let assess = |choice| {
+        assess_manual_program_with_assumed_recognition(
+            &registry,
+            &plan,
+            &[choice],
+            &policy,
+            SubmissionState::Draft,
+        )
+        .unwrap()
+    };
+    let unresolved = assess(choice.clone());
+    assert_eq!(unresolved.total_base_hundredths, None);
+    assert!(unresolved
+        .legality
+        .rules
+        .iter()
+        .any(|rule| rule.rule_id == "program-sequence-direct-step"
+            && rule.state == RuleCoverageState::MissingEvidence));
+    choice.direct_transitions_assumed = true;
+    let assumed = assess(choice);
+    assert_eq!(assumed.total_base_hundredths, Some(150));
+    assert!(assumed.legality.rules.iter().any(
+        |rule| rule.rule_id.contains("direct") && rule.state == RuleCoverageState::Conditional
+    ));
+}
+
+#[test]
+fn assumed_choreography_reports_unknown_plan_vocabulary() {
+    let category = AdultCategory::Silver;
+    let plan = planned(
+        adult_profile(category),
+        vec![PlannedElement::ChoreographicSequence {
+            movements: Some(vec!["unmodeled choreography".into()]),
+        }],
+    );
+    let result = assess_manual_program_with_assumed_recognition(
+        &ProfileRegistry::adult(),
+        &plan,
+        &assumptions(&["ChSq1"]),
+        &adult_program_policy(category),
+        SubmissionState::Draft,
+    )
+    .unwrap();
+    assert!(result
+        .legality
+        .validation
+        .validation
+        .findings
+        .iter()
+        .any(|f| f.rule_id == "program-choreographic-plan-consistency"
+            && f.kind == FindingKind::Unsupported));
+    assert_eq!(result.total_base_hundredths, None);
+}
+
+#[test]
+fn senior_manual_total_uses_eighty_percent_for_second_advanced_solo() {
+    let category = SeniorCategory::Women;
+    let axel = PlannedElement::Jump(JumpElement::Solo(ListedJump {
+        kind: Some(JumpKind::Axel),
+        rotations: Some(3),
+    }));
+    let plan = planned(senior_profile(category), vec![axel.clone(), axel]);
+    let result = assess_manual_program_with_assumed_recognition(
+        &ProfileRegistry::senior(),
+        &plan,
+        &assumptions(&["3A", "3A"]),
+        &senior_program_policy(category),
+        SubmissionState::Draft,
+    )
+    .unwrap();
+    assert_eq!(result.unfactored_base[1].hundredths, 800);
+    assert_eq!(result.total_base_hundredths, Some(1440));
 }

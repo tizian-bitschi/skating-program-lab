@@ -5,38 +5,48 @@ pub(crate) const SPIN_REQUIRED_ROLE_RULE: &str = "spin-required-role";
 pub(crate) const SPIN_EXECUTION_RULE: &str = "spin-execution-recognition";
 
 #[cfg(feature = "optimizer")]
-pub(crate) const RULE_IDS: &[&str] = &[
-    "spin-abbreviation",
-    "spin-basic-position",
-    "spin-combination-positions",
-    "spin-count",
-    "spin-distinct-abbreviation",
-    "spin-eligibility",
-    "spin-entry",
-    "spin-evidence-entry",
-    "spin-evidence-foot-change",
-    "spin-evidence-target",
-    SPIN_EXECUTION_RULE,
-    "spin-feature-credit",
-    "spin-feature-evidence",
-    "spin-feature-target",
-    "spin-layback-position",
-    "spin-level-cap",
-    "spin-minimum-revolutions",
-    "spin-multiple-foot-changes",
-    "spin-panel-reconciliation",
-    "spin-panel-target",
-    "spin-per-foot-policy",
-    "spin-per-foot-revolutions",
-    "spin-policy",
-    "spin-position-evidence",
-    "spin-position-policy",
-    "spin-position-type",
-    "spin-recognition-minimum",
-    SPIN_REQUIRED_ROLE_RULE,
-    "spin-rotations",
-    "spin-wind-up-target",
+const RULES: &[(&str, bool)] = &[
+    ("spin-abbreviation", true),
+    ("spin-basic-position", false),
+    ("spin-combination-positions", false),
+    ("spin-count", true),
+    ("spin-distinct-abbreviation", true),
+    ("spin-eligibility", true),
+    ("spin-entry", true),
+    ("spin-evidence-entry", true),
+    ("spin-evidence-foot-change", false),
+    ("spin-evidence-target", true),
+    (SPIN_EXECUTION_RULE, false),
+    ("spin-feature-credit", false),
+    ("spin-feature-evidence", false),
+    ("spin-feature-target", false),
+    ("spin-layback-position", false),
+    ("spin-level-cap", true),
+    ("spin-minimum-revolutions", false),
+    ("spin-multiple-foot-changes", false),
+    ("spin-panel-reconciliation", false),
+    ("spin-panel-target", false),
+    ("spin-per-foot-policy", false),
+    ("spin-per-foot-revolutions", false),
+    ("spin-policy", true),
+    ("spin-position-evidence", false),
+    ("spin-position-policy", false),
+    ("spin-position-type", false),
+    ("spin-recognition-minimum", false),
+    (SPIN_REQUIRED_ROLE_RULE, true),
+    ("spin-rotations", false),
+    ("spin-wind-up-target", false),
 ];
+
+#[cfg(feature = "optimizer")]
+pub(crate) fn supported_rules(
+    scope: crate::program_validation::EvaluationScope,
+) -> impl Iterator<Item = &'static str> {
+    RULES.iter().filter_map(move |&(id, structural)| {
+        (structural || scope == crate::program_validation::EvaluationScope::EvidenceBased)
+            .then_some(id)
+    })
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RegularSpinKind {

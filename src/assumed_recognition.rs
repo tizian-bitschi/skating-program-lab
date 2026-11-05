@@ -1,5 +1,5 @@
 //! SOV selections for hypothetical recognition in program construction.
-use crate::program_validation::{validate_program_scope, EvaluationScope};
+use crate::program_validation::EvaluationScope;
 use crate::*;
 
 /// Exact published notation selected for an intended element. The request's
@@ -7,6 +7,8 @@ use crate::*;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AssumedRecognition {
     pub code: String,
+    /// Caller assumption for a direct step into the Axel in a jump sequence.
+    pub direct_transitions_assumed: bool,
 }
 
 fn spin_abbreviation(code: &str) -> Option<SpinAbbreviation> {
@@ -45,18 +47,37 @@ pub struct AssumedProgramAssessment {
 }
 
 impl AssumedRecognition {
+    pub fn new(code: impl Into<String>) -> Self {
+        Self {
+            code: code.into(),
+            direct_transitions_assumed: false,
+        }
+    }
+
     pub(crate) fn resolve(
         &self,
         table: ScoringTableId,
         element: &PlannedElement,
         ruleset: RulesetId,
+        supplied: Option<&ElementPlanEvidence>,
     ) -> Option<(ElementPlanEvidence, BaseValue)> {
+        let sequence = matches!(element, PlannedElement::Jump(JumpElement::Sequence(_)));
+        if self.direct_transitions_assumed && !sequence {
+            return None;
+        }
         if matches!(
             element,
             PlannedElement::Jump(JumpElement::Combination(_) | JumpElement::Sequence(_))
         ) {
             let evidence = ElementPlanEvidence::Jump {
-                direct_transitions_assumed: false,
+                direct_transitions_assumed: sequence
+                    && (self.direct_transitions_assumed
+                        || matches!(
+                            supplied,
+                            Some(ElementPlanEvidence::Jump {
+                                direct_transitions_assumed: true
+                            })
+                        )),
             };
             let details = crate::plan_recognition::intended_details(element, &evidence)?;
             let value = crate::scoring::assumed_jump_unit_value(
@@ -101,7 +122,12 @@ impl AssumedRecognition {
                 CatalogFamily::ChoreographicSequence,
                 PlannedElement::ChoreographicSequence { .. },
             ) if row.notation == "ChSq1" => ElementPlanEvidence::ChoreographicSequence {
-                movements: None,
+                movements: match supplied {
+                    Some(ElementPlanEvidence::ChoreographicSequence { movements, .. }) => {
+                        movements.clone()
+                    }
+                    _ => None,
+                },
                 clearly_visible: None,
             },
             (CatalogFamily::ChoreographicSpin, PlannedElement::ChoreographicSpin)
@@ -154,6 +180,7 @@ pub fn assess_manual_program_with_assumed_recognition(
                     program.scoring_table,
                     element,
                     profile.scoring.recognition_ruleset,
+                    None,
                 )
                 .ok_or_else(|| {
                     invalid(format!(
@@ -165,10 +192,37 @@ pub fn assess_manual_program_with_assumed_recognition(
         .collect::<Result<Vec<_>, _>>()?
         .into_iter()
         .unzip();
+    let request = ManualProgramRequest {
+        profile: program.profile.clone(),
+        scoring_table: program.scoring_table,
+        policy: policy.clone(),
+        submission,
+        entries: program
+            .elements
+            .iter()
+            .cloned()
+            .zip(evidence.iter().cloned())
+            .map(|(planned, evidence)| ManualProgramEntry {
+                planned,
+                evidence,
+                intended_recognition: None,
+                scenario: None,
+            })
+            .collect(),
+        request_hypothetical_total: false,
+        second_half_boundary: None,
+    };
+    let assessment =
+        crate::assessment::assess_manual_scope(registry, &request, Some(&unfactored_base))?;
     let scope = EvaluationScope::AssumedRecognition;
-    let validation = validate_program_scope(registry, program, &evidence, policy, scope)?;
     let legality = crate::legality::report_program_legality(
-        registry, program, &evidence, policy, submission, validation, scope,
+        registry,
+        program,
+        &evidence,
+        policy,
+        submission,
+        assessment.validation,
+        scope,
     )?;
     let total_base_hundredths = legality
         .validation
@@ -178,20 +232,12 @@ pub fn assess_manual_program_with_assumed_recognition(
         .enumerate()
         .all(|(i, _)| legality.repairable_absences.contains(&i))
         .then(|| {
-            let mut total = unfactored_base
-                .iter()
-                .map(|v| u32::from(v.hundredths))
-                .sum::<u32>();
-            if profile.scoring.recognition_ruleset == RulesetId::IsuSenior2026_27June12 {
-                for (index, value) in unfactored_base.iter().enumerate() {
-                    if repeated_advanced_solo(&program.elements, index) {
-                        let base = u32::from(value.hundredths);
-                        total -= base - (base * 8 + 5) / 10;
-                    }
-                }
-            }
-            total
-        });
+            assessment
+                .intended_base
+                .exact_hundredths
+                .and_then(|total| u32::try_from(total).ok())
+        })
+        .flatten();
     Ok(AssumedProgramAssessment {
         program: program.clone(),
         recognition: recognition.to_vec(),
@@ -220,30 +266,48 @@ pub fn assess_program_legality_with_assumed_recognition(
     .map(|assessment| assessment.legality)
 }
 
+fn advanced_solo(element: &PlannedElement) -> Option<&ListedJump> {
+    match element {
+        PlannedElement::Jump(JumpElement::Solo(jump)) if jump.rotations.is_some_and(|r| r >= 3) => {
+            Some(jump)
+        }
+        _ => None,
+    }
+}
+
 #[cfg(feature = "optimizer")]
 pub(crate) fn has_repeated_advanced_solo<'a>(
     elements: impl Iterator<Item = &'a PlannedElement>,
 ) -> bool {
     let mut seen = Vec::new();
-    for element in elements {
-        if let PlannedElement::Jump(JumpElement::Solo(jump)) = element {
-            if jump.rotations.is_some_and(|r| r >= 3) {
-                if seen.contains(&jump) {
-                    return true;
-                }
-                seen.push(jump);
-            }
-        }
-    }
-    false
+    elements.filter_map(advanced_solo).any(|jump| {
+        let repeated = seen.contains(&jump);
+        seen.push(jump);
+        repeated
+    })
 }
 
-fn repeated_advanced_solo(elements: &[PlannedElement], index: usize) -> bool {
-    let PlannedElement::Jump(JumpElement::Solo(jump)) = &elements[index] else {
-        return false;
-    };
-    jump.rotations.is_some_and(|r| r >= 3)
-        && elements[..index].iter().any(|element| {
-            matches!(element, PlannedElement::Jump(JumpElement::Solo(previous)) if previous == jump)
+pub(crate) fn contextual_base(
+    elements: &[PlannedElement],
+    index: usize,
+    value: &BaseValue,
+    senior: bool,
+) -> BaseValue {
+    let mut value = value.clone();
+    if senior
+        && advanced_solo(&elements[index]).is_some_and(|jump| {
+            elements[..index]
+                .iter()
+                .filter_map(advanced_solo)
+                .any(|previous| previous == jump)
         })
+    {
+        value.hundredths = crate::scoring::repetition_hundredths(value.hundredths);
+        value.notation.push_str("+REP");
+        value
+            .source
+            .location
+            .push_str("; ISU 2786 p. 14, remark 5, contextual 80% BASE");
+    }
+    value
 }

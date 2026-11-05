@@ -541,9 +541,7 @@ fn generation_admits_assumed_gold_levels_and_applies_semantic_filters() {
         },
         recognition_assumed: false,
     }];
-    let choices = [AssumedRecognition {
-        code: "FSSp2".into(),
-    }];
+    let choices = [AssumedRecognition::new("FSSp2")];
     let registry = ProfileRegistry::adult();
     let result =
         generate_program_candidates_with_assumed_recognition(&registry, &q, &choices).unwrap();
@@ -559,4 +557,36 @@ fn generation_admits_assumed_gold_levels_and_applies_semantic_filters() {
         generate_program_candidates_with_assumed_recognition(&registry, &q, &choices).unwrap();
     assert!(result.domain.variants.is_empty());
     assert_eq!(result.domain.audit.omissions.len(), 1);
+}
+
+#[test]
+fn generation_preserves_explicit_axel_transition_assumptions() {
+    let mut q = request(AdultCategory::Silver);
+    q.solo_jumps = false;
+    let jump = |kind| {
+        JumpPart::Jump(ListedJump {
+            kind: Some(kind),
+            rotations: Some(1),
+        })
+    };
+    q.manual_variants.push(ProgramVariant {
+        element: PlannedElement::Jump(JumpElement::Sequence(vec![
+            jump(JumpKind::ToeLoop),
+            jump(JumpKind::Axel),
+        ])),
+        evidence: ElementPlanEvidence::Jump {
+            direct_transitions_assumed: true,
+        },
+        recognition_assumed: false,
+    });
+    let result = generate_program_candidates_with_assumed_recognition(
+        &ProfileRegistry::adult(),
+        &q,
+        &[AssumedRecognition::new("1T+1A+SEQ")],
+    )
+    .unwrap();
+    assert_eq!(
+        result.domain.variants[0].evidence,
+        q.manual_variants[0].evidence
+    );
 }

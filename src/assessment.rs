@@ -284,7 +284,14 @@ pub(crate) fn assess_manual_scope(
                 .collect();
             let intended_base = if let Some(values) = assumed_values {
                 if unresolved.is_empty() {
-                    Ok(BaseValueOutcome::Value(values[index].clone()))
+                    Ok(BaseValueOutcome::Value(
+                        crate::assumed_recognition::contextual_base(
+                            &program.elements,
+                            index,
+                            &values[index],
+                            senior,
+                        ),
+                    ))
                 } else {
                     Err(AssessmentValueError::UnresolvedPlanEvidence(unresolved))
                 }
