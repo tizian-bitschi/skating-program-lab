@@ -211,3 +211,145 @@ fn selection_does_not_fall_back_to_a_builtin_profile() {
         ));
     }
 }
+
+#[test]
+fn full_selection_matrix_matches_independent_category_and_catalog_fixtures() {
+    use std::collections::BTreeSet;
+    let adult = ProfileRegistry::adult();
+    let senior = ProfileRegistry::senior();
+    // Adult announcement pp. 8–11 and ISU Sports Rules, Rule 612 pp. 70–71.
+    let bronze_spins = "CSp SSp USp LSp CCSp CSSp CUSp CLSp";
+    let silver_spins = "CSp SSp USp LSp CCSp CSSp CUSp CLSp FCSp FSSp FUSp FLSp FCCSp FCSSp FCUSp FCLSp CoSp CCoSp FCoSp FCCoSp";
+    let gold_spins = "CCoSp FCSp FSSp FUSp FLSp FCCSp FCSSp FCUSp FCLSp FCoSp FCCoSp";
+    let masters_spins = "CoSp CCoSp FCSp FSSp FUSp FLSp FCoSp";
+    let senior_spins = "CoSp CCoSp FCoSp FCCoSp FCSp FSSp FUSp FLSp";
+    let singles = "1T 1S 1Lo 1F 1Lz";
+    let doubles = "1A 2T 2S 2Lo 2F 2Lz 2A";
+    let senior_jumps =
+        "1A 2T 2S 2Lo 2F 2Lz 2A 3T 3S 3Lo 3F 3Lz 3A 4T 4S 4Lo 4F 4Lz 4A 5T 5S 5Lo 5F 5Lz";
+    let cases = [
+        (
+            &adult,
+            adult_profile(AdultCategory::Bronze),
+            bronze_spins,
+            "B1",
+            "",
+            "ChSq1",
+        ),
+        (
+            &adult,
+            adult_profile(AdultCategory::Silver),
+            silver_spins,
+            "B12",
+            "1A",
+            "ChSq1",
+        ),
+        (
+            &adult,
+            adult_profile(AdultCategory::Gold),
+            gold_spins,
+            "B123",
+            "1A 2T 2S 2Lo",
+            "StSqB StSq1 StSq2 ChSp1",
+        ),
+        (
+            &adult,
+            adult_profile(AdultCategory::Masters),
+            masters_spins,
+            "B1234",
+            doubles,
+            "StSqB StSq1 StSq2 StSq3 StSq4 ChSp1",
+        ),
+        (
+            &senior,
+            senior_profile(SeniorCategory::Women),
+            senior_spins,
+            "B1234",
+            senior_jumps,
+            "StSqB StSq1 StSq2 StSq3 StSq4 ChSp1 ChSq1",
+        ),
+        (
+            &senior,
+            senior_profile(SeniorCategory::Men),
+            senior_spins,
+            "B1234",
+            senior_jumps,
+            "StSqB StSq1 StSq2 StSq3 StSq4 ChSp1 ChSq1",
+        ),
+    ];
+    let inventory = include_str!("fixtures/isu-2786-2026-06-02-source-codes.txt")
+        .lines()
+        .filter(|line| !line.starts_with('#'))
+        .filter_map(|line| line.rsplit('|').next())
+        .flat_map(str::split_whitespace);
+    for (registry, profile, spins, levels, jumps, movement) in cases {
+        let mut expected: BTreeSet<_> = singles
+            .split_whitespace()
+            .chain(jumps.split_whitespace())
+            .chain(movement.split_whitespace())
+            .map(str::to_owned)
+            .collect();
+        for stem in spins.split_whitespace() {
+            expected.extend(levels.chars().map(|level| format!("{stem}{level}")));
+        }
+        let listed = selectable_elements(registry, &profile.id, TABLE).unwrap();
+        let actual: BTreeSet<_> = listed
+            .iter()
+            .map(|item| item.row.notation.to_owned())
+            .collect();
+        assert_eq!(actual, expected, "{:?}", profile.id);
+        assert_eq!(listed.len(), actual.len());
+        for code in inventory.clone() {
+            let direct = check_selectable_element(registry, &profile.id, TABLE, code);
+            assert_eq!(
+                direct.is_ok(),
+                actual.contains(code),
+                "{:?} {code}",
+                profile.id
+            );
+        }
+    }
+}
+
+#[test]
+fn manual_base_at_each_level_boundary_uses_the_exact_selection_source() {
+    let profile = senior_profile(SeniorCategory::Women);
+    let registry = ProfileRegistry::senior();
+    let plan = ProfileProgram {
+        profile: profile.id,
+        scoring_table: TABLE,
+        elements: vec![PlannedElement::RegularSpin(RegularSpin {
+            entry: None,
+            steps: None,
+        })],
+    };
+    // ISU 2786 (2 June 2026), p. 9, BASE column and value rows 1–5.
+    for (i, (code, base)) in [
+        ("CCoSpB", 200),
+        ("CCoSp1", 240),
+        ("CCoSp2", 300),
+        ("CCoSp3", 360),
+        ("CCoSp4", 420),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let selected = check_selectable_element(&registry, &plan.profile, TABLE, code).unwrap();
+        let assessed = assess_manual_program_with_assumed_recognition(
+            &registry,
+            &plan,
+            &[AssumedRecognition::new(code)],
+            &senior_program_policy(SeniorCategory::Women),
+            SubmissionState::Draft,
+        )
+        .unwrap();
+        let value = &assessed.unfactored_base[0];
+        assert_eq!(value.hundredths, base);
+        assert_eq!(value.notation, code);
+        assert_eq!(value.source, selected.row.source.reference(code));
+        assert_eq!(
+            (selected.row.source.page, selected.row.source.row),
+            (9, i as u8 + 1)
+        );
+    }
+}

@@ -1,5 +1,7 @@
 //! Profile-local choices from the immutable SOV, without execution assumptions.
-use crate::program_validation::EvaluationScope;
+use crate::program_validation::{
+    individual_element_restriction, ElementRestriction, EvaluationScope,
+};
 use crate::*;
 
 /// A published single-element choice. The catalog row identifies its edition,
@@ -197,31 +199,15 @@ impl<'a> Selection<'a> {
             EvaluationScope::AssumedRecognition,
         )
         .map_err(Error::Profile)?;
-        let is_level = |f: &Finding| {
-            matches!(
-                f.rule_id,
-                "spin-level-cap" | crate::program_validation::ASSUMED_STEP_LEVEL_CAP
-            )
-        };
-        // Type restrictions explain the rejection even if the level also exceeds its cap.
-        if let Some(finding) = report
-            .validation
-            .findings
-            .into_iter()
-            .filter(|f| {
-                f.kind == FindingKind::Violation
-                    && (f.element_index.is_some()
-                        || f.rule_id == crate::program_validation::FAMILY_CAP_RULE)
-            })
-            .min_by_key(is_level)
-        {
-            return Err(if is_level(&finding) {
-                Error::LevelNotSelectable(Box::new(finding))
-            } else {
-                Error::TypeNotSelectable(Box::new(finding))
-            });
+        match individual_element_restriction(report.validation.findings) {
+            Some(ElementRestriction::Type(finding)) => {
+                Err(Error::TypeNotSelectable(Box::new(finding)))
+            }
+            Some(ElementRestriction::Level(finding)) => {
+                Err(Error::LevelNotSelectable(Box::new(finding)))
+            }
+            None => Ok(SelectableElement { row, kind }),
         }
-        Ok(SelectableElement { row, kind })
     }
 }
 

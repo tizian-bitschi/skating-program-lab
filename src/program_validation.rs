@@ -126,8 +126,33 @@ program_rules![
     ("program-step-recognition", Qualification, Plan),
 ];
 
-pub(crate) const FAMILY_CAP_RULE: &str = "program-family-cap";
-pub(crate) const ASSUMED_STEP_LEVEL_CAP: &str = "program-step-level-cap";
+const FAMILY_CAP_RULE: &str = "program-family-cap";
+const ASSUMED_STEP_LEVEL_CAP: &str = "program-step-level-cap";
+
+pub(crate) enum ElementRestriction {
+    Type(Finding),
+    Level(Finding),
+}
+
+/// Interpret violations from validation of a single assumed element. A family
+/// count violation here means the policy allows zero elements of that family.
+pub(crate) fn individual_element_restriction(findings: Vec<Finding>) -> Option<ElementRestriction> {
+    let mut level = None;
+    for finding in findings {
+        if finding.kind != FindingKind::Violation
+            || (finding.element_index.is_none() && finding.rule_id != FAMILY_CAP_RULE)
+        {
+            continue;
+        }
+        match finding.rule_id {
+            crate::spin_validation::SPIN_LEVEL_CAP_RULE | ASSUMED_STEP_LEVEL_CAP => {
+                level.get_or_insert(finding);
+            }
+            _ => return Some(ElementRestriction::Type(finding)),
+        }
+    }
+    level.map(ElementRestriction::Level)
+}
 
 #[cfg(feature = "optimizer")]
 pub(crate) fn supported_rules(scope: EvaluationScope) -> impl Iterator<Item = &'static str> {
