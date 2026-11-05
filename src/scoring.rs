@@ -537,6 +537,23 @@ fn table_row(
     }
 }
 
+/// Score an explicitly selected jump unit without constructing a panel outcome.
+pub(crate) fn assumed_jump_unit_value(
+    table: ScoringTableId,
+    details: &crate::RecognitionDetails,
+    code: &str,
+    senior: bool,
+) -> Option<BaseValue> {
+    let notation = details.notation()?;
+    if notation != code {
+        return None;
+    }
+    match jump_unit_row(table, details, notation, senior).ok()? {
+        ResolvedRow::Value(row) => Some(row.base()),
+        _ => None,
+    }
+}
+
 enum ResolvedRow {
     Value(TableRow),
     Ignored,

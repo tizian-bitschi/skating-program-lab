@@ -90,6 +90,7 @@ struct RuleDescriptor {
 // One metadata declaration supplies optimizer inventory and coverage semantics.
 macro_rules! program_rules {
     ($(($id:expr, $basis:ident, $evidence:ident)),* $(,)?) => {
+        #[cfg(feature = "optimizer")]
         pub(crate) const RULE_IDS: &[&str] = &[$($id),*];
         const RULES: &[RuleDescriptor] = &[$(RuleDescriptor { id: $id, basis: EvaluationBasis::$basis, evidence: EvidenceRequirement::$evidence }),*];
     };
@@ -292,6 +293,28 @@ pub fn validate_supported_program(
     evidence: &[ElementPlanEvidence],
     policy: &ProgramPolicy,
 ) -> Result<EvidenceValidationReport, ProfileSelectionError> {
+    validate_program_scope(
+        registry,
+        program,
+        evidence,
+        policy,
+        EvaluationScope::EvidenceBased,
+    )
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(crate) enum EvaluationScope {
+    EvidenceBased,
+    AssumedRecognition,
+}
+
+pub(crate) fn validate_program_scope(
+    registry: &ProfileRegistry,
+    program: &ProfileProgram,
+    evidence: &[ElementPlanEvidence],
+    policy: &ProgramPolicy,
+    scope: EvaluationScope,
+) -> Result<EvidenceValidationReport, ProfileSelectionError> {
     let profile = registry.resolve(&program.profile, program.scoring_table)?;
     let invalid = |reason: &str| ProfileSelectionError {
         profile: program.profile.clone(),
@@ -366,7 +389,14 @@ pub fn validate_supported_program(
         &spin_evidence,
         Some(&policy.spins),
         &assumed_direct_sequences,
-        crate::spin_validation::FeatureCreditEvaluation::ProgramWide,
+        match scope {
+            EvaluationScope::EvidenceBased => {
+                crate::spin_validation::FeatureCreditEvaluation::ProgramWide
+            }
+            EvaluationScope::AssumedRecognition => {
+                crate::spin_validation::FeatureCreditEvaluation::AssumedRecognition
+            }
+        },
     )?;
     let mut checks = MixedChecks {
         findings: &mut report.validation.findings,
@@ -429,6 +459,21 @@ pub fn validate_supported_program(
     let mut unknown_attempts_seen = false;
     let mut uncertain_attempts = Vec::new();
     for (index, (element, data)) in program.elements.iter().zip(evidence).enumerate() {
+        if scope == EvaluationScope::AssumedRecognition {
+            if let ElementPlanEvidence::Step { level, .. } = data {
+                checks.apply("program-step-level-cap", Some(index), &policy.step_source);
+                if level.number() > policy.max_step_level.number() {
+                    checks.add(
+                        FindingKind::Violation,
+                        "program-step-level-cap",
+                        Some(index),
+                        "The selected SOV level exceeds the profile cap.",
+                        &policy.step_source,
+                    );
+                }
+            }
+            continue;
+        }
         match data {
             ElementPlanEvidence::Spin {
                 spin,
@@ -752,7 +797,22 @@ pub fn validate_supported_program(
         }
     }
     for coverage in &mut report.coverage {
-        if matches!(
+        if scope == EvaluationScope::AssumedRecognition {
+            match coverage.family {
+                ValidationFamily::RegularSpins => {
+                    coverage.explanation = "Assumed recognition: spin counts, roles, abbreviations and level caps are checked; execution is unverified.";
+                }
+                ValidationFamily::SpinFeatures => {
+                    coverage.explanation =
+                        "Feature qualification is outside the assumed-recognition evaluation.";
+                }
+                ValidationFamily::StepsAndChoreography => {
+                    coverage.coverage = FamilyCoverage::Partial;
+                    coverage.explanation = "Assumed recognition: family counts and step level caps are checked; movements are unverified.";
+                }
+                _ => {}
+            }
+        } else if matches!(
             coverage.family,
             ValidationFamily::SpinFeatures | ValidationFamily::StepsAndChoreography
         ) {

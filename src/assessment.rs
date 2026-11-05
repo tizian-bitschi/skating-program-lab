@@ -1,4 +1,5 @@
 //! Ordered manual-plan orchestration. No result establishes official compliance.
+use crate::program_validation::{validate_program_scope, EvaluationScope};
 use crate::*;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -154,6 +155,14 @@ pub fn assess_manual_program(
     registry: &ProfileRegistry,
     request: &ManualProgramRequest,
 ) -> Result<ManualProgramAssessment, ProfileSelectionError> {
+    assess_manual_scope(registry, request, None)
+}
+
+pub(crate) fn assess_manual_scope(
+    registry: &ProfileRegistry,
+    request: &ManualProgramRequest,
+    assumed_values: Option<&[BaseValue]>,
+) -> Result<ManualProgramAssessment, ProfileSelectionError> {
     let profile = registry.resolve(&request.profile, request.scoring_table)?;
     let invalid = |reason: &str| ProfileSelectionError {
         profile: request.profile.clone(),
@@ -193,7 +202,12 @@ pub fn assess_manual_program(
         elements: request.entries.iter().map(|e| e.planned.clone()).collect(),
     };
     let evidence: Vec<_> = request.entries.iter().map(|e| e.evidence.clone()).collect();
-    let validation = validate_supported_program(registry, &program, &evidence, &request.policy)?;
+    let scope = if assumed_values.is_some() {
+        EvaluationScope::AssumedRecognition
+    } else {
+        EvaluationScope::EvidenceBased
+    };
+    let validation = validate_program_scope(registry, &program, &evidence, &request.policy, scope)?;
     let completion_findings = crate::program_validation::completion_findings(
         &validation,
         profile,
@@ -268,29 +282,37 @@ pub fn assess_manual_program(
                 })
                 .map(|(i, _)| i)
                 .collect();
-            let intended_base = match &entry.intended_recognition {
-                None => Err(AssessmentValueError::MissingRecognition),
-                Some(_) if !unresolved.is_empty() => {
+            let intended_base = if let Some(values) = assumed_values {
+                if unresolved.is_empty() {
+                    Ok(BaseValueOutcome::Value(values[index].clone()))
+                } else {
                     Err(AssessmentValueError::UnresolvedPlanEvidence(unresolved))
                 }
-                Some(panel)
-                    if !crate::plan_recognition::matches_intended(
-                        &entry.planned,
-                        &entry.evidence,
-                        panel,
-                    ) =>
-                {
-                    Err(AssessmentValueError::PlanRecognitionMismatch)
+            } else {
+                match &entry.intended_recognition {
+                    None => Err(AssessmentValueError::MissingRecognition),
+                    Some(_) if !unresolved.is_empty() => {
+                        Err(AssessmentValueError::UnresolvedPlanEvidence(unresolved))
+                    }
+                    Some(panel)
+                        if !crate::plan_recognition::matches_intended(
+                            &entry.planned,
+                            &entry.evidence,
+                            panel,
+                        ) =>
+                    {
+                        Err(AssessmentValueError::PlanRecognitionMismatch)
+                    }
+                    Some(_) if senior && intended_context[index].is_none() => {
+                        Err(AssessmentValueError::BaseValue(BaseValueError::Unsupported))
+                    }
+                    Some(panel) => lookup_base_value(
+                        request.scoring_table,
+                        intended_context[index].as_ref().unwrap_or(panel),
+                        &[],
+                    )
+                    .map_err(AssessmentValueError::BaseValue),
                 }
-                Some(_) if senior && intended_context[index].is_none() => {
-                    Err(AssessmentValueError::BaseValue(BaseValueError::Unsupported))
-                }
-                Some(panel) => lookup_base_value(
-                    request.scoring_table,
-                    intended_context[index].as_ref().unwrap_or(panel),
-                    &[],
-                )
-                .map_err(AssessmentValueError::BaseValue),
             };
             let scenario_base = entry.scenario.as_ref().map(|s| {
                 if senior && scenario_context[index].is_none() {

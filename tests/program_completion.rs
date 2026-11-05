@@ -640,3 +640,41 @@ fn fixed_repetition_call_preserves_recognition_and_reduced_objective() {
     // Supplied solo +REP uses the existing 80% BV path, not an inferred call.
     fixed_call_case(PanelCall::Repetition, CallTarget::Element, 88);
 }
+
+#[test]
+fn assumed_completion_keeps_original_plan_and_uses_no_panel_outcomes() {
+    let mut q = request();
+    for original in &mut q.original {
+        original.entry.intended_recognition = None;
+    }
+    q.original[1].entry.planned = PlannedElement::RegularSpin(RegularSpin {
+        entry: None,
+        steps: None,
+    });
+    let originals = ["1A", "SSp2"].map(|code| AssumedRecognition { code: code.into() });
+    let additions = ["1T", "1S"].map(|code| AssumedRecognition { code: code.into() });
+    let result = complete_program_with_assumed_recognition(
+        &ProfileRegistry::adult(),
+        &q,
+        &originals,
+        &additions,
+    )
+    .unwrap();
+    assert_eq!(result.status, OptimizerStatus::OptimalProven);
+    let candidate = &result.candidates[0];
+    for (index, provenance) in candidate.provenance.iter().enumerate() {
+        let entry = &candidate.assessment.request.entries[index];
+        assert!(entry.intended_recognition.is_none() && entry.scenario.is_none());
+        if let CompletionProvenance::Original { original_index, .. } = provenance {
+            assert_eq!(*entry, q.original[*original_index].entry);
+            assert_eq!(
+                candidate.per_element[index].notation,
+                originals[*original_index].code
+            );
+        }
+    }
+    assert_eq!(
+        candidate.assessment.intended_base.exact_hundredths,
+        Some(i64::from(candidate.total_base_hundredths))
+    );
+}

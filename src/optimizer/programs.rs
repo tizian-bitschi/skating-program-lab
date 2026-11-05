@@ -3,6 +3,7 @@ use super::{
     solver_common::{self, Deadline},
     OptimizerObjective, OptimizerStatus,
 };
+use crate::program_validation::{validate_program_scope, EvaluationScope};
 use crate::*;
 use pumpkin_solver::{
     conflict_resolvers::resolvers::ResolutionResolver,
@@ -171,10 +172,11 @@ pub(super) fn score(
     }
 }
 
-pub(super) fn excluded(
+pub(super) fn excluded_in_scope(
     variant: &ProgramVariant,
     exclusion: &PersonalExclusion,
     index: usize,
+    assumed: bool,
 ) -> bool {
     let jumps: Vec<_> = match &variant.element {
         PlannedElement::Jump(JumpElement::Solo(j)) => vec![j],
@@ -198,6 +200,8 @@ pub(super) fn excluded(
         PersonalExclusion::JumpKind(k) => jumps.iter().any(|j| j.kind == Some(*k)),
         PersonalExclusion::FlyingEntry => {
             matches!(&variant.element, PlannedElement::RegularSpin(s) if s.entry == Some(SpinEntry::Flying))
+                || (assumed
+                    && matches!(&variant.evidence, ElementPlanEvidence::Spin { spin, .. } if spin.abbreviation.is_some_and(|a| a.entry == SpinEntry::Flying)))
         }
         PersonalExclusion::SpinKind(k) => {
             matches!(&variant.evidence, ElementPlanEvidence::Spin { spin, .. } if spin.abbreviation.is_some_and(|a| a.kind == *k))
@@ -252,7 +256,15 @@ pub(super) fn prepare_variant(
         .resolve(profile_id, table)
         .map_err(ProgramOptimizationError::Profile)?;
     let value = score(variant, table, profile.scoring.recognition_ruleset)?;
-    prepare_with_base(registry, profile_id, table, policy, variant, value)
+    prepare_with_base(
+        registry,
+        profile_id,
+        table,
+        policy,
+        variant,
+        value,
+        EvaluationScope::EvidenceBased,
+    )
 }
 
 /// A fixed original's base comes from its validated manual recognition, not a clean reconstruction.
@@ -263,6 +275,7 @@ pub(super) fn prepare_with_base(
     policy: &ProgramPolicy,
     variant: &ProgramVariant,
     value: BaseValue,
+    scope: EvaluationScope,
 ) -> Result<PreparedVariant, ProgramOptimizationError> {
     let profile = registry
         .resolve(profile_id, table)
@@ -272,11 +285,12 @@ pub(super) fn prepare_with_base(
         scoring_table: table,
         elements: vec![variant.element.clone()],
     };
-    let report = validate_supported_program(
+    let report = validate_program_scope(
         registry,
         &program,
         std::slice::from_ref(&variant.evidence),
         policy,
+        scope,
     )
     .map_err(ProgramOptimizationError::Profile)?;
     let local_findings = report
@@ -303,8 +317,8 @@ fn checked(
     registry: &ProfileRegistry,
     request: &ProgramOptimizationRequest,
     indices: &[usize],
-    ruleset: RulesetId,
-    anchors: Option<&AnchoredPlacement>,
+    universe: &[(usize, BaseValue)],
+    scope: EvaluationScope,
 ) -> Result<Option<ProgramCandidate>, ProgramOptimizationError> {
     if indices.len() < request.min_elements
         || request
@@ -326,8 +340,9 @@ fn checked(
         .iter()
         .map(|i| request.variants[*i].evidence.clone())
         .collect();
-    let mut validation = validate_supported_program(registry, &program, &evidence, &request.policy)
-        .map_err(ProgramOptimizationError::Profile)?;
+    let mut validation =
+        validate_program_scope(registry, &program, &evidence, &request.policy, scope)
+            .map_err(ProgramOptimizationError::Profile)?;
     if validation
         .validation
         .findings
@@ -347,8 +362,14 @@ fn checked(
     }
     let per_element = indices
         .iter()
-        .map(|i| variant_base(request, *i, ruleset, anchors))
-        .collect::<Result<Vec<_>, _>>()?;
+        .map(|i| {
+            universe[universe
+                .binary_search_by_key(i, |(index, _)| *index)
+                .expect("solver index belongs to the universe")]
+            .1
+            .clone()
+        })
+        .collect::<Vec<_>>();
     for (index, value) in per_element.iter().enumerate() {
         crate::validation::record_rule(
             &mut validation.applied_rules,
@@ -386,7 +407,7 @@ fn optimize(
     request: &ProgramOptimizationRequest,
     stop_after_incumbent: bool,
 ) -> Result<ProgramOptimizationResult, ProgramOptimizationError> {
-    optimize_anchored(registry, request, stop_after_incumbent, None)
+    optimize_anchored(registry, request, stop_after_incumbent, None, None)
 }
 
 pub(super) struct AnchoredPlacement {
@@ -415,6 +436,7 @@ pub(super) fn optimize_anchored(
     request: &ProgramOptimizationRequest,
     stop_after_incumbent: bool,
     anchors: Option<&AnchoredPlacement>,
+    assumed_values: Option<&[BaseValue]>,
 ) -> Result<ProgramOptimizationResult, ProgramOptimizationError> {
     use ProgramOptimizationError as E;
     let start = Instant::now();
@@ -459,6 +481,12 @@ pub(super) fn optimize_anchored(
     let mut universe = vec![];
     let mut excluded_variants = vec![];
     let mut values = vec![0i32];
+    let mut universe_values = vec![];
+    let scope = if assumed_values.is_some() {
+        EvaluationScope::AssumedRecognition
+    } else {
+        EvaluationScope::EvidenceBased
+    };
     let mut sources = profile.sources.clone();
     // Verify all requested variants before exclusions; unsupported inputs are never hidden.
     for (i, variant) in request.variants.iter().enumerate() {
@@ -466,8 +494,11 @@ pub(super) fn optimize_anchored(
         {
             return Err(E::InvalidRequest("duplicate candidate variants"));
         }
-        let value =
-            variant_base(request, i, ruleset, anchors).map_err(|_| E::UnsupportedVariant(i))?;
+        let value = if let Some(values) = assumed_values {
+            values[i].clone()
+        } else {
+            variant_base(request, i, ruleset, anchors).map_err(|_| E::UnsupportedVariant(i))?
+        };
         let prepared = prepare_with_base(
             registry,
             &request.profile,
@@ -475,6 +506,7 @@ pub(super) fn optimize_anchored(
             &request.policy,
             variant,
             value,
+            scope,
         )
         .map_err(|e| match e {
             ProgramOptimizationError::Profile(_) => e,
@@ -494,12 +526,27 @@ pub(super) fn optimize_anchored(
                 sources.push(src);
             }
         }
-        if request.exclusions.iter().any(|x| excluded(variant, x, i)) {
+        if request
+            .exclusions
+            .iter()
+            .any(|x| excluded_in_scope(variant, x, i, assumed_values.is_some()))
+        {
             excluded_variants.push(i);
         } else {
             universe.push(i);
             values.push(i32::from(value.hundredths));
+            universe_values.push((i, value));
         }
+    }
+    if scope == EvaluationScope::AssumedRecognition
+        && ruleset == RulesetId::IsuSenior2026_27June12
+        && crate::assumed_recognition::has_repeated_advanced_solo(
+            universe.iter().map(|&i| &request.variants[i].element),
+        )
+    {
+        return Err(E::InvalidRequest(
+            "Senior repeated advanced solos require contextual BV in the solver objective",
+        ));
     }
     let mut result = ProgramOptimizationResult { request: request.clone(), universe, excluded_variants,
         unmodeled_variants: "Unlisted variants, Euler consequences, difficult-variation categories, unsupported feature prerequisites, Pair rules and physical skateability are outside this model.",
@@ -583,7 +630,7 @@ pub(super) fn optimize_anchored(
                 (v > 0).then(|| result.universe[v as usize - 1])
             })
             .collect();
-        if let Some(candidate) = checked(registry, request, &indices, ruleset, anchors)? {
+        if let Some(candidate) = checked(registry, request, &indices, &universe_values, scope)? {
             if candidate.base_hundredths != solution.get_integer_value(objective) as u32 {
                 return Err(E::InconsistentSolverResult);
             }
@@ -643,6 +690,64 @@ pub(super) fn optimize_anchored(
         let tag = solver.new_constraint_tag();
         solver.add_clause(clause, tag);
     }
+}
+
+/// Optimize the selected SOV variants in the same order as the request domain.
+/// Evidence fields are replaced by structural identities derived from the selections.
+pub fn optimize_program_with_assumed_recognition(
+    registry: &ProfileRegistry,
+    request: &ProgramOptimizationRequest,
+    recognition: &[AssumedRecognition],
+) -> Result<ProgramOptimizationResult, ProgramOptimizationError> {
+    if request
+        .exclusions
+        .iter()
+        .any(|e| matches!(e, PersonalExclusion::SpinFeature(_)))
+    {
+        return Err(ProgramOptimizationError::UnsupportedRestriction);
+    }
+    let mut request = request.clone();
+    let profile = registry
+        .resolve(&request.profile, request.scoring_table)
+        .map_err(ProgramOptimizationError::Profile)?;
+    let values = resolve_variants(
+        request.scoring_table,
+        &mut request.variants,
+        recognition,
+        profile.scoring.recognition_ruleset,
+    )?;
+    let mut result = optimize_anchored(registry, &request, false, None, Some(&values))?;
+    result.assumptions = ASSUMED_SCOPE;
+    Ok(result)
+}
+
+pub(super) const ASSUMED_SCOPE: &str =
+    "Exact supplied SOV recognition under covered program construction rules. Execution and panel recognition are unverified.";
+
+pub(super) fn resolve_variants(
+    table: ScoringTableId,
+    variants: &mut [ProgramVariant],
+    recognition: &[AssumedRecognition],
+    ruleset: RulesetId,
+) -> Result<Vec<BaseValue>, ProgramOptimizationError> {
+    if variants.len() != recognition.len() {
+        return Err(ProgramOptimizationError::InvalidRequest(
+            "supply one SOV selection per variant",
+        ));
+    }
+    variants
+        .iter_mut()
+        .zip(recognition)
+        .enumerate()
+        .map(|(i, (variant, assumption))| {
+            let (evidence, value) = assumption
+                .resolve(table, &variant.element, ruleset)
+                .ok_or(ProgramOptimizationError::UnsupportedVariant(i))?;
+            variant.evidence = evidence;
+            variant.recognition_assumed = true;
+            Ok(value)
+        })
+        .collect()
 }
 
 #[cfg(test)]

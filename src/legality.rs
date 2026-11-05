@@ -1,4 +1,5 @@
 //! Stage-aware coverage of technical plan rules. No panel outcome is inferred.
+use crate::program_validation::EvaluationScope;
 use crate::*;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -42,6 +43,26 @@ pub fn assess_program_legality(
     submission: SubmissionState,
 ) -> Result<ProgramLegalityReport, ProfileSelectionError> {
     let validation = validate_supported_program(registry, program, evidence, policy)?;
+    report_program_legality(
+        registry,
+        program,
+        evidence,
+        policy,
+        submission,
+        validation,
+        EvaluationScope::EvidenceBased,
+    )
+}
+
+pub(crate) fn report_program_legality(
+    registry: &ProfileRegistry,
+    program: &ProfileProgram,
+    evidence: &[ElementPlanEvidence],
+    policy: &ProgramPolicy,
+    submission: SubmissionState,
+    validation: EvidenceValidationReport,
+    scope: EvaluationScope,
+) -> Result<ProgramLegalityReport, ProfileSelectionError> {
     let profile = registry.resolve(&program.profile, program.scoring_table)?;
     let repairable_absences = if submission == SubmissionState::Draft {
         crate::program_validation::completion_findings(
@@ -187,7 +208,6 @@ pub fn assess_program_legality(
             "spin-entry",
             "spin-level-cap",
             "spin-distinct-abbreviation",
-            "spin-minimum-revolutions",
         ] {
             inventory(
                 &mut rules,
@@ -198,6 +218,17 @@ pub fn assess_program_legality(
                 "Missing spin structure prevents this check.",
             );
         }
+        if scope == EvaluationScope::AssumedRecognition {
+            continue;
+        }
+        inventory(
+            &mut rules,
+            "spin-minimum-revolutions",
+            &policy.spins.source,
+            Some(index),
+            RuleCoverageState::MissingEvidence,
+            "Missing spin structure prevents this check.",
+        );
         for (ids, source) in [
             (
                 &[
@@ -263,6 +294,9 @@ pub fn assess_program_legality(
             &policy.choreography_source,
         ),
     ] {
+        if scope == EvaluationScope::AssumedRecognition {
+            break;
+        }
         let indices: Vec<_> = program
             .elements
             .iter()
@@ -293,7 +327,10 @@ pub fn assess_program_legality(
         if adult {
             inventory(&mut rules, "program-waltz-recognition", &profile.binding(ProfileRule::Eligibility).source, None, RuleCoverageState::Unsupported, "The planned listed-jump model cannot represent a Waltz jump and its category-specific counting consequences.");
         }
-        for index in spins {
+        for index in spins
+            .into_iter()
+            .filter(|_| scope == EvaluationScope::EvidenceBased)
+        {
             inventory(&mut rules, "program-variation-categories", &policy.feature_source, Some(index), RuleCoverageState::Unsupported,
                 "Difficult-variation categories, two-variation quota, category reuse and dependent feature reuse require typed variation evidence; generic feature assertions do not establish them.");
         }

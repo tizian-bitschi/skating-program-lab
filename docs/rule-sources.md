@@ -1,5 +1,7 @@
 # Rule sources and open questions
 
+The [assumed-recognition coverage contract](specs/assumed-recognition.md) explains which construction rules are evaluated under an exact selection. Individual values retain their SOV row, page and edition.
+
 Checked 2026-11-01. Page numbers below refer to printed document pages. The source list supports the scoped requirements, not a complete rule database. Confirm current event-specific versions and later amendments before implementing each rule; preserve the source version and precise location with every rule and fixture.
 
 | Source and date | Relevant locations and use | Official source |

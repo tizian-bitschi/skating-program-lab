@@ -536,3 +536,49 @@ fn proposal_cap_stops_a_large_finite_domain_without_claiming_a_node_budget() {
     assert_eq!(r.termination_reason, JumpTerminationReason::SearchLimit);
     assert!(!r.enumeration_complete);
 }
+
+#[test]
+fn optimize_gold_sov_selections_without_spin_or_step_proof() {
+    let category = AdultCategory::Gold;
+    let mut variants = vec![];
+    for _ in 0..2 {
+        variants.push(ProgramVariant {
+            element: PlannedElement::RegularSpin(RegularSpin {
+                entry: None,
+                steps: None,
+            }),
+            evidence: ElementPlanEvidence::Spin {
+                spin: RegularSpinEvidence::default(),
+                local_feature_qualification_assumed: false,
+            },
+            recognition_assumed: false,
+        });
+    }
+    variants.push(ProgramVariant {
+        element: PlannedElement::StepSequence,
+        evidence: ElementPlanEvidence::Step {
+            level: Level::Two,
+            clean_difficult_turns: None,
+            full_ice_coverage: None,
+            movement: None,
+            qualified_features: None,
+            qualification_assumed: false,
+        },
+        recognition_assumed: false,
+    });
+    variants.push(chsp());
+    let q = request(category, variants, 4);
+    let choices =
+        ["CCoSp3", "FSSp2", "StSq2", "ChSp1"].map(|code| AssumedRecognition { code: code.into() });
+    let result =
+        optimize_program_with_assumed_recognition(&ProfileRegistry::adult(), &q, &choices).unwrap();
+    assert_eq!(result.status, OptimizerStatus::OptimalProven);
+    assert_eq!(result.candidates[0].base_hundredths, 1260);
+    for (value, &index) in result.candidates[0]
+        .per_element
+        .iter()
+        .zip(&result.candidates[0].variant_indices)
+    {
+        assert_eq!(value.notation, choices[index].code);
+    }
+}

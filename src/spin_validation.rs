@@ -4,6 +4,7 @@ use crate::*;
 pub(crate) const SPIN_REQUIRED_ROLE_RULE: &str = "spin-required-role";
 pub(crate) const SPIN_EXECUTION_RULE: &str = "spin-execution-recognition";
 
+#[cfg(feature = "optimizer")]
 pub(crate) const RULE_IDS: &[&str] = &[
     "spin-abbreviation",
     "spin-basic-position",
@@ -376,6 +377,7 @@ pub fn validate_profile_program_with_evidence(
 pub(crate) enum FeatureCreditEvaluation {
     Deferred,
     ProgramWide,
+    AssumedRecognition,
 }
 
 pub(crate) fn validate_profile_program_with_assumptions(
@@ -607,6 +609,10 @@ impl SpinValidator {
                 } else {
                     unknown = true;
                 }
+                if self.feature_credit == FeatureCreditEvaluation::AssumedRecognition {
+                    self.check_abbreviation(index, spin, data, policy);
+                    continue;
+                }
                 let mut effective = policy.clone();
                 if senior && abbreviation.is_some_and(|a| a.kind == RegularSpinKind::Combination) {
                     effective.min_revolutions = crate::senior::DEFINITION.combination_revolutions;
@@ -732,15 +738,41 @@ impl SpinValidator {
                 }
             }
         }
-        if spin.entry.is_none() {
+        if spin.entry.is_none()
+            && self.feature_credit != FeatureCreditEvaluation::AssumedRecognition
+        {
             self.add(FindingKind::Unknown, "spin-entry", Some(index), None,
                 "The planned entry is unspecified; abbreviation alone does not supply movement evidence.", source);
         }
         match data.and_then(|d| d.planned_level) {
-            None => self.add(FindingKind::Unknown, "spin-level-cap", Some(index), None,
-                "The target level is unspecified; no recognized level is inferred.", source),
-            Some(level) if level.number() > policy.max_level.number() => self.add(FindingKind::Unknown, "spin-level-cap", Some(index), None,
-                "The target exceeds the profile level cap; additional features are ignored, not a prohibition of the spin.", source),
+            None => self.add(
+                FindingKind::Unknown,
+                "spin-level-cap",
+                Some(index),
+                None,
+                "The target level is unspecified; no recognized level is inferred.",
+                source,
+            ),
+            Some(level) if level.number() > policy.max_level.number() => {
+                let (kind, explanation) = if self.feature_credit
+                    == FeatureCreditEvaluation::AssumedRecognition
+                {
+                    (
+                        FindingKind::Violation,
+                        "The selected SOV level exceeds the profile cap.",
+                    )
+                } else {
+                    (FindingKind::Unknown, "The target exceeds the profile level cap; additional features are ignored, not a prohibition of the spin.")
+                };
+                self.add(
+                    kind,
+                    "spin-level-cap",
+                    Some(index),
+                    None,
+                    explanation,
+                    source,
+                );
+            }
             _ => {}
         }
     }

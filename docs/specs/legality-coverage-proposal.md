@@ -1,5 +1,7 @@
 # Legality coverage contract and source matrix (#67)
 
+For construction coverage under exact SOV selections, see [assumed recognition](assumed-recognition.md). This mode retains structural findings and reports its execution coverage separately.
+
 Status: additive public interface approved on 2026-11-03. Existing public types
 and signatures stay unchanged. `assess_program_legality` returns the shared
 `EvidenceValidationReport`, submission state, per-rule coverage and indices of
