@@ -126,7 +126,33 @@ program_rules![
     ("program-step-recognition", Qualification, Plan),
 ];
 
+const FAMILY_CAP_RULE: &str = "program-family-cap";
 const ASSUMED_STEP_LEVEL_CAP: &str = "program-step-level-cap";
+
+pub(crate) enum ElementRestriction {
+    Type(Finding),
+    Level(Finding),
+}
+
+/// Interpret violations from validation of a single assumed element. A family
+/// count violation here means the policy allows zero elements of that family.
+pub(crate) fn individual_element_restriction(findings: Vec<Finding>) -> Option<ElementRestriction> {
+    let mut level = None;
+    for finding in findings {
+        if finding.kind != FindingKind::Violation
+            || (finding.element_index.is_none() && finding.rule_id != FAMILY_CAP_RULE)
+        {
+            continue;
+        }
+        match finding.rule_id {
+            crate::spin_validation::SPIN_LEVEL_CAP_RULE | ASSUMED_STEP_LEVEL_CAP => {
+                level.get_or_insert(finding);
+            }
+            _ => return Some(ElementRestriction::Type(finding)),
+        }
+    }
+    level.map(ElementRestriction::Level)
+}
 
 #[cfg(feature = "optimizer")]
 pub(crate) fn supported_rules(scope: EvaluationScope) -> impl Iterator<Item = &'static str> {
@@ -468,11 +494,11 @@ pub(crate) fn validate_program_scope(
         } else {
             &policy.choreography_source
         };
-        checks.apply("program-family-cap", None, family_source);
+        checks.apply(FAMILY_CAP_RULE, None, family_source);
         if count(family) > cap {
             checks.add(
                 FindingKind::Violation,
-                "program-family-cap",
+                FAMILY_CAP_RULE,
                 None,
                 "The family count exceeds the selected program policy.",
                 family_source,
@@ -996,7 +1022,7 @@ mod candidate_scope_tests {
             candidate_finding_scope(&finding, &profile),
             CandidateFindingScope::Element
         );
-        finding.rule_id = "program-family-cap";
+        finding.rule_id = FAMILY_CAP_RULE;
         finding.element_index = None;
         assert_eq!(
             candidate_finding_scope(&finding, &profile),

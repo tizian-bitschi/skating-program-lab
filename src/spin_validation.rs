@@ -2,6 +2,7 @@
 use crate::*;
 
 pub(crate) const SPIN_REQUIRED_ROLE_RULE: &str = "spin-required-role";
+pub(crate) const SPIN_LEVEL_CAP_RULE: &str = "spin-level-cap";
 pub(crate) const SPIN_EXECUTION_RULE: &str = "spin-execution-recognition";
 
 #[cfg(feature = "optimizer")]
@@ -21,7 +22,7 @@ const RULES: &[(&str, bool)] = &[
     ("spin-feature-evidence", false),
     ("spin-feature-target", false),
     ("spin-layback-position", false),
-    ("spin-level-cap", true),
+    (SPIN_LEVEL_CAP_RULE, true),
     ("spin-minimum-revolutions", false),
     ("spin-multiple-foot-changes", false),
     ("spin-panel-reconciliation", false),
@@ -702,7 +703,7 @@ impl SpinValidator {
             "spin-eligibility",
             "spin-abbreviation",
             "spin-entry",
-            "spin-level-cap",
+            SPIN_LEVEL_CAP_RULE,
         ] {
             self.apply(id, Some(index), source);
         }
@@ -757,7 +758,7 @@ impl SpinValidator {
         match data.and_then(|d| d.planned_level) {
             None => self.add(
                 FindingKind::Unknown,
-                "spin-level-cap",
+                SPIN_LEVEL_CAP_RULE,
                 Some(index),
                 None,
                 "The target level is unspecified; no recognized level is inferred.",
@@ -776,7 +777,7 @@ impl SpinValidator {
                 };
                 self.add(
                     kind,
-                    "spin-level-cap",
+                    SPIN_LEVEL_CAP_RULE,
                     Some(index),
                     None,
                     explanation,

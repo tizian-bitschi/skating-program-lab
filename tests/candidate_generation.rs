@@ -590,3 +590,30 @@ fn generation_preserves_explicit_axel_transition_assumptions() {
         q.manual_variants[0].evidence
     );
 }
+
+#[test]
+fn generation_rejects_saved_credit_above_the_profile_cap() {
+    let mut q = request(AdultCategory::Silver);
+    q.solo_jumps = false;
+    q.manual_variants.push(ProgramVariant {
+        element: PlannedElement::RegularSpin(RegularSpin {
+            entry: None,
+            steps: None,
+        }),
+        evidence: ElementPlanEvidence::Spin {
+            spin: RegularSpinEvidence::default(),
+            local_feature_qualification_assumed: false,
+        },
+        recognition_assumed: false,
+    });
+    let result = generate_program_candidates_with_assumed_recognition(
+        &ProfileRegistry::adult(),
+        &q,
+        &[AssumedRecognition::new("CCoSp3")],
+    );
+    assert!(matches!(
+        result,
+        Err(CandidateGenerationError::InvalidManualVariant { index: 0, reason })
+            if reason.contains("CCoSp3") && reason.contains("exceeds the profile cap")
+    ));
+}

@@ -15,6 +15,12 @@ pub fn catalog_row(table: ScoringTableId, notation: &str) -> Option<&'static Cat
     }
 }
 
+pub(crate) fn shared_rows(table: ScoringTableId) -> &'static [CatalogRow] {
+    match table {
+        ScoringTableId::Isu2786June2_2026 => shared::ROWS,
+    }
+}
+
 /// SHA-256 of the official PDF whose cover states "Updated as of 2 June, 2026".
 /// The PDF's internal title still names the superseded May edition.
 pub const ISU_2786_JUNE_2_2026_SHA256: &str =

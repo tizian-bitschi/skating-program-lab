@@ -16,6 +16,8 @@ pub use senior::{
 };
 mod assumed_recognition;
 pub use assumed_recognition::*;
+mod selection;
+pub use selection::*;
 mod assessment;
 pub use assessment::*;
 mod program_validation;

@@ -338,6 +338,22 @@ pub fn generate_program_candidates_with_assumed_recognition(
         ));
     }
     let mut request = request.clone();
+    if request.manual_variants.len() != recognition.len() {
+        return Err(E::InvalidRequest("supply one SOV selection per variant"));
+    }
+    let selection =
+        crate::selection::Selection::new(registry, &request.profile, request.scoring_table)
+            .map_err(E::Profile)?;
+    for (index, (variant, assumption)) in
+        request.manual_variants.iter().zip(recognition).enumerate()
+    {
+        selection
+            .check_assumption(&variant.element, assumption)
+            .map_err(|error| E::InvalidManualVariant {
+                index,
+                reason: error.reason(&assumption.code),
+            })?;
+    }
     let ruleset = registry
         .resolve(&request.profile, request.scoring_table)
         .map_err(E::Profile)?
