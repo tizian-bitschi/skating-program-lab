@@ -310,9 +310,18 @@ fn known_nonjump(details: &RecognitionDetails) -> bool {
 pub(crate) fn repetition_context(
     panels: &[Option<PanelRecognition>],
 ) -> Vec<Option<PanelRecognition>> {
+    repetition_context_with_plan(panels, |_| false)
+}
+
+pub(crate) fn repetition_context_with_plan(
+    panels: &[Option<PanelRecognition>],
+    known_planned_nonjump: impl Fn(usize) -> bool,
+) -> Vec<Option<PanelRecognition>> {
     let inputs: Vec<_> = panels
         .iter()
-        .map(|panel| match panel {
+        .enumerate()
+        .map(|(index, panel)| match panel {
+            _ if known_planned_nonjump(index) => RepetitionInput::NonJump,
             Some(panel) if panel.outcome == RecognitionOutcome::Recognized => panel
                 .details
                 .as_ref()

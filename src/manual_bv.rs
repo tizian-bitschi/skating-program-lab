@@ -46,8 +46,16 @@ pub fn assess_manual_bv(
     registry: &ProfileRegistry,
     request: &ManualBvRequest,
 ) -> Result<ManualBvAssessment, ProfileSelectionError> {
-    let selection = Selection::new(registry, &request.profile, request.scoring_table)?;
     let profile = registry.resolve(&request.profile, request.scoring_table)?;
+    assess_selections(registry, profile, request).map(|(assessment, _, _)| assessment)
+}
+
+pub(crate) fn assess_selections(
+    registry: &ProfileRegistry,
+    profile: &RuleProfile,
+    request: &ManualBvRequest,
+) -> Result<(ManualBvAssessment, ProfileProgram, Vec<ElementPlanEvidence>), ProfileSelectionError> {
+    let selection = Selection::new(registry, &request.profile, request.scoring_table)?;
     let mut program = ProfileProgram {
         profile: request.profile.clone(),
         scoring_table: request.scoring_table,
@@ -130,11 +138,15 @@ pub fn assess_manual_bv(
         validation,
         scope,
     )?;
-    Ok(ManualBvAssessment {
-        elements,
-        total,
-        legality,
-    })
+    Ok((
+        ManualBvAssessment {
+            elements,
+            total,
+            legality,
+        },
+        program,
+        evidence,
+    ))
 }
 
 // Preserve the listed sum even when the compound shape cannot be credited.

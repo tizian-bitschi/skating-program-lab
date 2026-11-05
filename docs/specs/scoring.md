@@ -83,6 +83,33 @@ See [implementation status](../implementation-status.md#scoring) for supported r
 
 `score_planning_scenario` calculates a hypothetical single-judge sum without skating times. With no boundary it uses unfactored values and categorizes no element as second half. An optional index marks the first element assumed to be in the second half; the resulting credit is conditional on that assumption. The index is not evidence of an actual start time, event applicability or an official TES. Unknown elements can leave the conditional selection incomplete. `score_program` remains the separate time-dependent path and requires timing and applicable rule evidence for exact claims; duration remains available for deductions.
 
+### GOE preview for selected programs
+
+Prepare a `GoeScenarioPlan` from the selected `ManualBvRequest`. Its
+`assessment()` contains BV and composition findings. Pass the prepared plan
+to `preview_goe_scenario` with an optional uniform final grade from −5 through
++5 and overrides keyed by zero-based element index. Reuse the prepared plan
+when changing grades. For an optimized or completed program, prepare its
+ordered selections and direct-transition assumptions with the same profile
+and table.
+An override grade takes precedence. With neither grade, a supported element
+remains ungraded. An explicit zero yields a numeric element score. The
+preview uses the published columns and call limits of `score_element`,
+including choreographic increments and Senior contextual repetition credit.
+
+The default scenario assumes clean execution and no fall. An override can
+supply recognition calls, a fall assumption and execution evidence. Supplied
+recognized components and levels must match the selection. A supplied
+recognition or execution override requires its own fall evidence when
+scoring depends on it. A disallowed grade leaves an indexed scoring error.
+Ignored and no-value outcomes each contribute zero and remain distinguishable
+from missing grades, unavailable selections and unsupported consequences.
+If any requested grade or consequence remains unresolved, only the subtotal
+of resolved elements is exact. The result records the ruleset and table.
+An optional second-half boundary determines hypothetical credit from the
+recognized jump order, independently of which grades were supplied.
+The preview includes element points only.
+
 ## Remaining contextual jump work (#46)
 
 The fourth milestone adds explicit execution evidence:

@@ -7,6 +7,10 @@ An open-source Rust library for planning technical figure skating programs. The 
 For theoretical program construction, use `assess_manual_bv` to calculate
 base value from ordered SOV codes and check composition without supplying
 spin or step feature evidence. See the [assumed-recognition API](docs/specs/assumed-recognition.md).
+Prepare a `GoeScenarioPlan` from the selected codes to run
+`preview_goe_scenario` with a uniform final GOE and individual overrides.
+The [BV-first acceptance matrix](docs/milestone-89.md) covers Adult and Senior
+manual BV, composition, full optimization and locked completion.
 
 The [Senior Grand Prix integration audit](docs/milestone-75.md) maps the six
 workstreams to parent acceptance evidence and a source-ordered eleven-slot

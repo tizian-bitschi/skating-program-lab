@@ -22,6 +22,8 @@ mod assessment;
 pub use assessment::*;
 mod manual_bv;
 pub use manual_bv::*;
+mod goe_scenario;
+pub use goe_scenario::*;
 mod program_validation;
 pub use program_validation::*;
 mod legality;
