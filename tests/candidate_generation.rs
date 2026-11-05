@@ -560,6 +560,73 @@ fn generation_admits_assumed_gold_levels_and_applies_semantic_filters() {
 }
 
 #[test]
+fn exact_codes_generate_eligible_levels_without_templates() {
+    let registry = ProfileRegistry::adult();
+    let choices = [
+        "CCoSpB", "CCoSp2", "CCoSp3", "FSSp2", "StSq2", "ChSp1", "1A",
+    ]
+    .map(AssumedRecognition::new);
+    let mut gold = request(AdultCategory::Gold);
+    gold.solo_jumps = false;
+    let generated =
+        generate_program_candidates_with_assumed_recognition(&registry, &gold, &choices).unwrap();
+    assert_eq!(generated.recognition, choices);
+    assert!(generated.domain.variants[..4]
+        .iter()
+        .all(|variant| matches!(
+            (&variant.element, &variant.evidence),
+            (
+                PlannedElement::RegularSpin(RegularSpin {
+                    entry: None,
+                    steps: None
+                }),
+                ElementPlanEvidence::Spin {
+                    spin: RegularSpinEvidence {
+                        feature_attempts: None,
+                        ..
+                    },
+                    ..
+                }
+            )
+        )));
+    gold.exclusions.push(PersonalExclusion::FlyingEntry);
+    let filtered =
+        generate_program_candidates_with_assumed_recognition(&registry, &gold, &choices).unwrap();
+    assert_eq!(filtered.input_indices, [0, 1, 2, 4, 5, 6]);
+
+    let selected = ["CCoSp2", "CCoSp3", "1T"].map(AssumedRecognition::new);
+    for (category, expected) in [
+        (AdultCategory::Silver, vec![0, 2]),
+        (AdultCategory::Bronze, vec![2]),
+    ] {
+        let mut q = request(category);
+        q.solo_jumps = false;
+        let result =
+            generate_program_candidates_with_assumed_recognition(&registry, &q, &selected).unwrap();
+        assert_eq!(result.input_indices, expected);
+        assert_eq!(
+            result.domain.audit.omissions.len(),
+            selected.len() - expected.len()
+        );
+    }
+}
+
+#[test]
+fn exact_codes_generate_eligible_masters_level_four() {
+    let mut q = request(AdultCategory::Masters);
+    q.solo_jumps = false;
+    let choices = ["CCoSp4", "FSSp4", "StSq4"].map(AssumedRecognition::new);
+    let generated = generate_program_candidates_with_assumed_recognition(
+        &ProfileRegistry::adult(),
+        &q,
+        &choices,
+    )
+    .unwrap();
+    assert_eq!(generated.recognition, choices);
+    assert_eq!(generated.domain.variants.len(), choices.len());
+}
+
+#[test]
 fn generation_preserves_explicit_axel_transition_assumptions() {
     let mut q = request(AdultCategory::Silver);
     q.solo_jumps = false;

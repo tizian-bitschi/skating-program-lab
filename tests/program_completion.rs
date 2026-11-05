@@ -2,6 +2,10 @@
 use skating_program_lab::*;
 use std::{collections::BTreeSet, time::Duration};
 
+#[path = "support/generation_defaults.rs"]
+#[allow(dead_code)]
+mod generation_defaults;
+
 fn pos(position: SpinPosition, n: u16) -> SpinStep {
     SpinStep::Position {
         position: Some(position),
@@ -661,12 +665,28 @@ fn assumed_completion_keeps_original_plan_and_uses_no_panel_outcomes() {
     )
     .unwrap();
     assert_eq!(result.status, OptimizerStatus::OptimalProven);
+    assert_eq!(result.request.original[1].entry, q.original[1].entry);
+    let resolved_spin = &result.original_assessment.request.entries[1].evidence;
+    assert_ne!(resolved_spin, &q.original[1].entry.evidence);
+    assert!(matches!(
+        resolved_spin,
+        ElementPlanEvidence::Spin {
+            spin: RegularSpinEvidence {
+                planned_level: Some(Level::Two),
+                ..
+            },
+            ..
+        }
+    ));
     let candidate = &result.candidates[0];
     for (index, provenance) in candidate.provenance.iter().enumerate() {
         let entry = &candidate.assessment.request.entries[index];
         assert!(entry.intended_recognition.is_none() && entry.scenario.is_none());
         if let CompletionProvenance::Original { original_index, .. } = provenance {
-            assert_eq!(*entry, q.original[*original_index].entry);
+            assert_eq!(
+                entry,
+                &result.original_assessment.request.entries[*original_index]
+            );
             assert_eq!(
                 candidate.per_element[index].notation,
                 originals[*original_index].code
@@ -677,6 +697,184 @@ fn assumed_completion_keeps_original_plan_and_uses_no_panel_outcomes() {
         candidate.assessment.intended_base.exact_hundredths,
         Some(i64::from(candidate.total_base_hundredths))
     );
+}
+
+#[test]
+fn gold_code_domain_completion_matches_manual_bv_and_order_oracle() {
+    let registry = ProfileRegistry::adult();
+    let category = AdultCategory::Gold;
+    let generation = generation_defaults::request(adult_profile(category));
+    let original_codes = ["1A", "CCoSp3"].map(AssumedRecognition::new);
+    let addition_codes =
+        ["CCoSp2", "FSSp2", "StSq2", "ChSp1", "FCSp3"].map(AssumedRecognition::new);
+    let originals = generate_program_candidates_with_assumed_recognition(
+        &registry,
+        &generation,
+        &original_codes,
+    )
+    .unwrap();
+    let additions = generate_program_candidates_with_assumed_recognition(
+        &registry,
+        &generation,
+        &addition_codes,
+    )
+    .unwrap();
+    let mut q = request();
+    q.profile = generation.profile;
+    q.policy = adult_program_policy(category);
+    q.original = ["axel", "combination"]
+        .into_iter()
+        .zip(originals.domain.variants)
+        .map(|(id, variant)| {
+            let mut original = entry(id, variant);
+            original.entry.intended_recognition = None;
+            original
+        })
+        .collect();
+    q.variants = additions.domain.variants.clone();
+    q.generated_domain = Some(additions.domain);
+    q.exclusions = vec![PersonalExclusion::Variant(4)];
+    q.min_additions = 3;
+    q.max_additions = 3;
+
+    let result = complete_program_with_assumed_recognition(
+        &registry,
+        &q,
+        &original_codes,
+        &additions.recognition,
+    )
+    .unwrap();
+    assert_eq!(result.status, OptimizerStatus::OptimalProven);
+    assert!(result.enumeration_complete);
+    let mut actual = BTreeSet::new();
+    for candidate in &result.candidates {
+        let mut word = Vec::new();
+        for (index, provenance) in candidate.provenance.iter().enumerate() {
+            match provenance {
+                CompletionProvenance::Original {
+                    original_index, id, ..
+                } => {
+                    assert_eq!(id, &q.original[*original_index].id);
+                    assert_eq!(
+                        candidate.assessment.request.entries[index],
+                        q.original[*original_index].entry
+                    );
+                }
+                CompletionProvenance::Inserted { boundary, .. } => {
+                    assert_eq!(
+                        *boundary,
+                        word.iter()
+                            .filter(|&&code| matches!(code, "1A" | "CCoSp3"))
+                            .count()
+                    );
+                }
+            }
+            word.push(candidate.per_element[index].notation.as_str());
+        }
+        let manual = assess_manual_bv(
+            &registry,
+            &ManualBvRequest {
+                profile: q.profile.clone(),
+                scoring_table: q.scoring_table,
+                submission: SubmissionState::Complete,
+                elements: word.iter().copied().map(AssumedRecognition::new).collect(),
+            },
+        )
+        .unwrap();
+        assert_eq!(candidate.total_base_hundredths, 1370);
+        assert_eq!(manual.total.exact_hundredths, Some(1370));
+        assert!(actual.insert(word));
+    }
+    let codes = ["1A", "CCoSp3", "FSSp2", "StSq2", "ChSp1"];
+    let expected = (0..5usize.pow(5))
+        .filter_map(|encoded| {
+            let indices: Vec<_> = (0..5)
+                .map(|place| encoded / 5usize.pow(place) % 5)
+                .collect();
+            let axel = indices.iter().position(|&i| i == 0)?;
+            let spin = indices.iter().position(|&i| i == 1)?;
+            (axel < spin && (2..5).all(|i| indices.contains(&i)))
+                .then(|| indices.iter().map(|&i| codes[i]).collect::<Vec<_>>())
+        })
+        .collect();
+    assert_eq!(actual, expected);
+}
+
+#[test]
+fn assumed_senior_completion_keeps_distinct_equal_bv_choices() {
+    let category = SeniorCategory::Women;
+    let profile = senior_profile(category);
+    let registry = ProfileRegistry::senior();
+    let generation = generation_defaults::request(profile.clone());
+    let original_codes = ["2A", "CCoSp4", "StSq4", "ChSq1", "ChSp1"].map(AssumedRecognition::new);
+    let addition_codes = ["FCSp4", "FLSp4"].map(AssumedRecognition::new);
+    let originals = generate_program_candidates_with_assumed_recognition(
+        &registry,
+        &generation,
+        &original_codes,
+    )
+    .unwrap();
+    let additions = generate_program_candidates_with_assumed_recognition(
+        &registry,
+        &generation,
+        &addition_codes,
+    )
+    .unwrap();
+    let mut q = request();
+    q.profile = profile.id;
+    q.scoring_table = profile.scoring_table;
+    q.policy = senior_program_policy(category);
+    q.original = original_codes
+        .iter()
+        .zip(originals.domain.variants)
+        .map(|(code, variant)| CompletionEntry {
+            id: code.code.clone(),
+            locked: true,
+            entry: ManualProgramEntry {
+                planned: variant.element,
+                evidence: variant.evidence,
+                intended_recognition: None,
+                scenario: None,
+            },
+        })
+        .collect();
+    q.variants = additions.domain.variants;
+    q.insertion.boundaries = vec![q.original.len()];
+    q.min_additions = 1;
+    q.max_additions = 1;
+    let result = complete_program_with_assumed_recognition(
+        &registry,
+        &q,
+        &original_codes,
+        &additions.recognition,
+    )
+    .unwrap();
+    assert_eq!(result.status, OptimizerStatus::OptimalProven);
+    assert!(result.enumeration_complete);
+    assert_eq!(result.candidates.len(), 2);
+    let mut found = BTreeSet::new();
+    for candidate in &result.candidates {
+        let manual = assess_manual_bv(
+            &registry,
+            &ManualBvRequest {
+                profile: q.profile.clone(),
+                scoring_table: q.scoring_table,
+                submission: SubmissionState::Complete,
+                elements: candidate
+                    .per_element
+                    .iter()
+                    .map(|value| AssumedRecognition::new(&value.notation))
+                    .collect(),
+            },
+        )
+        .unwrap();
+        assert_eq!(
+            manual.total.exact_hundredths,
+            Some(i64::from(candidate.total_base_hundredths))
+        );
+        found.insert(candidate.per_element.last().unwrap().notation.as_str());
+    }
+    assert_eq!(found, BTreeSet::from(["FCSp4", "FLSp4"]));
 }
 
 #[test]

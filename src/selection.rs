@@ -103,6 +103,14 @@ pub(crate) struct Selection<'a> {
     policy: ProgramPolicy,
 }
 
+pub(crate) struct ResolvedIndividual {
+    pub(crate) option: SelectableElement,
+    pub(crate) element: PlannedElement,
+    pub(crate) evidence: ElementPlanEvidence,
+    pub(crate) value: BaseValue,
+    pub(crate) restriction: Option<ElementSelectionError>,
+}
+
 impl<'a> Selection<'a> {
     pub(crate) fn new(
         registry: &'a ProfileRegistry,
@@ -173,47 +181,68 @@ impl<'a> Selection<'a> {
     }
 
     pub(crate) fn check(&self, code: &str) -> Result<SelectableElement, ElementSelectionError> {
-        self.check_row(catalog_row(self.table, code).ok_or_else(|| {
-            ElementSelectionError::UnknownCode {
-                source: self
-                    .table
-                    .source_reference(format!("Exact notation lookup: {code}")),
-            }
-        })?)
+        self.check_row(self.row(code)?)
+    }
+
+    pub(crate) fn row(&self, code: &str) -> Result<&'static CatalogRow, ElementSelectionError> {
+        catalog_row(self.table, code).ok_or_else(|| ElementSelectionError::UnknownCode {
+            source: self
+                .table
+                .source_reference(format!("Exact notation lookup: {code}")),
+        })
     }
 
     pub(crate) fn check_row(
         &self,
         row: &'static CatalogRow,
     ) -> Result<SelectableElement, ElementSelectionError> {
+        let resolved = self.resolve_row(row)?;
+        match resolved.restriction {
+            Some(error) => Err(error),
+            None => Ok(resolved.option),
+        }
+    }
+
+    pub(crate) fn resolve_row(
+        &self,
+        row: &'static CatalogRow,
+    ) -> Result<ResolvedIndividual, ElementSelectionError> {
         use ElementSelectionError as Error;
         let unsupported = || Error::UnsupportedCode {
             source: row.source.reference(row.notation),
         };
         let (kind, element) = selection_shape(row).ok_or_else(unsupported)?;
-        let (evidence, _) = crate::assumed_recognition::resolve_individual_row(row, &element, None)
-            .ok_or_else(unsupported)?;
+        let (evidence, value) =
+            crate::assumed_recognition::resolve_individual_row(row, &element, None)
+                .ok_or_else(unsupported)?;
         let report = crate::program_validation::validate_program_scope(
             self.registry,
             &ProfileProgram {
                 profile: self.profile.id.clone(),
                 scoring_table: self.table,
-                elements: vec![element],
+                elements: vec![element.clone()],
             },
-            &[evidence],
+            std::slice::from_ref(&evidence),
             &self.policy,
             EvaluationScope::AssumedRecognition,
         )
         .map_err(Error::Profile)?;
-        match individual_element_restriction(report.validation.findings) {
+        let restriction = match individual_element_restriction(report.validation.findings) {
             Some(ElementRestriction::Type(finding)) => {
-                Err(Error::TypeNotSelectable(Box::new(finding)))
+                Some(Error::TypeNotSelectable(Box::new(finding)))
             }
             Some(ElementRestriction::Level(finding)) => {
-                Err(Error::LevelNotSelectable(Box::new(finding)))
+                Some(Error::LevelNotSelectable(Box::new(finding)))
             }
-            None => Ok(SelectableElement { row, kind }),
-        }
+            None => None,
+        };
+        Ok(ResolvedIndividual {
+            option: SelectableElement { row, kind },
+            element,
+            evidence,
+            value,
+            restriction,
+        })
     }
 }
 

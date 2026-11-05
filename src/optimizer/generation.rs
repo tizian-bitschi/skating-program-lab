@@ -307,8 +307,9 @@ pub struct AssumedCandidateGenerationResult {
     pub recognition: Vec<AssumedRecognition>,
 }
 
-/// Generate a finite domain from explicit SOV selections for the manual variants.
-/// Automatic evidence templates and automatic jump expansion belong to the detailed API.
+/// Generate a finite domain from exact SOV selections. With no manual variants,
+/// selections are expanded directly into individual elements. Compound jump
+/// units still require a matching manual variant.
 pub fn generate_program_candidates_with_assumed_recognition(
     registry: &ProfileRegistry,
     request: &CandidateGenerationRequest,
@@ -338,53 +339,99 @@ pub fn generate_program_candidates_with_assumed_recognition(
         ));
     }
     let mut request = request.clone();
-    if request.manual_variants.len() != recognition.len() {
+    let codes_only = request.manual_variants.is_empty();
+    if recognition.len() > 1000
+        || (!codes_only && request.manual_variants.len() != recognition.len())
+    {
         return Err(E::InvalidRequest("supply one SOV selection per variant"));
     }
     let selection =
         crate::selection::Selection::new(registry, &request.profile, request.scoring_table)
             .map_err(E::Profile)?;
-    for (index, (variant, assumption)) in
-        request.manual_variants.iter().zip(recognition).enumerate()
-    {
-        selection
-            .check_assumption(&variant.element, assumption)
-            .map_err(|error| E::InvalidManualVariant {
+    let mut indices = Vec::new();
+    let mut omissions = Vec::new();
+    let values = if codes_only {
+        let mut values = Vec::new();
+        for (index, assumption) in recognition.iter().enumerate() {
+            let resolved = selection
+                .row(&assumption.code)
+                .and_then(|row| selection.resolve_row(row))
+                .map_err(|error| match error {
+                    ElementSelectionError::Profile(error) => E::Profile(error),
+                    error => E::InvalidManualVariant {
+                        index,
+                        reason: error.reason(&assumption.code),
+                    },
+                })?;
+            let variant = ProgramVariant {
+                element: resolved.element,
+                evidence: resolved.evidence,
+                recognition_assumed: true,
+            };
+            if let Some(error) = resolved.restriction {
+                omissions.push(CandidateOmission {
+                    variant,
+                    reason: error.reason(&assumption.code),
+                });
+            } else {
+                if assumption.direct_transitions_assumed {
+                    return Err(E::InvalidManualVariant {
+                        index,
+                        reason: "direct transition assumptions require a sequence".into(),
+                    });
+                }
+                request.manual_variants.push(variant);
+                values.push(resolved.value);
+                indices.push(index);
+            }
+        }
+        values
+    } else {
+        for (index, (variant, assumption)) in
+            request.manual_variants.iter().zip(recognition).enumerate()
+        {
+            selection
+                .check_assumption(&variant.element, assumption)
+                .map_err(|error| E::InvalidManualVariant {
+                    index,
+                    reason: error.reason(&assumption.code),
+                })?;
+            indices.push(index);
+        }
+        let ruleset = registry
+            .resolve(&request.profile, request.scoring_table)
+            .map_err(E::Profile)?
+            .scoring
+            .recognition_ruleset;
+        super::programs::resolve_variants(
+            request.scoring_table,
+            &mut request.manual_variants,
+            recognition,
+            ruleset,
+        )
+        .map_err(|error| match error {
+            ProgramOptimizationError::UnsupportedVariant(index) => E::InvalidManualVariant {
                 index,
-                reason: error.reason(&assumption.code),
-            })?;
-    }
-    let ruleset = registry
-        .resolve(&request.profile, request.scoring_table)
-        .map_err(E::Profile)?
-        .scoring
-        .recognition_ruleset;
-    let values = super::programs::resolve_variants(
-        request.scoring_table,
-        &mut request.manual_variants,
-        recognition,
-        ruleset,
-    )
-    .map_err(|error| match error {
-        ProgramOptimizationError::UnsupportedVariant(index) => E::InvalidManualVariant {
-            index,
-            reason: "SOV code is unsupported or does not match the plan".into(),
-        },
-        _ => E::InvalidRequest("supply one SOV selection per variant"),
-    })?;
+                reason: "SOV code is unsupported or does not match the plan".into(),
+            },
+            _ => E::InvalidRequest("supply one SOV selection per variant"),
+        })?
+    };
     request.recognition_assumed = true;
     let mut result = generate_candidates(registry, &request, Some(&values))?;
+    result.audit.omissions.extend(omissions);
     result.audit.assumptions = super::programs::ASSUMED_SCOPE;
     result.audit.declared_domain = "Explicit finite SOV selections in input order.";
     let input_indices: Vec<_> = result
         .variants
         .iter()
         .map(|variant| {
-            request
+            let index = request
                 .manual_variants
                 .iter()
                 .position(|input| super::programs::normalize_variant(input.clone()) == *variant)
-                .expect("generated assumed variants originate from explicit inputs")
+                .expect("generated assumed variants originate from explicit inputs");
+            indices[index]
         })
         .collect();
     Ok(AssumedCandidateGenerationResult {
