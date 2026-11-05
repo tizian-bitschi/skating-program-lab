@@ -1,7 +1,7 @@
 //! Base-value assessment of ordered selections under a single profile and SOV.
-use crate::assumed_recognition::{assumed_credit, resolve_individual_row};
+use crate::assumed_recognition::assumed_credit;
 use crate::program_validation::{validate_program_scope_with_credit, EvaluationScope};
-use crate::selection::{clean_jump, selection_shape, Selection};
+use crate::selection::{clean_jump, Selection};
 use crate::*;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -192,13 +192,20 @@ fn resolve_selection(
         direct_transitions_assumed: false,
     };
     if let Some(row) = catalog_row(table, code) {
-        let error = selection.check_row(row).err().map(|error| (error, None));
-        if let Some((_, element)) = selection_shape(row) {
-            if let Some((evidence, base)) = resolve_individual_row(row, &element, None) {
-                return (element, evidence, Some(base), error);
-            }
-        }
-        return (PlannedElement::Unspecified, jump_evidence, None, error);
+        return match selection.resolve_row(row) {
+            Ok(resolved) => (
+                resolved.element,
+                resolved.evidence,
+                Some(resolved.value),
+                resolved.restriction.map(|error| (error, None)),
+            ),
+            Err(error) => (
+                PlannedElement::Unspecified,
+                jump_evidence,
+                None,
+                Some((error, None)),
+            ),
+        };
     }
 
     let (components, sequence) = match code.strip_suffix("+SEQ") {

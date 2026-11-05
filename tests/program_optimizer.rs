@@ -597,6 +597,50 @@ fn optimize_gold_sov_selections_without_spin_or_step_proof() {
 }
 
 #[test]
+fn assumed_senior_full_program_matches_manual_bv() {
+    let category = SeniorCategory::Women;
+    let profile = senior_profile(category);
+    let registry = ProfileRegistry::senior();
+    let choices = ["2A", "CCoSp4", "FCSp4", "StSq4", "ChSq1", "ChSp1"].map(AssumedRecognition::new);
+    let generation = generation_defaults::request(profile.clone());
+    let generated =
+        generate_program_candidates_with_assumed_recognition(&registry, &generation, &choices)
+            .unwrap();
+    assert_eq!(generated.recognition, choices);
+    let mut q = request(
+        AdultCategory::Gold,
+        generated.domain.variants,
+        choices.len(),
+    );
+    q.profile = profile.id;
+    q.scoring_table = profile.scoring_table;
+    q.policy = senior_program_policy(category);
+    q.must_have = (0..choices.len()).map(|index| vec![index]).collect();
+    q.enumerate_equal_optima = false;
+    let result = optimize_program_with_assumed_recognition(&registry, &q, &choices).unwrap();
+    assert_eq!(result.status, OptimizerStatus::OptimalProven);
+    let candidate = &result.candidates[0];
+    let manual = assess_manual_bv(
+        &registry,
+        &ManualBvRequest {
+            profile: q.profile,
+            scoring_table: q.scoring_table,
+            submission: SubmissionState::Complete,
+            elements: candidate
+                .variant_indices
+                .iter()
+                .map(|&i| choices[i].clone())
+                .collect(),
+        },
+    )
+    .unwrap();
+    assert_eq!(
+        manual.total.exact_hundredths,
+        Some(i64::from(candidate.base_hundredths))
+    );
+}
+
+#[test]
 fn assumed_optimizer_rejects_senior_repeat_credit_before_search() {
     let category = SeniorCategory::Women;
     let profile = senior_profile(category);

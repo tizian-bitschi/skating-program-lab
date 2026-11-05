@@ -612,6 +612,21 @@ fn exact_codes_generate_eligible_levels_without_templates() {
 }
 
 #[test]
+fn exact_codes_generate_eligible_masters_level_four() {
+    let mut q = request(AdultCategory::Masters);
+    q.solo_jumps = false;
+    let choices = ["CCoSp4", "FSSp4", "StSq4"].map(AssumedRecognition::new);
+    let generated = generate_program_candidates_with_assumed_recognition(
+        &ProfileRegistry::adult(),
+        &q,
+        &choices,
+    )
+    .unwrap();
+    assert_eq!(generated.recognition, choices);
+    assert_eq!(generated.domain.variants.len(), choices.len());
+}
+
+#[test]
 fn generation_preserves_explicit_axel_transition_assumptions() {
     let mut q = request(AdultCategory::Silver);
     q.solo_jumps = false;

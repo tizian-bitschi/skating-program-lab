@@ -496,28 +496,6 @@ pub fn complete_program_with_assumed_recognition(
     let mut result = complete(registry, &request, Some(&values))?;
     result.assumptions = programs::ASSUMED_SCOPE;
     result.request = original_request.clone();
-    for (entry, original) in result
-        .original_assessment
-        .request
-        .entries
-        .iter_mut()
-        .zip(&original_request.original)
-    {
-        *entry = original.entry.clone();
-    }
-    for candidate in &mut result.candidates {
-        for (entry, provenance) in candidate
-            .assessment
-            .request
-            .entries
-            .iter_mut()
-            .zip(&candidate.provenance)
-        {
-            if let CompletionProvenance::Original { original_index, .. } = provenance {
-                *entry = original_request.original[*original_index].entry.clone();
-            }
-        }
-    }
     Ok(result)
 }
 

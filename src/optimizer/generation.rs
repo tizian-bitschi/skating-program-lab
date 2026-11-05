@@ -350,45 +350,42 @@ pub fn generate_program_candidates_with_assumed_recognition(
             .map_err(E::Profile)?;
     let mut indices = Vec::new();
     let mut omissions = Vec::new();
-    if codes_only {
+    let values = if codes_only {
+        let mut values = Vec::new();
         for (index, assumption) in recognition.iter().enumerate() {
-            let invalid = || E::InvalidManualVariant {
-                index,
-                reason: format!("Unsupported individual SOV selection: {}", assumption.code),
-            };
-            let row = catalog_row(request.scoring_table, &assumption.code).ok_or_else(invalid)?;
-            let (_, element) = crate::selection::selection_shape(row).ok_or_else(invalid)?;
-            let (evidence, _) =
-                crate::assumed_recognition::resolve_individual_row(row, &element, None)
-                    .ok_or_else(invalid)?;
-            let variant = ProgramVariant {
-                element,
-                evidence,
-                recognition_assumed: true,
-            };
-            match selection.check_row(row) {
-                Ok(_) => {
-                    request.manual_variants.push(variant);
-                    indices.push(index);
-                }
-                Err(
-                    error @ (ElementSelectionError::TypeNotSelectable(_)
-                    | ElementSelectionError::LevelNotSelectable(_)),
-                ) => {
-                    omissions.push(CandidateOmission {
-                        variant,
-                        reason: error.reason(&assumption.code),
-                    });
-                }
-                Err(ElementSelectionError::Profile(error)) => return Err(E::Profile(error)),
-                Err(error) => {
-                    return Err(E::InvalidManualVariant {
+            let resolved = selection
+                .row(&assumption.code)
+                .and_then(|row| selection.resolve_row(row))
+                .map_err(|error| match error {
+                    ElementSelectionError::Profile(error) => E::Profile(error),
+                    error => E::InvalidManualVariant {
                         index,
                         reason: error.reason(&assumption.code),
-                    })
+                    },
+                })?;
+            let variant = ProgramVariant {
+                element: resolved.element,
+                evidence: resolved.evidence,
+                recognition_assumed: true,
+            };
+            if let Some(error) = resolved.restriction {
+                omissions.push(CandidateOmission {
+                    variant,
+                    reason: error.reason(&assumption.code),
+                });
+            } else {
+                if assumption.direct_transitions_assumed {
+                    return Err(E::InvalidManualVariant {
+                        index,
+                        reason: "direct transition assumptions require a sequence".into(),
+                    });
                 }
+                request.manual_variants.push(variant);
+                values.push(resolved.value);
+                indices.push(index);
             }
         }
+        values
     } else {
         for (index, (variant, assumption)) in
             request.manual_variants.iter().zip(recognition).enumerate()
@@ -401,29 +398,25 @@ pub fn generate_program_candidates_with_assumed_recognition(
                 })?;
             indices.push(index);
         }
-    }
-    let selected: Vec<_> = indices
-        .iter()
-        .map(|&index| recognition[index].clone())
-        .collect();
-    let ruleset = registry
-        .resolve(&request.profile, request.scoring_table)
-        .map_err(E::Profile)?
-        .scoring
-        .recognition_ruleset;
-    let values = super::programs::resolve_variants(
-        request.scoring_table,
-        &mut request.manual_variants,
-        &selected,
-        ruleset,
-    )
-    .map_err(|error| match error {
-        ProgramOptimizationError::UnsupportedVariant(index) => E::InvalidManualVariant {
-            index: indices[index],
-            reason: "SOV code is unsupported or does not match the plan".into(),
-        },
-        _ => E::InvalidRequest("supply one SOV selection per variant"),
-    })?;
+        let ruleset = registry
+            .resolve(&request.profile, request.scoring_table)
+            .map_err(E::Profile)?
+            .scoring
+            .recognition_ruleset;
+        super::programs::resolve_variants(
+            request.scoring_table,
+            &mut request.manual_variants,
+            recognition,
+            ruleset,
+        )
+        .map_err(|error| match error {
+            ProgramOptimizationError::UnsupportedVariant(index) => E::InvalidManualVariant {
+                index,
+                reason: "SOV code is unsupported or does not match the plan".into(),
+            },
+            _ => E::InvalidRequest("supply one SOV selection per variant"),
+        })?
+    };
     request.recognition_assumed = true;
     let mut result = generate_candidates(registry, &request, Some(&values))?;
     result.audit.omissions.extend(omissions);

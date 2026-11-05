@@ -32,7 +32,9 @@ or panel decisions.
   domain and `complete_program_with_assumed_recognition` for additions to
   immutable originals. The latter receives one ordered selection list for
   originals and a second for additions. Variant indices and original IDs
-  remain the stable references in returned placements.
+  remain the stable references in returned placements. The completion request
+  preserves the original entries. The original and completed assessments
+  retain the resolved evidence used for their BV calculations.
 - Existing entry points keep the evidence-based contract. Use them when
   the task requires technical position, movement, revolution, feature
   reuse or level-credit checks.
