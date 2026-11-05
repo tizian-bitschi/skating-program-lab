@@ -168,6 +168,10 @@ impl<'a> Selection<'a> {
         self.check(&assumption.code).map(|_| ())
     }
 
+    pub(crate) fn policy(&self) -> &ProgramPolicy {
+        &self.policy
+    }
+
     pub(crate) fn check(&self, code: &str) -> Result<SelectableElement, ElementSelectionError> {
         self.check_row(catalog_row(self.table, code).ok_or_else(|| {
             ElementSelectionError::UnknownCode {
@@ -178,49 +182,15 @@ impl<'a> Selection<'a> {
         })?)
     }
 
-    fn check_row(
+    pub(crate) fn check_row(
         &self,
         row: &'static CatalogRow,
     ) -> Result<SelectableElement, ElementSelectionError> {
         use ElementSelectionError as Error;
-        use SelectableElementKind as Kind;
         let unsupported = || Error::UnsupportedCode {
             source: row.source.reference(row.notation),
         };
-        if row.discipline != CatalogDiscipline::SingleAndPair {
-            return Err(unsupported());
-        }
-        let (kind, element) = match row.family {
-            CatalogFamily::Jump => {
-                let (kind, rotations) = clean_jump(row.notation).ok_or_else(unsupported)?;
-                (
-                    Kind::SoloJump { kind, rotations },
-                    PlannedElement::Jump(JumpElement::Solo(ListedJump {
-                        kind: Some(kind),
-                        rotations: Some(rotations),
-                    })),
-                )
-            }
-            CatalogFamily::Spin => (
-                Kind::RegularSpin(
-                    crate::assumed_recognition::spin_abbreviation(row.notation)
-                        .ok_or_else(unsupported)?,
-                ),
-                PlannedElement::RegularSpin(RegularSpin {
-                    entry: None,
-                    steps: None,
-                }),
-            ),
-            CatalogFamily::StepSequence => (Kind::StepSequence, PlannedElement::StepSequence),
-            CatalogFamily::ChoreographicSequence => (
-                Kind::ChoreographicSequence,
-                PlannedElement::ChoreographicSequence { movements: None },
-            ),
-            CatalogFamily::ChoreographicSpin => {
-                (Kind::ChoreographicSpin, PlannedElement::ChoreographicSpin)
-            }
-            _ => return Err(unsupported()),
-        };
+        let (kind, element) = selection_shape(row).ok_or_else(unsupported)?;
         let (evidence, _) = crate::assumed_recognition::resolve_individual_row(row, &element, None)
             .ok_or_else(unsupported)?;
         let report = crate::program_validation::validate_program_scope(
@@ -247,6 +217,41 @@ impl<'a> Selection<'a> {
     }
 }
 
+pub(crate) fn selection_shape(row: &CatalogRow) -> Option<(SelectableElementKind, PlannedElement)> {
+    use SelectableElementKind as Kind;
+    if row.discipline != CatalogDiscipline::SingleAndPair {
+        return None;
+    }
+    Some(match row.family {
+        CatalogFamily::Jump => {
+            let (kind, rotations) = clean_jump(row.notation)?;
+            (
+                Kind::SoloJump { kind, rotations },
+                PlannedElement::Jump(JumpElement::Solo(ListedJump {
+                    kind: Some(kind),
+                    rotations: Some(rotations),
+                })),
+            )
+        }
+        CatalogFamily::Spin => (
+            Kind::RegularSpin(crate::assumed_recognition::spin_abbreviation(row.notation)?),
+            PlannedElement::RegularSpin(RegularSpin {
+                entry: None,
+                steps: None,
+            }),
+        ),
+        CatalogFamily::StepSequence => (Kind::StepSequence, PlannedElement::StepSequence),
+        CatalogFamily::ChoreographicSequence => (
+            Kind::ChoreographicSequence,
+            PlannedElement::ChoreographicSequence { movements: None },
+        ),
+        CatalogFamily::ChoreographicSpin => {
+            (Kind::ChoreographicSpin, PlannedElement::ChoreographicSpin)
+        }
+        _ => return None,
+    })
+}
+
 fn unsupported_profile(profile: &RuleProfile) -> ProfileSelectionError {
     ProfileSelectionError {
         profile: profile.id.clone(),
@@ -255,7 +260,7 @@ fn unsupported_profile(profile: &RuleProfile) -> ProfileSelectionError {
     }
 }
 
-fn clean_jump(code: &str) -> Option<(JumpKind, u8)> {
+pub(crate) fn clean_jump(code: &str) -> Option<(JumpKind, u8)> {
     let (rotations, suffix) = code.split_at_checked(1)?;
     let kind = match suffix {
         "T" => JumpKind::ToeLoop,

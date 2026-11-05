@@ -125,7 +125,7 @@ pub struct ManualProgramAssessment {
     pub completion_findings: Vec<usize>,
 }
 
-fn aggregate(values: impl Iterator<Item = Option<i64>>) -> AssessmentAggregate {
+pub(crate) fn aggregate(values: impl Iterator<Item = Option<i64>>) -> AssessmentAggregate {
     let mut resolved_hundredths = 0;
     let mut unresolved_indices = vec![];
     for (index, value) in values.enumerate() {
@@ -238,6 +238,8 @@ pub(crate) fn assess_manual_scope(
         AssessmentStatus::NoViolationInCoveredRules
     };
     let senior = profile.binding(ProfileRule::Scoring).mechanism == RuleMechanism::SeniorScoringV1;
+    let assumed_context = (senior && assumed_values.is_some())
+        .then(|| crate::assumed_recognition::senior_context(&program.elements, &evidence));
     let contextual = |panels: Vec<Option<PanelRecognition>>| {
         if senior {
             crate::senior::repetition_context(&panels)
@@ -284,14 +286,11 @@ pub(crate) fn assess_manual_scope(
                 .collect();
             let intended_base = if let Some(values) = assumed_values {
                 if unresolved.is_empty() {
-                    Ok(BaseValueOutcome::Value(
-                        crate::assumed_recognition::contextual_base(
-                            &program.elements,
-                            index,
-                            &values[index],
-                            senior,
-                        ),
-                    ))
+                    crate::assumed_recognition::contextual_base(
+                        &values[index],
+                        assumed_context.as_ref().map(|context| &context[index]),
+                    )
+                    .map_err(AssessmentValueError::BaseValue)
                 } else {
                     Err(AssessmentValueError::UnresolvedPlanEvidence(unresolved))
                 }

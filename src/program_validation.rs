@@ -418,6 +418,7 @@ pub(crate) fn validate_program_scope(
     let mut spin_evidence = ProgramValidationEvidence::default();
     for (index, (element, data)) in program.elements.iter().zip(evidence).enumerate() {
         match (element, data) {
+            (PlannedElement::Unspecified, _) if scope == EvaluationScope::AssumedRecognition => {}
             (PlannedElement::RegularSpin(_), ElementPlanEvidence::Spin { spin, .. }) => {
                 spin_evidence.spins.push(IndexedSpinEvidence {
                     element_index: index,

@@ -298,6 +298,7 @@ pub fn assess_program_legality_with_assumed_recognition(
         .map(|assessment| assessment.legality)
 }
 
+#[cfg(feature = "optimizer")]
 fn advanced_solo(element: &PlannedElement) -> Option<&ListedJump> {
     match element {
         PlannedElement::Jump(JumpElement::Solo(jump)) if jump.rotations.is_some_and(|r| r >= 3) => {
@@ -319,27 +320,57 @@ pub(crate) fn has_repeated_advanced_solo<'a>(
     })
 }
 
-pub(crate) fn contextual_base(
+/// Reuse the Senior scorer's repetition decisions with clean intended details.
+pub(crate) fn senior_context(
     elements: &[PlannedElement],
-    index: usize,
-    value: &BaseValue,
-    senior: bool,
-) -> BaseValue {
-    let mut value = value.clone();
-    if senior
-        && advanced_solo(&elements[index]).is_some_and(|jump| {
-            elements[..index]
-                .iter()
-                .filter_map(advanced_solo)
-                .any(|previous| previous == jump)
+    evidence: &[ElementPlanEvidence],
+) -> Vec<Option<PanelRecognition>> {
+    let panels: Vec<_> = elements
+        .iter()
+        .zip(evidence)
+        .map(|(element, evidence)| {
+            if matches!(element, PlannedElement::Jump(JumpElement::Sequence(_)))
+                && matches!(
+                    evidence,
+                    ElementPlanEvidence::Jump {
+                        direct_transitions_assumed: false
+                    }
+                )
+            {
+                return None;
+            }
+            Some(PanelRecognition {
+                ruleset: RulesetId::IsuSenior2026_27June12,
+                source: None,
+                planned_element: None,
+                observed_element: None,
+                outcome: RecognitionOutcome::Recognized,
+                details: Some(crate::plan_recognition::intended_details(
+                    element, evidence,
+                )?),
+            })
         })
-    {
-        value.hundredths = crate::scoring::repetition_hundredths(value.hundredths);
-        value.notation.push_str("+REP");
-        value
-            .source
-            .location
-            .push_str("; ISU 2786 p. 14, remark 5, contextual 80% BASE");
+        .collect();
+    crate::senior::repetition_context(&panels)
+}
+
+pub(crate) fn contextual_base(
+    table: &BaseValue,
+    senior: Option<&Option<PanelRecognition>>,
+) -> Result<BaseValueOutcome, BaseValueError> {
+    match senior {
+        Some(Some(panel))
+            if panel
+                .details
+                .as_ref()
+                .and_then(RecognitionDetails::calls)
+                .is_some_and(|calls| {
+                    calls.iter().any(|call| call.call == PanelCall::Repetition)
+                }) =>
+        {
+            lookup_base_value(table.table, panel, &[])
+        }
+        Some(None) => Err(BaseValueError::Unsupported),
+        _ => Ok(BaseValueOutcome::Value(table.clone())),
     }
-    value
 }
