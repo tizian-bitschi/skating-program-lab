@@ -60,3 +60,21 @@ identical advanced solo jumps in an otherwise supported repetition context.
 The current ordered solver has an unfactored objective. It rejects assumed
 domains containing repeated advanced solo choices before claiming an
 optimum, including repetitions involving locked originals.
+
+## Profile-filtered choices
+
+Call `selectable_elements` with the exact profile and SOV edition to list
+individual options in published table order. Each option identifies its
+semantic kind and exact catalog row, including its published level when
+applicable. Fixed codes such as ChSp1 and ChSq1 are not level ranges.
+Reduced variants and pair rows are outside this selection contract.
+`check_selectable_element` checks a saved code against the same rules and
+distinguishes an unknown code, an unsupported row, a disallowed type and a
+credited level above the profile cap. Type restrictions take precedence.
+
+Manual BV assessment and assumed candidate generation reject unavailable
+individual selections without substituting a different row. The separate
+legality report still reports construction findings for a supplied plan.
+An available choice does not reserve a slot or satisfy any required role;
+those checks need the whole program. Compound jump units continue through
+the existing compound scoring and validation path.

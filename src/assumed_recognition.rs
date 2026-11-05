@@ -11,8 +11,8 @@ pub struct AssumedRecognition {
     pub direct_transitions_assumed: bool,
 }
 
-fn spin_abbreviation(code: &str) -> Option<SpinAbbreviation> {
-    let (code, _) = code.split_at(code.len().checked_sub(1)?);
+pub(crate) fn spin_abbreviation(code: &str) -> Option<SpinAbbreviation> {
+    let (code, _) = code.split_at_checked(code.len().checked_sub(1)?)?;
     let (entry, code) = match code.strip_prefix('F') {
         Some(code) => (SpinEntry::Flying, code),
         None => (SpinEntry::NonFlying, code),
@@ -89,39 +89,46 @@ impl AssumedRecognition {
             return Some((evidence, value));
         }
         let row = catalog_row(table, &self.code)?;
-        if row.discipline != CatalogDiscipline::SingleAndPair {
-            return None;
+        resolve_individual_row(row, element, supplied)
+    }
+}
+
+pub(crate) fn resolve_individual_row(
+    row: &CatalogRow,
+    element: &PlannedElement,
+    supplied: Option<&ElementPlanEvidence>,
+) -> Option<(ElementPlanEvidence, BaseValue)> {
+    if row.discipline != CatalogDiscipline::SingleAndPair {
+        return None;
+    }
+    let evidence = match (row.family, element) {
+        (CatalogFamily::Jump, PlannedElement::Jump(JumpElement::Solo(jump)))
+            if crate::plan_recognition::jump_component(jump)?.as_str() == row.notation =>
+        {
+            ElementPlanEvidence::Jump {
+                direct_transitions_assumed: false,
+            }
         }
-        let evidence = match (row.family, element) {
-            (CatalogFamily::Jump, PlannedElement::Jump(JumpElement::Solo(jump)))
-                if crate::plan_recognition::jump_component(jump)?.as_str() == row.notation =>
-            {
-                ElementPlanEvidence::Jump {
-                    direct_transitions_assumed: false,
-                }
-            }
-            (CatalogFamily::Spin, PlannedElement::RegularSpin(_)) => ElementPlanEvidence::Spin {
-                spin: RegularSpinEvidence {
-                    abbreviation: Some(spin_abbreviation(row.notation)?),
-                    planned_level: Some(row.level?),
-                    ..RegularSpinEvidence::default()
-                },
-                local_feature_qualification_assumed: false,
+        (CatalogFamily::Spin, PlannedElement::RegularSpin(_)) => ElementPlanEvidence::Spin {
+            spin: RegularSpinEvidence {
+                abbreviation: Some(spin_abbreviation(row.notation)?),
+                planned_level: Some(row.level?),
+                ..RegularSpinEvidence::default()
             },
-            (CatalogFamily::StepSequence, PlannedElement::StepSequence) => {
-                ElementPlanEvidence::Step {
-                    level: row.level?,
-                    clean_difficult_turns: None,
-                    full_ice_coverage: None,
-                    movement: None,
-                    qualified_features: None,
-                    qualification_assumed: false,
-                }
-            }
-            (
-                CatalogFamily::ChoreographicSequence,
-                PlannedElement::ChoreographicSequence { .. },
-            ) if row.notation == "ChSq1" => ElementPlanEvidence::ChoreographicSequence {
+            local_feature_qualification_assumed: false,
+        },
+        (CatalogFamily::StepSequence, PlannedElement::StepSequence) => ElementPlanEvidence::Step {
+            level: row.level?,
+            clean_difficult_turns: None,
+            full_ice_coverage: None,
+            movement: None,
+            qualified_features: None,
+            qualification_assumed: false,
+        },
+        (CatalogFamily::ChoreographicSequence, PlannedElement::ChoreographicSequence { .. })
+            if row.notation == "ChSq1" =>
+        {
+            ElementPlanEvidence::ChoreographicSequence {
                 movements: match supplied {
                     Some(ElementPlanEvidence::ChoreographicSequence { movements, .. }) => {
                         movements.clone()
@@ -129,26 +136,26 @@ impl AssumedRecognition {
                     _ => None,
                 },
                 clearly_visible: None,
-            },
-            (CatalogFamily::ChoreographicSpin, PlannedElement::ChoreographicSpin)
-                if row.notation == "ChSp1" =>
-            {
-                ElementPlanEvidence::ChoreographicSpin {
-                    consecutive_revolutions_per_foot: None,
-                }
             }
-            _ => return None,
-        };
-        Some((
-            evidence,
-            BaseValue {
-                hundredths: row.base_hundredths,
-                table,
-                notation: row.notation.into(),
-                source: row.source.reference(row.notation),
-            },
-        ))
-    }
+        }
+        (CatalogFamily::ChoreographicSpin, PlannedElement::ChoreographicSpin)
+            if row.notation == "ChSp1" =>
+        {
+            ElementPlanEvidence::ChoreographicSpin {
+                consecutive_revolutions_per_foot: None,
+            }
+        }
+        _ => return None,
+    };
+    Some((
+        evidence,
+        BaseValue {
+            hundredths: row.base_hundredths,
+            table: row.source.table,
+            notation: row.notation.into(),
+            source: row.source.reference(row.notation),
+        },
+    ))
 }
 
 /// Evaluate construction and list source-backed unfactored BV under the exact
@@ -160,6 +167,17 @@ pub fn assess_manual_program_with_assumed_recognition(
     policy: &ProgramPolicy,
     submission: SubmissionState,
 ) -> Result<AssumedProgramAssessment, ProfileSelectionError> {
+    assess_assumed_program(registry, program, recognition, policy, submission, true)
+}
+
+fn assess_assumed_program(
+    registry: &ProfileRegistry,
+    program: &ProfileProgram,
+    recognition: &[AssumedRecognition],
+    policy: &ProgramPolicy,
+    submission: SubmissionState,
+    check_selection: bool,
+) -> Result<AssumedProgramAssessment, ProfileSelectionError> {
     let profile = registry.resolve(&program.profile, program.scoring_table)?;
     let invalid = |reason: String| ProfileSelectionError {
         profile: program.profile.clone(),
@@ -169,12 +187,32 @@ pub fn assess_manual_program_with_assumed_recognition(
     if program.elements.len() != recognition.len() {
         return Err(invalid("Supply one SOV selection per element.".into()));
     }
+    let selection = check_selection
+        .then(|| {
+            crate::selection::Selection::for_policy(
+                registry,
+                profile,
+                program.scoring_table,
+                policy,
+            )
+        })
+        .transpose()?;
     let (evidence, unfactored_base): (Vec<_>, Vec<_>) = program
         .elements
         .iter()
         .zip(recognition)
         .enumerate()
         .map(|(index, (element, assumption))| {
+            if let Some(selection) = &selection {
+                selection
+                    .check_assumption(element, assumption)
+                    .map_err(|error| {
+                        invalid(format!(
+                            "Element {index}: {}",
+                            error.reason(&assumption.code)
+                        ))
+                    })?;
+            }
             assumption
                 .resolve(
                     program.scoring_table,
@@ -256,14 +294,8 @@ pub fn assess_program_legality_with_assumed_recognition(
     policy: &ProgramPolicy,
     submission: SubmissionState,
 ) -> Result<ProgramLegalityReport, ProfileSelectionError> {
-    assess_manual_program_with_assumed_recognition(
-        registry,
-        program,
-        recognition,
-        policy,
-        submission,
-    )
-    .map(|assessment| assessment.legality)
+    assess_assumed_program(registry, program, recognition, policy, submission, false)
+        .map(|assessment| assessment.legality)
 }
 
 fn advanced_solo(element: &PlannedElement) -> Option<&ListedJump> {

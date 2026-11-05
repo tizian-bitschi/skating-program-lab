@@ -126,7 +126,8 @@ program_rules![
     ("program-step-recognition", Qualification, Plan),
 ];
 
-const ASSUMED_STEP_LEVEL_CAP: &str = "program-step-level-cap";
+pub(crate) const FAMILY_CAP_RULE: &str = "program-family-cap";
+pub(crate) const ASSUMED_STEP_LEVEL_CAP: &str = "program-step-level-cap";
 
 #[cfg(feature = "optimizer")]
 pub(crate) fn supported_rules(scope: EvaluationScope) -> impl Iterator<Item = &'static str> {
@@ -468,11 +469,11 @@ pub(crate) fn validate_program_scope(
         } else {
             &policy.choreography_source
         };
-        checks.apply("program-family-cap", None, family_source);
+        checks.apply(FAMILY_CAP_RULE, None, family_source);
         if count(family) > cap {
             checks.add(
                 FindingKind::Violation,
-                "program-family-cap",
+                FAMILY_CAP_RULE,
                 None,
                 "The family count exceeds the selected program policy.",
                 family_source,
@@ -996,7 +997,7 @@ mod candidate_scope_tests {
             candidate_finding_scope(&finding, &profile),
             CandidateFindingScope::Element
         );
-        finding.rule_id = "program-family-cap";
+        finding.rule_id = FAMILY_CAP_RULE;
         finding.element_index = None;
         assert_eq!(
             candidate_finding_scope(&finding, &profile),
