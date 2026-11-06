@@ -298,28 +298,6 @@ pub fn assess_program_legality_with_assumed_recognition(
         .map(|assessment| assessment.legality)
 }
 
-#[cfg(feature = "optimizer")]
-fn advanced_solo(element: &PlannedElement) -> Option<&ListedJump> {
-    match element {
-        PlannedElement::Jump(JumpElement::Solo(jump)) if jump.rotations.is_some_and(|r| r >= 3) => {
-            Some(jump)
-        }
-        _ => None,
-    }
-}
-
-#[cfg(feature = "optimizer")]
-pub(crate) fn has_repeated_advanced_solo<'a>(
-    elements: impl Iterator<Item = &'a PlannedElement>,
-) -> bool {
-    let mut seen = Vec::new();
-    elements.filter_map(advanced_solo).any(|jump| {
-        let repeated = seen.contains(&jump);
-        seen.push(jump);
-        repeated
-    })
-}
-
 /// Resolve credit from the shared construction trace and ordered SOV values.
 pub(crate) fn assumed_credit<'a>(
     profile: &RuleProfile,

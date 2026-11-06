@@ -12,13 +12,21 @@ index references are rebound to their new completed positions.
 
 Completion extends the shared ordered Pumpkin model: each original has one
 channelled position, positions increase, and forbidden gaps exclude additions.
-It optimizes the full completed catalog BV and uses the existing whole-program
-validator for every proposal. It reports separate existing/added/total BV and
-reassesses each completion with the manual assessment API. GOE is preserved as
+The evidence-based `complete_program` API optimizes the completed unfactored
+catalog BV. `complete_program_with_assumed_recognition` optimizes the completed
+credited BV over the explicit SOV selections, with the proof limits described
+below. Both use the shared whole-program validator, report separate
+existing/added/total BV, and reassess each completion with the manual API. GOE is preserved as
 an optional scenario and never enters the objective. Unknown or unsupported
 original recognition is an explicit error with its draft assessment; immutable
 violations are a different error. Missing required draft elements can be repaired.
 Unsupported requested addition definitions fail even when excluded.
+
+For assumed recognition, the returned request retains the caller's original
+entries and their full evidence. The draft and completed assessments contain
+the separate evidence resolved from the selected SOV codes. Completion
+provenance links each assessed original to its unchanged request entry by ID
+and original index.
 
 Personal predicates filter additions only. Explicit global predicates also
 check originals and report conflicting IDs; global variant indices are invalid.
@@ -65,7 +73,7 @@ scenario planning under declared recognition assumptions, not a Technical Panel.
 
 `ProgramOptimizationRequest` carries exact season/profile/SOV identity, a finite
 `ProgramVariant` list, typed ability exclusions, must-have alternative groups,
-minimum/maximum element counts, the unfactored BV objective, ordered-variant
+minimum/maximum element counts, the BV objective selector, ordered-variant
 equivalence, a time limit, a validator-proposal limit and an output cap. Must-have
 and exclusion indices refer to the original list. Variants may repeat where
 shared rules allow them. Identical duplicate variant definitions are rejected.
@@ -128,19 +136,33 @@ precedence remain in [rule sources](../rule-sources.md).
 Pumpkin models ordered slots and catalog-value sums using the same helper as the
 jump optimizer. It does not enumerate the full cross-product up front. Whole
 proposals pass the shared validator; rejected assignments are blocked lazily.
-Every returned proposal is validated and scored independently of solver values,
-with an objective consistency check. Results retain each original variant index,
-the ordered plan and evidence, each catalog BV, total BV, exact selected versions,
-source inventory, rule inventory, assumptions and omitted variants.
+Every proposal that can become a candidate is checked against the shared
+validator and scored independently of solver values. The evidence-based APIs
+retain their unfactored BV objective. The entry point determines the
+reported `effective_objective`. Candidate `listed_per_element` values are the
+ordered scoring inputs before program-context credit. In evidence-based
+completion they can include explicitly supplied calls. Candidate `per_element`
+values are the ordered values used by the objective. Their technical evidence and
+validation do not prove a contextual BV maximum.
 
-An optimal accepted proposal proves optimality only within this finite supported
-conditional model: rejected recognition/level scenarios are outside its feasible
-relation. A stopped solver keeps a valid unproven incumbent or returns Incomplete.
-InfeasibleProven requires exhausting the finite model. Tie enumeration is separate:
-only exhaustion at the fixed optimum proves completeness; a cap, proposal budget
-or interruption cannot do so. Unknown requested semantics produce an error before
-search rather than a false infeasibility proof. Per-program insufficiency of a
-known feature-credit rule rejects that scenario without claiming a panel call.
+The assumed-recognition APIs use the same credited BV resolver as manual
+assessment. For the applicable Senior Rule 612 context, the second of two
+identical advanced solo attempts is credited at 80%. A compound appearance
+prevents that two-solo reduction. The shared validator checks identical and
+cross-type limits, including the limit of one repeated quad or quint type.
+Originals keep their selected code, identity and relative order. Their
+credited contribution can change with the placement of an addition.
+
+Each remaining word's raw sum bounds its credited sum: the supported credit
+adjustment can only reduce a listed value. Pumpkin proves an upper bound over
+the remaining words; the shared scorer establishes the incumbent. Once these
+bounds meet, or there is no remaining word that can improve the incumbent,
+the credited optimum is proven. Enumeration must still exhaust every word
+that can tie it. Search interruption or a proposal cap can leave an unproven
+incumbent; an output cap can limit ties even when optimality is proven.
+Infeasibility requires exhausting the search without a valid incumbent.
+Unresolved credit produces a structured error. Coverage of regulations and
+completeness of a generated candidate domain are independent of these proofs.
 
 ## Current bounds
 
@@ -319,8 +341,8 @@ values sum to 720885 hundredths. The signed objective and its equality's absolut
 linear activity (at most 1441770) fit `i32`; accepted totals and original/added
 subtotals fit `u32`, and manual assessment compares exact `i64` hundredths.
 This proof covers larger triple/quad rows and three-component values without
-assuming today's largest SOV row. It does not add contextual repetition or
-second-half bonuses to the unfactored objective.
+assuming today's largest SOV row. Supported contextual repetition reduces
+the raw upper bound. Neither objective includes second-half bonuses.
 
 Slot indices, zero suffixes, anchor positions, gap constraints and completed
 recognition indices derive from vector lengths. Originals keep separate solver
@@ -352,11 +374,10 @@ audit and a solver optimum are independent; tie count is total only when
 `enumeration_complete=true`. An interrupted attempt with no incumbent stays
 `Incomplete`; absence of an incumbent is not proof of infeasibility.
 
-For Senior completion, avoid repeated high clean solo additions: manual assessment
-applies second-solo contextual credit while the objective remains unadjusted
-catalog BV. This can return `InconsistentAssessment`. The benchmark records that
-boundary and excludes >=3-rotation solo additions in its broad completion case;
-it does not silently interpret an error as a feasible or optimal plan.
+The earlier benchmark's evidence-based completion case excluded advanced
+solo additions because its table-BV objective could disagree with manual
+contextual credit. The assumed-recognition completion API now supports
+these explicitly selected additions and scores them in context.
 
 API wall time includes preflight/model/search/assessment; separate exact
 first-incumbent/proof times, memory and solver nodes are not exposed. Cooperative

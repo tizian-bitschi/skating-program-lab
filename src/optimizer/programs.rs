@@ -67,11 +67,21 @@ pub enum ProgramEquivalence {
     OrderedVariants,
 }
 
+/// The scoring objective selected by the program search entry point.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ProgramSearchObjective {
+    UnfactoredBaseValueHundredths,
+    CreditedBaseValueHundredths,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ProgramCandidate {
     pub program: ProfileProgram,
     pub variant_indices: Vec<usize>,
     pub evidence: Vec<ElementPlanEvidence>,
+    /// Ordered input values before program-context credit.
+    pub listed_per_element: Vec<BaseValue>,
+    /// Ordered values used for the objective.
     pub per_element: Vec<BaseValue>,
     pub base_hundredths: u32,
     pub validation: EvidenceValidationReport,
@@ -80,6 +90,7 @@ pub struct ProgramCandidate {
 #[derive(Debug, Clone)]
 pub struct ProgramOptimizationResult {
     pub request: ProgramOptimizationRequest,
+    pub effective_objective: ProgramSearchObjective,
     pub universe: Vec<usize>,
     pub excluded_variants: Vec<usize>,
     pub unmodeled_variants: &'static str,
@@ -316,11 +327,63 @@ pub(super) fn prepare_with_base(
     })
 }
 
+fn credited_values(
+    profile: &RuleProfile,
+    program: &ProfileProgram,
+    evidence: &[ElementPlanEvidence],
+    credit_blocks: &crate::validation::JumpCreditBlocks,
+    listed_values: &[BaseValue],
+    validation: &mut EvidenceValidationReport,
+) -> Result<Vec<BaseValue>, ProgramOptimizationError> {
+    crate::assumed_recognition::assumed_credit(
+        profile,
+        &program.elements,
+        evidence,
+        credit_blocks,
+        listed_values.iter().map(Some),
+    )
+    .into_iter()
+    .zip(listed_values)
+    .enumerate()
+    .map(|(index, (credit, listed))| {
+        let credited = match credit {
+            Ok(BaseValueOutcome::Value(value)) => value,
+            Err(error) => return Err(ProgramOptimizationError::Scoring(error)),
+            _ => {
+                return Err(ProgramOptimizationError::Scoring(
+                    BaseValueError::Unsupported,
+                ))
+            }
+        };
+        // Assumed recognition resolves exact clean table values. The only
+        // supported contextual adjustment is a non-increasing repetition credit.
+        if credited.hundredths > listed.hundredths {
+            return Err(ProgramOptimizationError::InconsistentSolverResult);
+        }
+        if credited != *listed {
+            let repetition = profile.binding(ProfileRule::Repetition);
+            crate::validation::record_rule(
+                &mut validation.applied_rules,
+                repetition.id,
+                Some(index),
+                None,
+                &repetition.source,
+            );
+            if !validation.sources.contains(&repetition.source) {
+                validation.sources.push(repetition.source.clone());
+            }
+        }
+        Ok(credited)
+    })
+    .collect()
+}
+
 fn checked(
     registry: &ProfileRegistry,
     request: &ProgramOptimizationRequest,
     indices: &[usize],
     universe: &[(usize, BaseValue)],
+    raw_upper: u32,
     scope: EvaluationScope,
 ) -> Result<Option<ProgramCandidate>, ProgramOptimizationError> {
     if indices.len() < request.min_elements
@@ -355,15 +418,21 @@ fn checked(
         return Ok(None);
     }
     // Execution remains a declared conditional assumption, not an established fact.
-    if validation
+    let unresolved = validation
         .validation
         .findings
         .iter()
-        .any(|f| f.rule_id != "spin-execution-recognition")
-    {
-        return Ok(None);
+        .filter(|f| f.rule_id != "spin-execution-recognition");
+    if unresolved.clone().next().is_some() {
+        return if scope == EvaluationScope::AssumedRecognition {
+            Err(ProgramOptimizationError::UnresolvedValidation(
+                unresolved.cloned().collect(),
+            ))
+        } else {
+            Ok(None)
+        };
     }
-    let per_element = indices
+    let listed_values = indices
         .iter()
         .map(|i| {
             universe[universe
@@ -373,26 +442,30 @@ fn checked(
             .clone()
         })
         .collect::<Vec<_>>();
-    if scope == EvaluationScope::AssumedRecognition {
+    if listed_values
+        .iter()
+        .map(|v| u32::from(v.hundredths))
+        .sum::<u32>()
+        != raw_upper
+    {
+        return Err(ProgramOptimizationError::InconsistentSolverResult);
+    }
+    let per_element = if scope == EvaluationScope::AssumedRecognition {
         let profile = registry
             .resolve(&request.profile, request.scoring_table)
             .map_err(ProgramOptimizationError::Profile)?;
-        let credits = crate::assumed_recognition::assumed_credit(
+        credited_values(
             profile,
-            &program.elements,
+            &program,
             &evidence,
             &credit_blocks,
-            per_element.iter().map(Some),
-        );
-        if credits.into_iter().zip(&per_element).any(|(credit, listed)| {
-            !matches!(credit, Ok(BaseValueOutcome::Value(value)) if value == *listed)
-        }) {
-            return Err(ProgramOptimizationError::InvalidRequest(
-                "domain requires contextual BV unsupported by the solver objective",
-            ));
-        }
-    }
-    for (index, value) in per_element.iter().enumerate() {
+            &listed_values,
+            &mut validation,
+        )?
+    } else {
+        listed_values.clone()
+    };
+    for (index, value) in listed_values.iter().enumerate() {
         crate::validation::record_rule(
             &mut validation.applied_rules,
             "catalog-unfactored-base-value",
@@ -400,8 +473,10 @@ fn checked(
             None,
             &value.source,
         );
-        if !validation.sources.contains(&value.source) {
-            validation.sources.push(value.source.clone());
+        for source in [&value.source, &per_element[index].source] {
+            if !validation.sources.contains(source) {
+                validation.sources.push(source.clone());
+            }
         }
     }
     // At most eleven u16 catalog values: <=720885, exact in u32.
@@ -410,6 +485,7 @@ fn checked(
         program,
         variant_indices: indices.to_vec(),
         evidence,
+        listed_per_element: listed_values,
         per_element,
         base_hundredths,
         validation,
@@ -562,24 +638,6 @@ pub(super) fn optimize_anchored(
             universe_values.push((i, value));
         }
     }
-    if scope == EvaluationScope::AssumedRecognition
-        && profile.binding(ProfileRule::Scoring).mechanism == RuleMechanism::SeniorScoringV1
-        && request.max_elements >= 2
-    {
-        let addition_count = anchors.map_or(request.variants.len(), |a| a.first_anchor);
-        let reusable = request.max_elements - anchors.map_or(0, |a| a.count) >= 2;
-        // Originals occupy unique slots. The same addition code can occupy two slots.
-        let possible_occurrences = universe
-            .iter()
-            .chain(universe.iter().filter(|&&i| reusable && i < addition_count));
-        if crate::assumed_recognition::has_repeated_advanced_solo(
-            possible_occurrences.map(|&i| &request.variants[i].element),
-        ) {
-            return Err(E::InvalidRequest(
-                "Senior repeated advanced solos require contextual BV in the solver objective",
-            ));
-        }
-    }
     if assumed_values.is_some() {
         let addition_count = anchors.map_or(request.variants.len(), |a| a.first_anchor);
         for (i, variant) in request.variants[..addition_count].iter().enumerate() {
@@ -588,13 +646,20 @@ pub(super) fn optimize_anchored(
             }
         }
     }
-    let mut result = ProgramOptimizationResult { request: request.clone(), universe, excluded_variants,
+    let effective_objective = match scope {
+        EvaluationScope::AssumedRecognition => ProgramSearchObjective::CreditedBaseValueHundredths,
+        EvaluationScope::EvidenceBased => ProgramSearchObjective::UnfactoredBaseValueHundredths,
+    };
+    let mut result = ProgramOptimizationResult { request: request.clone(), effective_objective, universe, excluded_variants,
         unmodeled_variants: "Unlisted variants, Euler consequences, difficult-variation categories, unsupported feature prerequisites, Pair rules and physical skateability are outside this model.",
         equivalence: "Identical ordered candidate variants including evidence; duplicate variants are rejected.",
         proof_scope: "Finite supplied recognized Single Free Skating scenarios and implemented applicable rules only; never full real-world ISU compliance or an official/global maximum.",
         assumptions: "Clean recognition is explicitly assumed for every variant; successful feature qualification is separately assumed where supplied. No execution or official second-half credit is established.",
         sources, applied_rules: vec![], supported_rules: profile.bindings.iter().filter(|b| b.rule != ProfileRule::Scoring).map(|b| profile.binding(b.rule).id).chain(crate::spin_validation::supported_rules(scope)).chain(crate::program_validation::supported_rules(scope)).chain(["catalog-unfactored-base-value"]).collect(),
         status: OptimizerStatus::Incomplete, enumeration_complete: false, termination_reason: JumpTerminationReason::Interrupted, examined_programs: 0, candidates: vec![] };
+    if assumed_values.is_some() {
+        result.proof_scope = "Maximum credited BV over the supplied ordered domain and implemented construction rules; no GOE, PCS, official second-half credit, regulatory completeness or global maximum.";
+    }
     let (mut solver, slots, objective) =
         solver_common::ordered_slots(&values, request.max_elements, request.min_elements);
     // Mandatory variants constrain the search as well as the final shared check.
@@ -618,7 +683,11 @@ pub(super) fn optimize_anchored(
         solver_common::anchor_slots(&mut solver, &slots, &result.universe, a);
     }
     let mut deadline = Deadline(end);
-    let mut enumerating = false;
+    // Pumpkin maximizes the remaining raw table sum. Each credited total is
+    // bounded above by that sum, so removing one checked word cannot hide a
+    // better plan. Keep searching while a remaining word could improve or tie.
+    let mut best = None;
+    let mut omitted_ties = false;
     loop {
         if end.is_some_and(|d| Instant::now() >= d) {
             return Ok(result);
@@ -651,9 +720,16 @@ pub(super) fn optimize_anchored(
             | OptimisationResult::Satisfiable(s)
             | OptimisationResult::Stopped(s, _) => s,
             OptimisationResult::Unsatisfiable => {
-                if enumerating {
-                    result.enumeration_complete = true;
-                    result.termination_reason = JumpTerminationReason::EnumerationExhausted;
+                if best.is_some() {
+                    result.status = OptimizerStatus::OptimalProven;
+                    if omitted_ties {
+                        result.termination_reason = JumpTerminationReason::SolutionLimit;
+                    } else if request.enumerate_equal_optima {
+                        result.enumeration_complete = true;
+                        result.termination_reason = JumpTerminationReason::EnumerationExhausted;
+                    } else {
+                        result.termination_reason = JumpTerminationReason::EnumerationDisabled;
+                    }
                 } else {
                     result.status = OptimizerStatus::InfeasibleProven;
                     result.termination_reason = JumpTerminationReason::Infeasible;
@@ -670,58 +746,67 @@ pub(super) fn optimize_anchored(
                 (v > 0).then(|| result.universe[v as usize - 1])
             })
             .collect();
-        if let Some(candidate) = checked(registry, request, &indices, &universe_values, scope)? {
-            if candidate.base_hundredths != solution.get_integer_value(objective) as u32 {
-                return Err(E::InconsistentSolverResult);
-            }
-            for src in &candidate.validation.sources {
-                if !result.sources.contains(src) {
-                    result.sources.push(src.clone());
-                }
-            }
-            for rule in &candidate.validation.applied_rules {
-                if !result.applied_rules.contains(rule) {
-                    result.applied_rules.push(rule.clone());
-                }
-            }
-            if !anchors.is_some_and(|a| {
-                result.candidates.iter().any(|c| {
-                    c.variant_indices
-                        .iter()
-                        .map(|i| a.equivalence_keys[*i])
-                        .eq(candidate
-                            .variant_indices
-                            .iter()
-                            .map(|i| a.equivalence_keys[*i]))
-                })
-            }) {
-                result.candidates.push(candidate);
-            }
-            if !enumerating {
-                result.status = status;
-                if status != OptimizerStatus::OptimalProven {
-                    return Ok(result);
-                }
-                if !request.enumerate_equal_optima {
-                    result.termination_reason = JumpTerminationReason::EnumerationDisabled;
-                    return Ok(result);
-                }
-                enumerating = true;
+        let upper = solution.get_integer_value(objective) as u32;
+        if let Some(candidate) =
+            checked(registry, request, &indices, &universe_values, upper, scope)?
+        {
+            let credited = candidate.base_hundredths;
+            if best.is_none_or(|b| credited > b) {
+                best = Some(credited);
+                result.status = OptimizerStatus::FeasibleUnproven;
+                omitted_ties = false;
+                result.candidates.clear();
+                result.applied_rules.clear();
+                // Below this floor a word cannot affect the requested result.
+                let floor = credited as i32 + i32::from(!request.enumerate_equal_optima);
                 let tag = solver.new_constraint_tag();
-                solver
-                    .add_constraint(pumpkin_solver::equals(
-                        vec![objective],
-                        solution.get_integer_value(objective),
-                        tag,
-                    ))
-                    .post();
+                solver.add_clause([predicate!(objective >= floor)], tag);
+            }
+            if best == Some(credited)
+                && (request.enumerate_equal_optima || result.candidates.is_empty())
+                && !anchors.is_some_and(|a| {
+                    result.candidates.iter().any(|c| {
+                        c.variant_indices
+                            .iter()
+                            .map(|i| a.equivalence_keys[*i])
+                            .eq(candidate
+                                .variant_indices
+                                .iter()
+                                .map(|i| a.equivalence_keys[*i]))
+                    })
+                })
+            {
+                if result.candidates.len() < request.max_solutions {
+                    for src in &candidate.validation.sources {
+                        if !result.sources.contains(src) {
+                            result.sources.push(src.clone());
+                        }
+                    }
+                    for rule in &candidate.validation.applied_rules {
+                        if !result.applied_rules.contains(rule) {
+                            result.applied_rules.push(rule.clone());
+                        }
+                    }
+                    result.candidates.push(candidate);
+                } else {
+                    // Search may still find a better score and discard these ties.
+                    omitted_ties = true;
+                }
+            }
+        }
+        if status != OptimizerStatus::OptimalProven {
+            return Ok(result);
+        }
+        if best == Some(upper) {
+            result.status = OptimizerStatus::OptimalProven;
+            if !request.enumerate_equal_optima {
+                result.termination_reason = JumpTerminationReason::EnumerationDisabled;
+                return Ok(result);
             }
             if result.candidates.len() >= request.max_solutions {
                 result.termination_reason = JumpTerminationReason::SolutionLimit;
                 return Ok(result);
             }
-        } else if status != OptimizerStatus::OptimalProven {
-            return Ok(result);
         }
         let clause = slots
             .iter()

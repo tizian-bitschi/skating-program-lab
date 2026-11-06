@@ -106,6 +106,14 @@ Jump transitions are distinct from listed jumps. Regular spins distinguish flyin
 
 The original reference and Bronze solver cover the finite 1Lz domain in the [optimization specification](specs/optimization.md). The separate category-aware `optimize_jumps` API searches explicit bounded jump-only domains in all four Adult categories. It supports clean singles and doubles and explicitly listed clean two-jump combinations ending in a toe loop or loop, subject to the shared validator and table. It does not optimize sequences, Euler, other transitions, calls, or full programs. Search interruption and incomplete tie enumeration remain distinct from proofs. The unfactored table-BV objective assumes clean recognition and does not resolve program-wide scoring consequences; see [category-aware optimization](specs/optimization.md#category-aware-jump-optimizer).
 
+The mixed-program assumed-recognition optimizer and anchored completion
+maximize credited BV for the supported explicit domain (#101). They share the
+manual Rule 612 credit resolver: two identical Senior advanced solos use
+full credit followed by 80%, with the credit assigned in final program order.
+Pumpkin's raw table sum bounds the search, and a separate flag reports
+whether every optimal ordered tie was found. The evidence-based optimizer
+still uses its unfactored objective. See the [proof scope and input bounds](specs/bounded-program-optimizer.md#proof-output-and-deployment-limits).
+
 Pumpkin is enabled by default; `--no-default-features` omits both solver APIs. These optimizers do not establish complete eligibility, a global maximum or WebAssembly compatibility.
 
 ## Versioned SOV catalog (issue #45)

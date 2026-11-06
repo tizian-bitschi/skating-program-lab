@@ -33,8 +33,10 @@ or panel decisions.
   immutable originals. The latter receives one ordered selection list for
   originals and a second for additions. Variant indices and original IDs
   remain the stable references in returned placements. The completion request
-  preserves the original entries. The original and completed assessments
-  retain the resolved evidence used for their BV calculations.
+  preserves the original entries and their detailed evidence. The draft and
+  completed assessments contain the separate SOV-resolved evidence used for
+  their BV calculations. Use provenance to look up the unchanged original
+  entry in the returned request.
 - Existing entry points keep the evidence-based contract. Use them when
   the task requires technical position, movement, revolution, feature
   reuse or level-credit checks.
@@ -73,11 +75,20 @@ compound structures, excess Senior jump slots and uncertain repetition
 credit leave affected values unresolved. An unknown earlier jump can
 consume a repetition slot. The listed value of a known compound is
 retained even when its credit is unresolved.
-The ordered solver uses listed BV for supported assumed domains. It rejects
-Senior domains that can require 80% repetition credit, including reuse of a
-single addition variant and repetitions involving locked originals. Both search
-workflows check feasible proposals against the contextual credit calculation
-used by manual assessment before reporting an optimum.
+Both assumed-recognition search APIs maximize credited BV over the supplied
+finite domain. A second identical advanced solo can receive 80% BV, including
+when the first or second attempt is a locked original. If the repeated jump
+appears in a combination or sequence, the two-solo reduction does not apply.
+The shared validator still checks repetition and composition limits.
+The returned per-element values include the contextual notation (such as
+`3A+REP`), while the rule trace retains the catalog and Rule 612 sources.
+The original assumed selections stay unchanged. If credit cannot be resolved,
+the search reports an error rather than substituting a table value or zero.
+
+Pumpkin's listed sum is an upper bound on credited BV; it does not determine
+which validated word wins. Optimality, completeness of ordered ties, and
+coverage of the declared variant domain are separate claims. Evidence-based
+entry points retain their unfactored objective and detailed validation scope.
 
 ## Profile-filtered choices
 

@@ -128,20 +128,27 @@ fn oracle(
     values: &[u32],
     valid: impl Fn(&[usize]) -> bool,
 ) -> (u32, BTreeSet<Vec<usize>>) {
+    word_oracle(n, values.len(), |word| {
+        valid(word).then(|| word.iter().map(|&i| values[i]).sum())
+    })
+}
+
+fn word_oracle(
+    n: usize,
+    domain_size: usize,
+    score: impl Fn(&[usize]) -> Option<u32>,
+) -> (u32, BTreeSet<Vec<usize>>) {
     let mut best = 0;
     let mut ties = BTreeSet::new();
-    for mut code in 0..values.len().pow(n as u32) {
+    for mut code in 0..domain_size.pow(n as u32) {
         let word: Vec<_> = (0..n)
             .map(|_| {
-                let digit = code % values.len();
-                code /= values.len();
+                let digit = code % domain_size;
+                code /= domain_size;
                 digit
             })
             .collect();
-        if !valid(&word) {
-            continue;
-        }
-        let value = word.iter().map(|i| values[*i]).sum();
+        let Some(value) = score(&word) else { continue };
         if value > best {
             best = value;
             ties.clear();
@@ -463,6 +470,14 @@ fn assumed_silver_axel_sequence_reaches_optimizer_scoring_and_shared_validation(
     assert_eq!(simple.status, OptimizerStatus::OptimalProven);
     assert_eq!(simple.candidates[0].base_hundredths, 280);
     let r = result(&req);
+    assert_eq!(
+        r.effective_objective,
+        ProgramSearchObjective::UnfactoredBaseValueHundredths
+    );
+    assert_eq!(
+        r.candidates[0].listed_per_element,
+        r.candidates[0].per_element
+    );
     assert_eq!(r.status, OptimizerStatus::OptimalProven);
     assert!(r.enumeration_complete);
     assert_eq!(ids(&r), BTreeSet::from([vec![0, 1], vec![1, 0]]));
@@ -486,6 +501,16 @@ fn assumed_silver_axel_sequence_reaches_optimizer_scoring_and_shared_validation(
     assert!(matches!(
         optimize_program(&ProfileRegistry::adult(), &req),
         Err(ProgramOptimizationError::UnsupportedVariant(0))
+    ));
+    assert!(matches!(
+        optimize_program_with_assumed_recognition(
+            &ProfileRegistry::adult(),
+            &req,
+            &["1T+1A+SEQ", "SSpB"].map(AssumedRecognition::new),
+        ),
+        Err(ProgramOptimizationError::UnsupportedVariant(0)
+            | ProgramOptimizationError::UnresolvedValidation(_)
+            | ProgramOptimizationError::Scoring(BaseValueError::Unsupported))
     ));
 }
 
@@ -651,21 +676,91 @@ fn assumed_senior_full_program_matches_manual_bv() {
 }
 
 #[test]
-fn assumed_optimizer_rejects_senior_repeat_credit_before_search() {
+fn assumed_senior_credited_optima_match_literal_ordered_oracle() {
     let category = SeniorCategory::Women;
     let profile = senior_profile(category);
-    let mut axel = jump(JumpKind::Axel);
-    let PlannedElement::Jump(JumpElement::Solo(jump)) = &mut axel.element else {
-        unreachable!()
-    };
-    jump.rotations = Some(3);
-    // A single addition variant can be placed more than once by the solver.
-    let mut q = request(AdultCategory::Gold, vec![axel], 2);
+    let registry = ProfileRegistry::senior();
+    let mut choices =
+        ["3A", "3Lz", "CCoSp4", "FCSp4", "StSq4", "ChSq1", "ChSp1"].map(AssumedRecognition::new);
+    let generated = generate_program_candidates_with_assumed_recognition(
+        &registry,
+        &generation_defaults::request(profile.clone()),
+        &choices,
+    )
+    .unwrap();
+    let mut q = request(AdultCategory::Gold, generated.domain.variants, 7);
+    choices[1] = AssumedRecognition::new("3Lz+2T");
+    q.variants[1].element = PlannedElement::Jump(JumpElement::Combination(vec![
+        JumpPart::Jump(ListedJump {
+            kind: Some(JumpKind::Lutz),
+            rotations: Some(3),
+        }),
+        JumpPart::Jump(ListedJump {
+            kind: Some(JumpKind::ToeLoop),
+            rotations: Some(2),
+        }),
+    ]));
     q.profile = profile.id;
+    q.scoring_table = profile.scoring_table;
     q.policy = senior_program_policy(category);
-    let choices = [AssumedRecognition::new("3A")];
-    assert!(matches!(
-        optimize_program_with_assumed_recognition(&ProfileRegistry::senior(), &q, &choices),
-        Err(ProgramOptimizationError::InvalidRequest(reason)) if reason.contains("contextual BV")
-    ));
+    q.must_have = (2..7).map(|i| vec![i]).collect();
+    q.max_solutions = 6000;
+    for (excluded, jump_total) in [(false, 1520), (true, 1440)] {
+        q.exclusions = if excluded {
+            vec![PersonalExclusion::Variant(1)]
+        } else {
+            vec![]
+        };
+        let valid = |word: &[usize]| {
+            (2..7).all(|i| word.iter().filter(|&&j| j == i).count() == 1)
+                && word.contains(&0)
+                && (!excluded || !word.contains(&1))
+        };
+        let raw = oracle(7, &[800, 720, 420, 380, 410, 350, 350], valid);
+        let (best, ties) = word_oracle(7, 7, |word| {
+            valid(word).then(|| {
+                let jump_score = if word.contains(&1) {
+                    800 + 720
+                } else {
+                    800 + 640
+                };
+                jump_score + 1910
+            })
+        });
+        // The best raw word repeats 3A; the credited winner can differ.
+        assert_eq!(raw.0, 1600 + 1910);
+        assert!(raw.1.iter().all(|word| !word.contains(&1)));
+        assert_eq!(raw.1 == ties, excluded);
+        assert_eq!(best, jump_total + 1910);
+        assert_ne!(raw.0, best);
+        let result = optimize_program_with_assumed_recognition(&registry, &q, &choices).unwrap();
+        assert_eq!(result.status, OptimizerStatus::OptimalProven);
+        assert_eq!(
+            result.effective_objective,
+            ProgramSearchObjective::CreditedBaseValueHundredths
+        );
+        assert!(result.enumeration_complete);
+        assert_eq!(ids(&result), ties);
+        assert_eq!(result.candidates.len(), ties.len());
+        for candidate in result.candidates {
+            assert_eq!(candidate.base_hundredths, best);
+            let listed_axels: Vec<_> = candidate
+                .listed_per_element
+                .iter()
+                .filter(|v| v.notation == "3A")
+                .map(|v| v.hundredths)
+                .collect();
+            assert_eq!(
+                listed_axels,
+                if excluded { vec![800, 800] } else { vec![800] }
+            );
+            let axels = candidate
+                .per_element
+                .iter()
+                .filter(|v| v.notation.starts_with("3A"))
+                .map(|v| v.hundredths)
+                .collect::<Vec<_>>();
+            assert_eq!(axels, if excluded { vec![800, 640] } else { vec![800] });
+        }
+    }
 }
