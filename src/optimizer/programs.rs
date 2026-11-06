@@ -651,7 +651,8 @@ pub(super) fn optimize_anchored(
     if assumed_values.is_some() {
         result.proof_scope = "Maximum credited BV over the supplied ordered domain and implemented construction rules; no GOE, PCS, official second-half credit, regulatory completeness or global maximum.";
     }
-    if deadline_elapsed(end) {
+    let mut deadline = Deadline(end);
+    if deadline.expired() {
         return Ok(result);
     }
     let (mut solver, slots, objective) =
@@ -676,14 +677,13 @@ pub(super) fn optimize_anchored(
         result.assumptions = "Original recognition, calls and qualification assumptions are supplied and retained; additions use explicit clean recognition and supplied feature qualification. No official recognition, execution, GOE or second-half credit is inferred.";
         solver_common::anchor_slots(&mut solver, &slots, &result.universe, a);
     }
-    let mut deadline = Deadline(end);
     // Pumpkin maximizes the remaining raw table sum. Each credited total is
     // bounded above by that sum, so removing one checked word cannot hide a
     // better plan. Keep searching while a remaining word could improve or tie.
     let mut best = None;
     let mut omitted_ties = false;
     loop {
-        if deadline_elapsed(end) {
+        if deadline.expired() {
             break;
         }
         if result.examined_programs >= request.max_proposals {
@@ -816,10 +816,6 @@ pub(super) fn optimize_anchored(
         result.applied_rules = result.candidates[0].validation.applied_rules.clone();
     }
     Ok(result)
-}
-
-fn deadline_elapsed(end: Option<Instant>) -> bool {
-    end.is_some_and(|deadline| Instant::now() >= deadline)
 }
 
 /// Optimize the selected SOV variants in the same order as the request domain.

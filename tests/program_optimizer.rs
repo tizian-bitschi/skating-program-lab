@@ -733,6 +733,23 @@ fn assumed_senior_credited_optima_match_literal_ordered_oracle() {
         assert_eq!(raw.1 == ties, excluded);
         assert_eq!(best, jump_total + 1910);
         assert_ne!(raw.0, best);
+        if excluded {
+            let mut bounded = q.clone();
+            // The first two deterministic proposals fail whole-program validation.
+            bounded.max_proposals = 3;
+            let stopped =
+                optimize_program_with_assumed_recognition(&registry, &bounded, &choices).unwrap();
+            assert_eq!(stopped.status, OptimizerStatus::FeasibleUnproven);
+            assert_eq!(
+                stopped.termination_reason,
+                JumpTerminationReason::SearchLimit
+            );
+            assert!(!stopped.enumeration_complete);
+            assert_eq!(stopped.candidates.len(), 1);
+            let candidate = &stopped.candidates[0];
+            assert_eq!(candidate.base_hundredths, best);
+            assert!(ties.contains(&candidate.variant_indices));
+        }
         let result = optimize_program_with_assumed_recognition(&registry, &q, &choices).unwrap();
         assert_eq!(result.status, OptimizerStatus::OptimalProven);
         assert_eq!(

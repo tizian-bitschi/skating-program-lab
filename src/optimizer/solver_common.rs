@@ -133,9 +133,14 @@ pub(super) fn anchor_slots(
 }
 
 pub(super) struct Deadline(pub(super) Option<Instant>);
+impl Deadline {
+    pub(super) fn expired(&self) -> bool {
+        self.0.is_some_and(|deadline| Instant::now() >= deadline)
+    }
+}
 impl TerminationCondition for Deadline {
     fn should_stop(&mut self) -> bool {
-        self.0.is_some_and(|deadline| Instant::now() >= deadline)
+        self.expired()
     }
 }
 
