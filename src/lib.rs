@@ -2,6 +2,9 @@
 //!
 //! These identities do not implement rules or establish event applicability.
 
+#[cfg(all(test, feature = "optimizer"))]
+extern crate self as skating_program_lab;
+
 use std::{fmt, str::FromStr};
 
 mod execution;

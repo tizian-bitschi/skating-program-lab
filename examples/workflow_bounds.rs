@@ -13,19 +13,7 @@ fn main() {
         AdultCategory::Gold,
         AdultCategory::Masters,
     ] {
-        let mut g = workflows::domain(category, true);
-        g.base_spins.extend([
-            SpinAbbreviation {
-                kind: RegularSpinKind::Combination,
-                entry: SpinEntry::NonFlying,
-                change_foot: true,
-            },
-            SpinAbbreviation {
-                kind: RegularSpinKind::Camel,
-                entry: SpinEntry::Flying,
-                change_foot: false,
-            },
-        ]);
+        let g = workflows::bounds_domain(category);
         let start = Instant::now();
         let generated = generate_program_candidates(&ProfileRegistry::adult(), &g).unwrap();
         let generation_us = start.elapsed().as_micros();
