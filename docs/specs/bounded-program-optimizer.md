@@ -442,3 +442,36 @@ The tiny Bronze solo fixture compares every feasible ordered word and its
 credited BV with an independent literal oracle before comparing all solver
 optima. New pruning constraints need separate feasible-set comparisons in
 their applicable profiles and a controlled before/after experiment (#104).
+
+### Required regular-spin roles
+
+The slot model posts one disjunction per required role group from the
+validated spin policy. It uses the same abbreviation matcher as the
+`spin-required-role` validator rule. For known abbreviations this encodes
+that rule exactly. A slot with unspecified identity can satisfy the clause
+provisionally, preserving the validator's ability to report unresolved
+evidence. Clauses use the filtered candidate universe, including immutable
+originals, and impose no order on the matching spins.
+
+Three runs per revision on the same Windows x64 host (Intel family 6, model
+183, Rust 1.99.1 debug, Pumpkin 0.5.0 default seed 42) used the diagnostic
+command above. The baseline was `cf1343f`, and the comparison added the
+role clauses. Both revisions used the same fixtures, requests and 250 ms
+budget per call. Ranges are observed minima and maxima.
+
+| Case | Checked proposals before → after | Missing-role rejections before → after | Runs with a verified program before → after | First verified program after |
+| --- | --- | --- | --- | --- |
+| Adult Bronze | 54 → 54 | 0 → 0 | 3/3 → 3/3 | 34–36 ms |
+| Adult Silver | 29 → 16–17 | 19 → 0 | 3/3 → 3/3 | 4.8–5.2 ms |
+| Adult Gold | 93 → 25 | 93 → 0 | 0/3 → 3/3 | 49–52 ms |
+| Adult Masters | 62 → 26 | 61 → 0 | 0/3 → 3/3 | 47–49 ms |
+| Senior large full, four domains | 3 → 11–12 | 3 → 0 | 0/12 → 9/12 | 198–209 ms |
+| Senior large completion, four domains | 4–17 → 4–17 | 0 → 0 | 12/12 → 12/12 | 41–80 ms |
+
+Senior large full searches still spent most of the budget inside Pumpkin
+(205–227 ms before, 216–222 ms after). The three France Women full runs
+still timed out without a verified program. All six Gold and Masters
+incumbents after the change were feasible with optimality unproven. These
+measurements show fewer late role rejections and more feasible incumbents
+on these requests. They do not measure internal nodes or prove faster
+optimality or tie enumeration.

@@ -13,6 +13,7 @@ use pumpkin_solver::{
         optimisation::{linear_sat_unsat::LinearSatUnsat, OptimisationDirection},
         predicate,
         results::{OptimisationResult, ProblemSolution, SolutionReference},
+        variables::DomainId,
         DefaultBrancher,
     },
     Solver,
@@ -540,6 +541,52 @@ fn variant_base(
     score(&request.variants[index], request.scoring_table, ruleset)
 }
 
+fn require_variant_group(
+    solver: &mut Solver,
+    slots: &[DomainId],
+    universe: &[usize],
+    matches: impl Fn(usize) -> bool,
+) {
+    let codes: Vec<_> = universe
+        .iter()
+        .enumerate()
+        .filter(|(_, variant)| matches(**variant))
+        .map(|(code, _)| code as i32 + 1)
+        .collect();
+    let clause = slots
+        .iter()
+        .flat_map(|&slot| codes.iter().map(move |&code| predicate!(slot == code)));
+    let tag = solver.new_constraint_tag();
+    solver.add_clause(clause, tag);
+}
+
+fn require_spin_roles(
+    solver: &mut Solver,
+    slots: &[DomainId],
+    universe: &[usize],
+    variants: &[ProgramVariant],
+    policy: &RegularSpinPolicy,
+) {
+    // A nonempty universe passed the same policy validation as the final check.
+    if universe.is_empty() {
+        return;
+    }
+    for group in &policy.required {
+        // SpinValidator::program (spin-required-role): exact for known
+        // abbreviations. Keep uncertain words for final validation.
+        require_variant_group(solver, slots, universe, |index| {
+            let variant = &variants[index];
+            match (&variant.element, &variant.evidence) {
+                (PlannedElement::Unspecified, _) => true,
+                (PlannedElement::RegularSpin(_), ElementPlanEvidence::Spin { spin, .. }) => spin
+                    .abbreviation
+                    .is_none_or(|a| crate::spin_validation::matches_spin_role(group, a)),
+                _ => false,
+            }
+        });
+    }
+}
+
 pub(super) fn optimize_anchored(
     registry: &ProfileRegistry,
     request: &ProgramOptimizationRequest,
@@ -682,24 +729,22 @@ pub(super) fn optimize_anchored(
         solver_common::ordered_slots(&values, request.max_elements, request.min_elements);
     // Mandatory variants constrain the search as well as the final shared check.
     for group in &request.must_have {
-        let clause = slots
-            .iter()
-            .flat_map(|&slot| {
-                result
-                    .universe
-                    .iter()
-                    .enumerate()
-                    .filter(|(_, variant)| group.contains(variant))
-                    .map(move |(code, _)| predicate!(slot == code as i32 + 1))
-            })
-            .collect::<Vec<_>>();
-        let tag = solver.new_constraint_tag();
-        solver.add_clause(clause, tag);
+        require_variant_group(&mut solver, &slots, &result.universe, |i| {
+            group.contains(&i)
+        });
     }
     if let Some(a) = anchors {
         result.assumptions = "Original recognition, calls and qualification assumptions are supplied and retained; additions use explicit clean recognition and supplied feature qualification. No official recognition, execution, GOE or second-half credit is inferred.";
         solver_common::anchor_slots(&mut solver, &slots, &result.universe, a);
     }
+    // Anchoring creates variables. Post potentially empty role clauses after it.
+    require_spin_roles(
+        &mut solver,
+        &slots,
+        &result.universe,
+        &request.variants,
+        &request.policy.spins,
+    );
     #[cfg(test)]
     proposal_diagnostics::record_model(model_start.elapsed());
     // Pumpkin maximizes the remaining raw table sum. Each credited total is
@@ -916,6 +961,117 @@ pub(super) fn resolve_variants(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn spin_role_model_matches_complete_ordered_sets_for_six_profiles() {
+        use pumpkin_solver::core::results::solution_iterator::IteratedSolution;
+        use std::collections::BTreeSet;
+        use RegularSpinKind::{Camel, Combination, Sit};
+        use SpinEntry::{Flying, NonFlying};
+
+        let mut variants: Vec<_> = [
+            (Sit, NonFlying, false, Level::Basic),
+            (Combination, NonFlying, true, Level::Basic),
+            (Combination, NonFlying, false, Level::Basic),
+            (Camel, Flying, false, Level::Basic),
+            (Camel, Flying, true, Level::Basic),
+            (Camel, Flying, false, Level::One),
+            (Combination, Flying, false, Level::Basic),
+        ]
+        .into_iter()
+        .map(|(kind, entry, change_foot, level)| ProgramVariant {
+            element: PlannedElement::RegularSpin(RegularSpin {
+                entry: Some(entry),
+                steps: None,
+            }),
+            evidence: ElementPlanEvidence::Spin {
+                spin: RegularSpinEvidence {
+                    abbreviation: Some(SpinAbbreviation {
+                        kind,
+                        entry,
+                        change_foot,
+                    }),
+                    planned_level: Some(level),
+                    ..Default::default()
+                },
+                local_feature_qualification_assumed: false,
+            },
+            recognition_assumed: true,
+        })
+        .collect();
+        let mut unknown = variants[0].clone();
+        if let ElementPlanEvidence::Spin { spin, .. } = &mut unknown.evidence {
+            spin.abbreviation = None;
+        }
+        variants.push(unknown);
+        // Literal roles for the fixture indices. The unknown word stays eligible
+        // for the validator, where a missing role can be an Unknown finding.
+        let cases: [(RegularSpinPolicy, &[&[usize]]); 6] = [
+            (adult_regular_spin_policy(AdultCategory::Bronze), &[]),
+            (adult_regular_spin_policy(AdultCategory::Silver), &[&[0]]),
+            (
+                adult_regular_spin_policy(AdultCategory::Gold),
+                &[&[1], &[3, 4, 5, 6]],
+            ),
+            (
+                adult_regular_spin_policy(AdultCategory::Masters),
+                &[&[1, 2], &[3, 5, 6]],
+            ),
+            (
+                senior_regular_spin_policy(SeniorCategory::Women),
+                &[&[1, 2, 6], &[3, 5]],
+            ),
+            (
+                senior_regular_spin_policy(SeniorCategory::Men),
+                &[&[1, 2, 6], &[3, 5]],
+            ),
+        ];
+        for (policy, roles) in cases {
+            for universe in [
+                (0..7).collect::<Vec<_>>(),
+                (0..8).filter(|&i| i != 3).collect(),
+            ] {
+                let mut expected = BTreeSet::new();
+                for &first in &universe {
+                    for second in std::iter::once(None).chain(universe.iter().copied().map(Some)) {
+                        let word: Vec<_> = std::iter::once(first).chain(second).collect();
+                        if word.contains(&7)
+                            || roles
+                                .iter()
+                                .all(|role| word.iter().any(|i| role.contains(i)))
+                        {
+                            expected.insert(word);
+                        }
+                    }
+                }
+                let values = vec![0; universe.len() + 1];
+                let (mut solver, slots, _) = solver_common::ordered_slots(&values, 2, 1);
+                require_spin_roles(&mut solver, &slots, &universe, &variants, &policy);
+                let mut brancher = solver.default_brancher();
+                let mut deadline = Deadline(None);
+                let mut resolver = ResolutionResolver::default();
+                let mut iterator =
+                    solver.get_solution_iterator(&mut brancher, &mut deadline, &mut resolver);
+                let mut actual = BTreeSet::new();
+                loop {
+                    match iterator.next_solution() {
+                        IteratedSolution::Solution(solution, ..) => {
+                            let word = slots
+                                .iter()
+                                .map(|&s| solution.get_integer_value(s))
+                                .filter(|&code| code != 0)
+                                .map(|code| universe[code as usize - 1])
+                                .collect::<Vec<_>>();
+                            assert!(actual.insert(word));
+                        }
+                        IteratedSolution::Finished => break,
+                        _ => panic!("expected complete enumeration"),
+                    }
+                }
+                assert_eq!(actual, expected, "{:?}", policy.profile);
+            }
+        }
+    }
 
     pub(super) fn bronze_solos() -> ProgramOptimizationRequest {
         let profile = adult_profile(AdultCategory::Bronze);

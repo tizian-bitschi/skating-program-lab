@@ -186,6 +186,10 @@ impl SpinRequirement {
     }
 }
 
+pub(crate) fn matches_spin_role(group: &[SpinRequirement], spin: SpinAbbreviation) -> bool {
+    group.iter().any(|requirement| requirement.matches(spin))
+}
+
 /// Minimum distinct permitted abbreviations satisfying the remaining role groups.
 /// One insertion may satisfy several compatible requirements.
 pub(crate) fn required_spin_insertions(
@@ -203,7 +207,7 @@ pub(crate) fn required_spin_insertions(
     let missing: Vec<_> = policy
         .required
         .iter()
-        .filter(|group| !known.iter().any(|a| group.iter().any(|r| r.matches(*a))))
+        .filter(|group| !known.iter().any(|&a| matches_spin_role(group, a)))
         .collect();
     let mut candidates = vec![];
     for kind in [
@@ -239,12 +243,12 @@ pub(crate) fn required_spin_insertions(
         }
         candidates
             .iter()
-            .filter(|a| first.iter().any(|r| r.matches(**a)))
+            .filter(|a| matches_spin_role(first, **a))
             .filter_map(|a| {
                 let remaining: Vec<_> = groups
                     .iter()
                     .copied()
-                    .filter(|group| !group.iter().any(|r| r.matches(*a)))
+                    .filter(|group| !matches_spin_role(group, *a))
                     .collect();
                 minimum(&remaining, candidates, available - 1).map(|n| n + 1)
             })
@@ -643,7 +647,7 @@ impl SpinValidator {
         }
         for required in &policy.required {
             self.apply(SPIN_REQUIRED_ROLE_RULE, None, &policy.source);
-            if !known.iter().any(|s| required.iter().any(|r| r.matches(*s))) {
+            if !known.iter().any(|&spin| matches_spin_role(required, spin)) {
                 self.add(
                     if unknown {
                         FindingKind::Unknown

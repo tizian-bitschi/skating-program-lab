@@ -281,8 +281,14 @@ fn all_four_profiles_handle_actual_mixed_programs_and_mandatory_roles() {
             if advanced { 850 } else { 170 }
         );
         if advanced {
+            assert!(r.applied_rules.iter().any(|rule| {
+                rule.rule_id == "spin-required-role" && rule.source == req.policy.spins.source
+            }));
+            req.must_have.clear();
             req.exclusions = vec![PersonalExclusion::FlyingEntry];
-            assert_eq!(result(&req).status, OptimizerStatus::InfeasibleProven);
+            let impossible = result(&req);
+            assert_eq!(impossible.status, OptimizerStatus::InfeasibleProven);
+            assert_eq!(impossible.examined_programs, 0);
         }
     }
 }
