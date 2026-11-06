@@ -453,6 +453,12 @@ provisionally, preserving the validator's ability to report unresolved
 evidence. Clauses use the filtered candidate universe, including immutable
 originals, and impose no order on the matching spins.
 
+The integration fixtures compare complete program sets and credited BV
+across all six profiles. They fix each alternative in turn so that every
+feasible word at that score is returned as an optimum, then compare all
+optima with the alternatives open. The Gold completion fixture also
+compares all orders under an absolute anchor and both exclusion scopes.
+
 Three runs per revision on the same Windows x64 host (Intel family 6, model
 183, Rust 1.99.1 debug, Pumpkin 0.5.0 default seed 42) used the diagnostic
 command above. The baseline was `cf1343f`, and the comparison added the

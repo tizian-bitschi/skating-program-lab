@@ -567,10 +567,6 @@ fn require_spin_roles(
     variants: &[ProgramVariant],
     policy: &RegularSpinPolicy,
 ) {
-    // A nonempty universe passed the same policy validation as the final check.
-    if universe.is_empty() {
-        return;
-    }
     for group in &policy.required {
         // SpinValidator::program (spin-required-role): exact for known
         // abbreviations. Keep uncertain words for final validation.
@@ -722,6 +718,26 @@ pub(super) fn optimize_anchored(
     proposal_diagnostics::record_preflight(start.elapsed());
     if deadline.expired() {
         return Ok(result);
+    }
+    if request.variants.is_empty()
+        && request.min_elements == 0
+        && request.must_have.is_empty()
+        && !request.policy.spins.required.is_empty()
+    {
+        // Without variants, preflight has not validated the policy. Preserve the
+        // final check's profile errors before the role clauses prune the empty word.
+        validate_program_scope(
+            registry,
+            &ProfileProgram {
+                profile: request.profile.clone(),
+                scoring_table: request.scoring_table,
+                elements: vec![],
+            },
+            &[],
+            &request.policy,
+            scope,
+        )
+        .map_err(E::Profile)?;
     }
     #[cfg(test)]
     let model_start = Instant::now();

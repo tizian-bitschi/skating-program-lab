@@ -772,7 +772,11 @@ fn gold_code_domain_completion_matches_manual_bv_and_order_oracle() {
         .collect();
     q.variants = additions.domain.variants.clone();
     q.generated_domain = Some(additions.domain);
-    q.exclusions = vec![PersonalExclusion::Variant(4)];
+    q.exclusions = vec![
+        PersonalExclusion::Variant(4),
+        PersonalExclusion::SpinKind(RegularSpinKind::Combination),
+    ];
+    q.insertion.absolute_positions = vec![("combination".into(), 1)];
     q.min_additions = 3;
     q.max_additions = 3;
 
@@ -832,11 +836,18 @@ fn gold_code_domain_completion_matches_manual_bv_and_order_oracle() {
                 .collect();
             let axel = indices.iter().position(|&i| i == 0)?;
             let spin = indices.iter().position(|&i| i == 1)?;
-            (axel < spin && (2..5).all(|i| indices.contains(&i)))
+            (axel < spin && spin == 1 && (2..5).all(|i| indices.contains(&i)))
                 .then(|| indices.iter().map(|&i| codes[i]).collect::<Vec<_>>())
         })
         .collect();
     assert_eq!(actual, expected);
+    q.global_exclusions = vec![PersonalExclusion::SpinKind(RegularSpinKind::Combination)];
+    assert!(matches!(
+        complete_program_with_assumed_recognition(
+            &registry, &q, &original_codes, &additions.recognition,
+        ),
+        Err(ProgramCompletionError::GlobalExclusionConflict(ids)) if ids == ["combination"]
+    ));
 }
 
 #[test]
