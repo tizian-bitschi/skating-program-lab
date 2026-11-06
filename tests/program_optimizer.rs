@@ -564,7 +564,7 @@ fn proposal_cap_stops_a_large_finite_domain_without_claiming_a_node_budget() {
     })
     .collect();
     // Ten slots and ten variants: 10^10 nonempty ordered assignments before rules.
-    // The first highest-BV repeated double-Lutz proposal is ineligible for Bronze.
+    // No ten-jump program is eligible for Bronze.
     let mut req = request(AdultCategory::Bronze, variants, 10);
     req.max_proposals = 1;
     let r = result(&req);

@@ -286,7 +286,6 @@ fn prepare_search(
     profile: &RuleProfile,
     original_values: Vec<BaseValue>,
     absolute: Vec<(usize, usize)>,
-    start: Instant,
     assumed: bool,
 ) -> (ProgramOptimizationRequest, AnchoredPlacement) {
     let n = request.original.len();
@@ -312,9 +311,6 @@ fn prepare_search(
         )
     });
     variants.extend(request.original.iter().map(|e| variant(&e.entry)));
-    let remaining_time = request
-        .time_limit
-        .map(|limit| limit.saturating_sub(start.elapsed()));
     let search_request = ProgramOptimizationRequest {
         season: request.season,
         profile: request.profile.clone(),
@@ -330,7 +326,7 @@ fn prepare_search(
         max_proposals: request.max_proposals,
         max_solutions: request.max_solutions,
         enumerate_equal_optima: request.enumerate_equal_optima,
-        time_limit: remaining_time,
+        time_limit: request.time_limit,
     };
     let mut identities: Vec<_> = request
         .variants
@@ -440,7 +436,7 @@ pub fn complete_program(
     registry: &ProfileRegistry,
     request: &ProgramCompletionRequest,
 ) -> Result<ProgramCompletionResult, ProgramCompletionError> {
-    complete(registry, request, None)
+    complete(registry, request, None, Instant::now())
 }
 
 /// Complete the ordered program with explicit SOV selections for originals and
@@ -452,6 +448,7 @@ pub fn complete_program_with_assumed_recognition(
     variant_recognition: &[AssumedRecognition],
 ) -> Result<ProgramCompletionResult, ProgramCompletionError> {
     use ProgramCompletionError as E;
+    let start = Instant::now();
     if request.original.len() != original_recognition.len() {
         return Err(E::InvalidRequest("supply one SOV selection per original"));
     }
@@ -498,7 +495,7 @@ pub fn complete_program_with_assumed_recognition(
         original.entry.evidence = evidence;
         values.push(value);
     }
-    let mut result = complete(registry, &request, Some(&values))?;
+    let mut result = complete(registry, &request, Some(&values), start)?;
     result.assumptions = programs::ASSUMED_SCOPE;
     result.request = original_request.clone();
     Ok(result)
@@ -508,9 +505,9 @@ fn complete(
     registry: &ProfileRegistry,
     request: &ProgramCompletionRequest,
     assumed_values: Option<&[BaseValue]>,
+    start: Instant,
 ) -> Result<ProgramCompletionResult, ProgramCompletionError> {
     use ProgramCompletionError as E;
-    let start = Instant::now();
     let profile = registry
         .resolve(&request.profile, request.scoring_table)
         .map_err(E::Profile)?;
@@ -520,12 +517,11 @@ fn complete(
     let original_values = assumed_values.map(|values| &values[request.variants.len()..]);
     let (original_assessment, values) =
         prepare_originals(registry, request, profile, original_values)?;
-    let (search_request, placement) =
-        prepare_search(request, profile, values, absolute, start, assumed);
+    let (search_request, placement) = prepare_search(request, profile, values, absolute, assumed);
     let search = programs::optimize_anchored(
         registry,
         &search_request,
-        false,
+        start,
         Some(&placement),
         assumed_values,
     )

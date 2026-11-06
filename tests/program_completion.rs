@@ -958,7 +958,7 @@ fn assumed_senior_completion_credits_the_second_axel_in_each_allowed_gap() {
     assert!(result.enumeration_complete);
     assert_eq!(result.candidates.len(), codes.len() + 1);
     let mut gaps = BTreeSet::new();
-    for candidate in result.candidates {
+    for candidate in &result.candidates {
         let mut selected = vec![];
         let mut original_indices = vec![];
         let mut axels = vec![];
@@ -1028,6 +1028,8 @@ fn assumed_senior_completion_credits_the_second_axel_in_each_allowed_gap() {
     assert_eq!(stopped.status, OptimizerStatus::FeasibleUnproven);
     assert!(!stopped.enumeration_complete);
     assert_eq!(stopped.candidates[0].total_base_hundredths, 3350);
+    assert_eq!(stopped.candidates.len(), 1);
+    assert!(result.candidates.contains(&stopped.candidates[0]));
 
     q.max_proposals = 100;
     q.max_solutions = 1;

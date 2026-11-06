@@ -497,15 +497,7 @@ pub fn optimize_program(
     registry: &ProfileRegistry,
     request: &ProgramOptimizationRequest,
 ) -> Result<ProgramOptimizationResult, ProgramOptimizationError> {
-    optimize(registry, request, false)
-}
-
-fn optimize(
-    registry: &ProfileRegistry,
-    request: &ProgramOptimizationRequest,
-    stop_after_incumbent: bool,
-) -> Result<ProgramOptimizationResult, ProgramOptimizationError> {
-    optimize_anchored(registry, request, stop_after_incumbent, None, None)
+    optimize_anchored(registry, request, Instant::now(), None, None)
 }
 
 pub(super) struct AnchoredPlacement {
@@ -532,12 +524,11 @@ fn variant_base(
 pub(super) fn optimize_anchored(
     registry: &ProfileRegistry,
     request: &ProgramOptimizationRequest,
-    stop_after_incumbent: bool,
+    start: Instant,
     anchors: Option<&AnchoredPlacement>,
     assumed_values: Option<&[BaseValue]>,
 ) -> Result<ProgramOptimizationResult, ProgramOptimizationError> {
     use ProgramOptimizationError as E;
-    let start = Instant::now();
     let profile = registry
         .resolve(&request.profile, request.scoring_table)
         .map_err(E::Profile)?;
@@ -660,6 +651,9 @@ pub(super) fn optimize_anchored(
     if assumed_values.is_some() {
         result.proof_scope = "Maximum credited BV over the supplied ordered domain and implemented construction rules; no GOE, PCS, official second-half credit, regulatory completeness or global maximum.";
     }
+    if deadline_elapsed(end) {
+        return Ok(result);
+    }
     let (mut solver, slots, objective) =
         solver_common::ordered_slots(&values, request.max_elements, request.min_elements);
     // Mandatory variants constrain the search as well as the final shared check.
@@ -689,15 +683,17 @@ pub(super) fn optimize_anchored(
     let mut best = None;
     let mut omitted_ties = false;
     loop {
-        if end.is_some_and(|d| Instant::now() >= d) {
-            return Ok(result);
+        if deadline_elapsed(end) {
+            break;
         }
         if result.examined_programs >= request.max_proposals {
             result.termination_reason = JumpTerminationReason::SearchLimit;
-            return Ok(result);
+            break;
         }
         let mut brancher = solver.default_brancher();
         let mut resolver = ResolutionResolver::default();
+        // Check one assignment at a time until the shared validator accepts one.
+        let seek_incumbent = best.is_none();
         let outcome = solver.optimise(
             &mut brancher,
             &mut deadline,
@@ -706,7 +702,7 @@ pub(super) fn optimize_anchored(
                 OptimisationDirection::Maximise,
                 objective,
                 |_: &Solver, _: SolutionReference, _: &DefaultBrancher, _: &ResolutionResolver| {
-                    if stop_after_incumbent {
+                    if seek_incumbent {
                         ControlFlow::Break(())
                     } else {
                         ControlFlow::Continue(())
@@ -736,7 +732,7 @@ pub(super) fn optimize_anchored(
                 }
                 return Ok(result);
             }
-            OptimisationResult::Unknown => return Ok(result),
+            OptimisationResult::Unknown => break,
         };
         result.examined_programs += 1;
         let indices: Vec<_> = slots
@@ -794,10 +790,10 @@ pub(super) fn optimize_anchored(
                 }
             }
         }
-        if status != OptimizerStatus::OptimalProven {
-            return Ok(result);
+        if status != OptimizerStatus::OptimalProven && !seek_incumbent {
+            break;
         }
-        if best == Some(upper) {
+        if status == OptimizerStatus::OptimalProven && best == Some(upper) {
             result.status = OptimizerStatus::OptimalProven;
             if !request.enumerate_equal_optima {
                 result.termination_reason = JumpTerminationReason::EnumerationDisabled;
@@ -815,6 +811,15 @@ pub(super) fn optimize_anchored(
         let tag = solver.new_constraint_tag();
         solver.add_clause(clause, tag);
     }
+    if result.status == OptimizerStatus::FeasibleUnproven && result.candidates.len() > 1 {
+        result.candidates.truncate(1);
+        result.applied_rules = result.candidates[0].validation.applied_rules.clone();
+    }
+    Ok(result)
+}
+
+fn deadline_elapsed(end: Option<Instant>) -> bool {
+    end.is_some_and(|deadline| Instant::now() >= deadline)
 }
 
 /// Optimize the selected SOV variants in the same order as the request domain.
@@ -824,6 +829,7 @@ pub fn optimize_program_with_assumed_recognition(
     request: &ProgramOptimizationRequest,
     recognition: &[AssumedRecognition],
 ) -> Result<ProgramOptimizationResult, ProgramOptimizationError> {
+    let start = Instant::now();
     if request
         .exclusions
         .iter()
@@ -841,7 +847,7 @@ pub fn optimize_program_with_assumed_recognition(
         recognition,
         profile.scoring.recognition_ruleset,
     )?;
-    let mut result = optimize_anchored(registry, &request, false, None, Some(&values))?;
+    let mut result = optimize_anchored(registry, &request, start, None, Some(&values))?;
     result.assumptions = ASSUMED_SCOPE;
     Ok(result)
 }
@@ -879,37 +885,61 @@ pub(super) fn resolve_variants(
 mod tests {
     use super::*;
     #[test]
-    fn stopped_search_returns_unproven_incumbent() {
+    fn proposal_cap_retains_first_verified_adult_program_before_proof() {
         let profile = adult_profile(AdultCategory::Bronze);
-        let request = ProgramOptimizationRequest {
+        let mut request = ProgramOptimizationRequest {
             season: profile.season,
             profile: profile.id,
             scoring_table: profile.scoring_table,
             policy: adult_program_policy(AdultCategory::Bronze),
-            variants: vec![ProgramVariant {
-                element: PlannedElement::Jump(JumpElement::Solo(ListedJump {
-                    kind: Some(JumpKind::ToeLoop),
-                    rotations: Some(1),
-                })),
-                evidence: ElementPlanEvidence::Jump {
-                    direct_transitions_assumed: false,
-                },
-                recognition_assumed: true,
-            }],
+            variants: [JumpKind::ToeLoop, JumpKind::Salchow]
+                .map(|kind| ProgramVariant {
+                    element: PlannedElement::Jump(JumpElement::Solo(ListedJump {
+                        kind: Some(kind),
+                        rotations: Some(1),
+                    })),
+                    evidence: ElementPlanEvidence::Jump {
+                        direct_transitions_assumed: false,
+                    },
+                    recognition_assumed: true,
+                })
+                .to_vec(),
             exclusions: vec![],
             must_have: vec![],
             min_elements: 1,
             max_elements: 1,
             objective: OptimizerObjective::MaximizeUnfactoredBaseValueHundredths,
             equivalence: ProgramEquivalence::OrderedVariants,
-            max_proposals: 100,
+            max_proposals: 1,
             max_solutions: 10,
             enumerate_equal_optima: true,
             time_limit: None,
         };
-        let result = optimize(&ProfileRegistry::adult(), &request, true).unwrap();
-        assert_eq!(result.status, OptimizerStatus::FeasibleUnproven);
-        assert_eq!(result.candidates.len(), 1);
-        assert!(!result.enumeration_complete);
+        let registry = ProfileRegistry::adult();
+        let codes = ["1T", "1S"].map(AssumedRecognition::new);
+        let stopped =
+            optimize_program_with_assumed_recognition(&registry, &request, &codes).unwrap();
+        assert_eq!(stopped.status, OptimizerStatus::FeasibleUnproven);
+        assert_eq!(
+            stopped.termination_reason,
+            JumpTerminationReason::SearchLimit
+        );
+        assert_eq!(stopped.examined_programs, 1);
+        assert_eq!(stopped.candidates.len(), 1);
+        assert_eq!(stopped.candidates[0].base_hundredths, 40);
+        assert!(!stopped.enumeration_complete);
+
+        request.max_proposals = 10;
+        let proven =
+            optimize_program_with_assumed_recognition(&registry, &request, &codes).unwrap();
+        assert_eq!(proven.status, OptimizerStatus::OptimalProven);
+        assert!(proven.enumeration_complete);
+        let mut words: Vec<_> = proven
+            .candidates
+            .iter()
+            .map(|candidate| (candidate.variant_indices.clone(), candidate.base_hundredths))
+            .collect();
+        words.sort_unstable();
+        assert_eq!(words, [(vec![0], 40), (vec![1], 40)]);
     }
 }
