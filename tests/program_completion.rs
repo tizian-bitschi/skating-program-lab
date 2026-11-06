@@ -669,7 +669,27 @@ fn assumed_completion_keeps_original_plan_and_uses_no_panel_outcomes() {
             local_feature_qualification_assumed: true,
         } if !attempts.is_empty()
     ));
-    let resolved_spin = &result.original_assessment.request.entries[1].evidence;
+    q.max_proposals = 1;
+    let stopped = complete_program_with_assumed_recognition(
+        &ProfileRegistry::adult(),
+        &q,
+        &originals,
+        &additions,
+    )
+    .unwrap();
+    assert_eq!(stopped.status, OptimizerStatus::FeasibleUnproven);
+    assert_eq!(
+        stopped.termination_reason,
+        JumpTerminationReason::SearchLimit
+    );
+    assert!(!stopped.enumeration_complete);
+    assert_eq!(stopped.candidates.len(), 1);
+    let candidate = &stopped.candidates[0];
+    assert_eq!(candidate.total_base_hundredths, 110 + 190 + 40 + 40);
+    assert!(result.enumeration_complete);
+    assert!(result.candidates.contains(candidate));
+    assert_eq!(stopped.request.original, q.original);
+    let resolved_spin = &stopped.original_assessment.request.entries[1].evidence;
     assert_ne!(resolved_spin, &q.original[1].entry.evidence);
     assert!(matches!(
         resolved_spin,
@@ -681,7 +701,7 @@ fn assumed_completion_keeps_original_plan_and_uses_no_panel_outcomes() {
             ..
         }
     ));
-    let candidate = &result.candidates[0];
+    let mut original_order = vec![];
     for (index, provenance) in candidate.provenance.iter().enumerate() {
         let entry = &candidate.assessment.request.entries[index];
         assert!(entry.intended_recognition.is_none() && entry.scenario.is_none());
@@ -691,7 +711,8 @@ fn assumed_completion_keeps_original_plan_and_uses_no_panel_outcomes() {
             locked,
         } = provenance
         {
-            let original = &result.request.original[*original_index];
+            original_order.push(*original_index);
+            let original = &q.original[*original_index];
             assert_eq!(id, &original.id);
             assert!(*locked && original.locked);
             assert_eq!(entry.planned, original.entry.planned);
@@ -700,12 +721,17 @@ fn assumed_completion_keeps_original_plan_and_uses_no_panel_outcomes() {
                 entry,
                 &result.original_assessment.request.entries[*original_index]
             );
-            assert_eq!(
-                candidate.per_element[index].notation,
-                originals[*original_index].code
-            );
+            let value = &candidate.per_element[index];
+            assert_eq!(value.notation, originals[*original_index].code);
+            assert_eq!(value.source.document, "ISU Communication 2786");
+            assert_eq!(value.source.version, "2026-06-02");
+            assert!(value
+                .source
+                .location
+                .contains(["value row 38, code 1A", "value row 18, code SSp2"][*original_index]));
         }
     }
+    assert_eq!(original_order, [0, 1]);
     assert_eq!(
         candidate.assessment.intended_base.exact_hundredths,
         Some(i64::from(candidate.total_base_hundredths))
@@ -958,7 +984,7 @@ fn assumed_senior_completion_credits_the_second_axel_in_each_allowed_gap() {
     assert!(result.enumeration_complete);
     assert_eq!(result.candidates.len(), codes.len() + 1);
     let mut gaps = BTreeSet::new();
-    for candidate in result.candidates {
+    for candidate in &result.candidates {
         let mut selected = vec![];
         let mut original_indices = vec![];
         let mut axels = vec![];
@@ -1028,6 +1054,8 @@ fn assumed_senior_completion_credits_the_second_axel_in_each_allowed_gap() {
     assert_eq!(stopped.status, OptimizerStatus::FeasibleUnproven);
     assert!(!stopped.enumeration_complete);
     assert_eq!(stopped.candidates[0].total_base_hundredths, 3350);
+    assert_eq!(stopped.candidates.len(), 1);
+    assert!(result.candidates.contains(&stopped.candidates[0]));
 
     q.max_proposals = 100;
     q.max_solutions = 1;

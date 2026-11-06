@@ -153,13 +153,24 @@ cross-type limits, including the limit of one repeated quad or quint type.
 Originals keep their selected code, identity and relative order. Their
 credited contribution can change with the placement of an addition.
 
+Pumpkin yields its first assignment for shared whole-program validation before
+trying to maximize the objective. Invalid assignments are excluded and the
+search continues until it finds a verified program or reaches a limit. The
+same search applies to anchored completion. The first verified program starts
+the proof phase with its recomputed score.
+
 Each remaining word's raw sum bounds its credited sum: the supported credit
 adjustment can only reduce a listed value. Pumpkin proves an upper bound over
 the remaining words; the shared scorer establishes the incumbent. Once these
 bounds meet, or there is no remaining word that can improve the incumbent,
 the credited optimum is proven. Enumeration must still exhaust every word
 that can tie it. Search interruption or a proposal cap can leave an unproven
-incumbent; an output cap can limit ties even when optimality is proven.
+incumbent. The result reports one verified program while its score remains
+unproven. An output cap can limit ties even when optimality is proven.
+The deadline includes input preparation and model construction. Pumpkin checks
+it cooperatively, and preparation, model construction, validation or result
+assembly can run past it. The proposal cap counts assignments sent to the
+validator. Results can vary when a time limit interrupts the search.
 Infeasibility requires exhausting the search without a valid incumbent.
 Unresolved credit produces a structured error. Coverage of regulations and
 completeness of a generated candidate domain are independent of these proofs.
