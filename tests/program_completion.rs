@@ -841,6 +841,56 @@ fn gold_code_domain_completion_matches_manual_bv_and_order_oracle() {
         })
         .collect();
     assert_eq!(actual, expected);
+    let mut locked = q.clone();
+    let choreographic = &q.variants[3];
+    locked.original.push(CompletionEntry {
+        id: "choreographic".into(),
+        locked: true,
+        entry: ManualProgramEntry {
+            planned: choreographic.element.clone(),
+            evidence: choreographic.evidence.clone(),
+            scenario: None,
+            intended_recognition: None,
+        },
+    });
+    locked
+        .insertion
+        .absolute_positions
+        .push(("choreographic".into(), 4));
+    locked.exclusions.push(PersonalExclusion::Variant(3));
+    locked.min_additions = 2;
+    locked.max_additions = 2;
+    let locked_codes = ["1A", "CCoSp3", "ChSp1"].map(AssumedRecognition::new);
+    let result = complete_program_with_assumed_recognition(
+        &registry,
+        &locked,
+        &locked_codes,
+        &additions.recognition,
+    )
+    .unwrap();
+    assert_eq!(result.status, OptimizerStatus::OptimalProven);
+    assert!(result.enumeration_complete);
+    let mut locked_words = BTreeSet::new();
+    for candidate in &result.candidates {
+        assert_eq!(candidate.total_base_hundredths, 1370);
+        assert!(matches!(&candidate.provenance[4],
+            CompletionProvenance::Original { id, .. } if id == "choreographic"));
+        assert!(locked_words.insert(
+            candidate
+                .per_element
+                .iter()
+                .map(|value| value.notation.as_str())
+                .collect::<Vec<_>>()
+        ));
+    }
+    assert_eq!(
+        locked_words,
+        expected
+            .into_iter()
+            .filter(|word| word[4] == "ChSp1")
+            .collect()
+    );
+
     q.global_exclusions = vec![PersonalExclusion::SpinKind(RegularSpinKind::Combination)];
     assert!(matches!(
         complete_program_with_assumed_recognition(
