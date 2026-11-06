@@ -378,6 +378,10 @@ fn credited_values(
     .collect()
 }
 
+#[cfg(test)]
+#[path = "proposal_diagnostics.rs"]
+mod proposal_diagnostics;
+
 fn checked(
     registry: &ProfileRegistry,
     request: &ProgramOptimizationRequest,
@@ -392,6 +396,11 @@ fn checked(
             .iter()
             .any(|group| !indices.iter().any(|i| group.contains(i)))
     {
+        #[cfg(test)]
+        proposal_diagnostics::record_rejection(
+            proposal_diagnostics::Rejection::ModelRequirements,
+            std::iter::empty(),
+        );
         return Ok(None);
     }
     let program = ProfileProgram {
@@ -409,12 +418,17 @@ fn checked(
     let (mut validation, credit_blocks) =
         validate_program_scope_with_credit(registry, &program, &evidence, &request.policy, scope)
             .map_err(ProgramOptimizationError::Profile)?;
-    if validation
+    let violations = validation
         .validation
         .findings
         .iter()
-        .any(|f| f.kind == FindingKind::Violation)
-    {
+        .filter(|f| f.kind == FindingKind::Violation);
+    if violations.clone().next().is_some() {
+        #[cfg(test)]
+        proposal_diagnostics::record_rejection(
+            proposal_diagnostics::Rejection::Violation,
+            violations,
+        );
         return Ok(None);
     }
     // Execution remains a declared conditional assumption, not an established fact.
@@ -424,6 +438,11 @@ fn checked(
         .iter()
         .filter(|f| f.rule_id != "spin-execution-recognition");
     if unresolved.clone().next().is_some() {
+        #[cfg(test)]
+        proposal_diagnostics::record_rejection(
+            proposal_diagnostics::Rejection::Unresolved,
+            unresolved.clone(),
+        );
         return if scope == EvaluationScope::AssumedRecognition {
             Err(ProgramOptimizationError::UnresolvedValidation(
                 unresolved.cloned().collect(),
@@ -652,9 +671,13 @@ pub(super) fn optimize_anchored(
         result.proof_scope = "Maximum credited BV over the supplied ordered domain and implemented construction rules; no GOE, PCS, official second-half credit, regulatory completeness or global maximum.";
     }
     let mut deadline = Deadline(end);
+    #[cfg(test)]
+    proposal_diagnostics::record_preflight(start.elapsed());
     if deadline.expired() {
         return Ok(result);
     }
+    #[cfg(test)]
+    let model_start = Instant::now();
     let (mut solver, slots, objective) =
         solver_common::ordered_slots(&values, request.max_elements, request.min_elements);
     // Mandatory variants constrain the search as well as the final shared check.
@@ -677,6 +700,8 @@ pub(super) fn optimize_anchored(
         result.assumptions = "Original recognition, calls and qualification assumptions are supplied and retained; additions use explicit clean recognition and supplied feature qualification. No official recognition, execution, GOE or second-half credit is inferred.";
         solver_common::anchor_slots(&mut solver, &slots, &result.universe, a);
     }
+    #[cfg(test)]
+    proposal_diagnostics::record_model(model_start.elapsed());
     // Pumpkin maximizes the remaining raw table sum. Each credited total is
     // bounded above by that sum, so removing one checked word cannot hide a
     // better plan. Keep searching while a remaining word could improve or tie.
@@ -694,6 +719,8 @@ pub(super) fn optimize_anchored(
         let mut resolver = ResolutionResolver::default();
         // Check one assignment at a time until the shared validator accepts one.
         let seek_incumbent = best.is_none();
+        #[cfg(test)]
+        let solver_start = Instant::now();
         let outcome = solver.optimise(
             &mut brancher,
             &mut deadline,
@@ -710,6 +737,8 @@ pub(super) fn optimize_anchored(
                 },
             ),
         );
+        #[cfg(test)]
+        proposal_diagnostics::record_solver(solver_start.elapsed());
         let status = solver_common::status(&outcome);
         let solution = match outcome {
             OptimisationResult::Optimal(s)
@@ -743,9 +772,16 @@ pub(super) fn optimize_anchored(
             })
             .collect();
         let upper = solution.get_integer_value(objective) as u32;
-        if let Some(candidate) =
-            checked(registry, request, &indices, &universe_values, upper, scope)?
-        {
+        #[cfg(test)]
+        let check_start = Instant::now();
+        let candidate = checked(registry, request, &indices, &universe_values, upper, scope)?;
+        #[cfg(test)]
+        proposal_diagnostics::record_check(
+            check_start.elapsed(),
+            start.elapsed(),
+            candidate.is_some(),
+        );
+        if let Some(candidate) = candidate {
             let credited = candidate.base_hundredths;
             if best.is_none_or(|b| credited > b) {
                 best = Some(credited);
@@ -880,10 +916,10 @@ pub(super) fn resolve_variants(
 #[cfg(test)]
 mod tests {
     use super::*;
-    #[test]
-    fn proposal_cap_retains_first_verified_adult_program_before_proof() {
+
+    pub(super) fn bronze_solos() -> ProgramOptimizationRequest {
         let profile = adult_profile(AdultCategory::Bronze);
-        let mut request = ProgramOptimizationRequest {
+        ProgramOptimizationRequest {
             season: profile.season,
             profile: profile.id,
             scoring_table: profile.scoring_table,
@@ -910,7 +946,12 @@ mod tests {
             max_solutions: 10,
             enumerate_equal_optima: true,
             time_limit: None,
-        };
+        }
+    }
+
+    #[test]
+    fn proposal_cap_retains_first_verified_adult_program_before_proof() {
+        let mut request = bronze_solos();
         let registry = ProfileRegistry::adult();
         let codes = ["1T", "1S"].map(AssumedRecognition::new);
         let stopped =
@@ -937,5 +978,69 @@ mod tests {
             .collect();
         words.sort_unstable();
         assert_eq!(words, [(vec![0], 40), (vec![1], 40)]);
+    }
+
+    #[test]
+    fn complete_bronze_solo_fixture_matches_literal_ordered_words_and_optima() {
+        use std::collections::BTreeMap;
+
+        let mut request = bronze_solos();
+        request.min_elements = 1;
+        request.max_elements = 3;
+        request.max_proposals = 100;
+        let registry = ProfileRegistry::adult();
+        let codes = ["1T", "1S"].map(AssumedRecognition::new);
+        let result =
+            optimize_program_with_assumed_recognition(&registry, &request, &codes).unwrap();
+        let profile = registry
+            .resolve(&request.profile, request.scoring_table)
+            .unwrap();
+        let universe: Vec<_> = resolve_variants(
+            request.scoring_table,
+            &mut request.variants,
+            &codes,
+            profile.scoring.recognition_ruleset,
+        )
+        .unwrap()
+        .into_iter()
+        .enumerate()
+        .collect();
+
+        // Bronze permits each listed jump at most twice. Both singles are 0.40 BV.
+        let mut expected = BTreeMap::new();
+        let mut verified = BTreeMap::new();
+        for length in 1..=3 {
+            let bv = 40 * length as u32;
+            for bits in 0..(1 << length) {
+                let word: Vec<_> = (0..length).map(|i| (bits >> i) & 1).collect();
+                if length < 3 || (bits != 0 && bits != 7) {
+                    expected.insert(word.clone(), bv);
+                }
+                if let Some(candidate) = checked(
+                    &registry,
+                    &request,
+                    &word,
+                    &universe,
+                    bv,
+                    EvaluationScope::AssumedRecognition,
+                )
+                .unwrap()
+                {
+                    verified.insert(word, candidate.base_hundredths);
+                }
+            }
+        }
+        assert_eq!(verified, expected);
+        expected.retain(|_, score| *score == 120);
+        assert_eq!(result.status, OptimizerStatus::OptimalProven);
+        assert!(result.enumeration_complete);
+        let returned = result.candidates.len();
+        let actual: BTreeMap<_, _> = result
+            .candidates
+            .into_iter()
+            .map(|c| (c.variant_indices, c.base_hundredths))
+            .collect();
+        assert_eq!(returned, actual.len(), "duplicate ordered optimum");
+        assert_eq!(actual, expected);
     }
 }

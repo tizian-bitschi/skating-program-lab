@@ -397,3 +397,48 @@ or general eleven-slot performance guarantee follows from these measurements.
 Use explicit bounded budgets, report proof scope, and expect incomplete broad
 attempts. A later optimization needs identical-input before/after measurements
 and independent equivalence tests before adoption.
+## Proposal rejection inventory (#103)
+
+Run the test-only diagnostic from the repository root:
+
+```sh
+cargo test --lib source_domain_proposal_inventory -- --ignored --nocapture
+```
+
+It uses the six-slot Adult domains from `workflow_bounds` with the 100-tie
+cap and the eleven-slot Senior large full and immutable-completion domains
+from `senior_grand_prix`. Each call receives a 250 ms budget. The diagnostic
+records preflight, model posting, total time inside Pumpkin optimization
+calls, proposal-check time, first accepted time, and accepted and rejected
+counts. Preflight ends at the deadline check before model construction and
+is recorded even if the budget has already expired. Model posting is a
+separate interval and is absent if construction never starts.
+A rejected proposal contributes once per blocking validator rule ID,
+even when the rule produces multiple findings on that word. A proposal can
+contribute to several rule counts. Accepted proposals include words that
+do not improve the incumbent. Returned words are counted separately.
+
+One Windows x64 debug run (Rust 1.99.1, Pumpkin 0.5.0) from the #102 baseline
+(`aa85e4a`) with diagnostic instrumentation gave these observations:
+
+| Case | Checked | Accepted | Selected rejection counts |
+| --- | ---: | ---: | --- |
+| Adult Bronze full | 54 | 1 | Family cap 34, compound count 18, jump repetition 14 |
+| Adult Silver full | 29 | 2 | Family cap 24, spin role 19 |
+| Adult Gold full | 93 | 0 | Spin role 93, compound count 64, jump repetition 55 |
+| Adult Masters full | 62 | 0 | Spin role 61, choreographic spin 48, compound count 41 |
+| Senior large full (four runs) | 3 per run | 0 | Jump count, repetition, spin role and choreographic spin on all proposals |
+| Senior large completion (four runs) | 4–16 per run | 1 per run | Compound count 3–11 and repetition 3–10 per run |
+
+Pumpkin calls consumed about 214–241 ms per run. Proposal checking
+took about 1–13 ms per run. The Gold and Masters observations show repeated
+late rejections with a missing required role. The Senior full runs spent
+most of the budget inside Pumpkin while returning only three proposals each.
+The timing groups propagation with other internal solver work and provides
+no node count or isolated propagation time. These single-run observations
+prioritize rules for equivalence experiments. They establish no speedup.
+
+The tiny Bronze solo fixture compares every feasible ordered word and its
+credited BV with an independent literal oracle before comparing all solver
+optima. New pruning constraints need separate feasible-set comparisons in
+their applicable profiles and a controlled before/after experiment (#104).

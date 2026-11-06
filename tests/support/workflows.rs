@@ -36,6 +36,24 @@ pub fn domain(category: AdultCategory, broad: bool) -> CandidateGenerationReques
     g
 }
 
+#[allow(dead_code)] // Only benchmark callers use the broader domain.
+pub fn bounds_domain(category: AdultCategory) -> CandidateGenerationRequest {
+    let mut request = domain(category, true);
+    request.base_spins.extend([
+        SpinAbbreviation {
+            kind: RegularSpinKind::Combination,
+            entry: SpinEntry::NonFlying,
+            change_foot: true,
+        },
+        SpinAbbreviation {
+            kind: RegularSpinKind::Camel,
+            entry: SpinEntry::Flying,
+            change_foot: false,
+        },
+    ]);
+    request
+}
+
 fn qualified_spin(kind: RegularSpinKind) -> SpinGenerationPlan {
     SpinGenerationPlan {
         plan: RegularSpin {
