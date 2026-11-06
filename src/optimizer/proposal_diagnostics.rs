@@ -16,8 +16,8 @@ mod workflows;
 
 #[derive(Debug, Default)]
 struct Diagnostics {
-    setup: Duration,
-    model: Duration,
+    preflight: Option<Duration>,
+    model: Option<Duration>,
     solver: Duration,
     solver_calls: usize,
     check: Duration,
@@ -46,11 +46,12 @@ fn record(update: impl FnOnce(&mut Diagnostics)) {
     });
 }
 
-pub(super) fn record_setup(setup: Duration, model: Duration) {
-    record(|d| {
-        d.setup = setup;
-        d.model = model;
-    });
+pub(super) fn record_preflight(elapsed: Duration) {
+    record(|d| d.preflight = Some(elapsed));
+}
+
+pub(super) fn record_model(elapsed: Duration) {
+    record(|d| d.model = Some(elapsed));
 }
 
 pub(super) fn record_solver(elapsed: Duration) {
@@ -83,18 +84,46 @@ pub(super) fn record_rejection<'a>(
     });
 }
 
+fn capture<T>(run: impl FnOnce() -> T) -> (T, Diagnostics) {
+    ACTIVE.with_borrow_mut(|active| assert!(active.replace(Diagnostics::default()).is_none()));
+    let result = run();
+    (
+        result,
+        ACTIVE.with_borrow_mut(|active| active.take().unwrap()),
+    )
+}
+
 fn sample(
     label: &str,
     run: impl FnOnce() -> (usize, usize, OptimizerStatus, JumpTerminationReason),
 ) {
-    ACTIVE.with_borrow_mut(|active| assert!(active.replace(Diagnostics::default()).is_none()));
     let start = Instant::now();
-    let (proposals, returned, status, termination) = run();
+    let ((proposals, returned, status, termination), d) = capture(run);
     let elapsed = start.elapsed();
-    let d = ACTIVE.with_borrow_mut(|active| active.take().unwrap());
     assert_eq!(d.accepted + d.rejected.values().sum::<usize>(), proposals);
     assert!(returned <= d.accepted);
     println!("{label} elapsed={elapsed:?} proposals={proposals} returned={returned} {status:?}/{termination:?} {d:?}");
+}
+
+#[test]
+fn zero_budget_records_preflight_without_posting_the_model() {
+    let mut request = super::tests::bronze_solos();
+    request.time_limit = Some(Duration::ZERO);
+    let registry = ProfileRegistry::adult();
+    let prior_preflight = Duration::from_millis(1);
+    let start = Instant::now() - prior_preflight;
+    let (result, diagnostics) =
+        capture(|| super::optimize_anchored(&registry, &request, start, None, None).unwrap());
+
+    assert_eq!(result.status, OptimizerStatus::Incomplete);
+    assert_eq!(
+        result.termination_reason,
+        JumpTerminationReason::Interrupted
+    );
+    assert_eq!(result.examined_programs, 0);
+    assert!(diagnostics.preflight.unwrap() >= prior_preflight);
+    assert_eq!(diagnostics.model, None);
+    assert_eq!(diagnostics.solver_calls, 0);
 }
 
 #[test]

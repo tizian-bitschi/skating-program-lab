@@ -671,6 +671,8 @@ pub(super) fn optimize_anchored(
         result.proof_scope = "Maximum credited BV over the supplied ordered domain and implemented construction rules; no GOE, PCS, official second-half credit, regulatory completeness or global maximum.";
     }
     let mut deadline = Deadline(end);
+    #[cfg(test)]
+    proposal_diagnostics::record_preflight(start.elapsed());
     if deadline.expired() {
         return Ok(result);
     }
@@ -699,7 +701,7 @@ pub(super) fn optimize_anchored(
         solver_common::anchor_slots(&mut solver, &slots, &result.universe, a);
     }
     #[cfg(test)]
-    proposal_diagnostics::record_setup(start.elapsed(), model_start.elapsed());
+    proposal_diagnostics::record_model(model_start.elapsed());
     // Pumpkin maximizes the remaining raw table sum. Each credited total is
     // bounded above by that sum, so removing one checked word cannot hide a
     // better plan. Keep searching while a remaining word could improve or tie.
@@ -915,7 +917,7 @@ pub(super) fn resolve_variants(
 mod tests {
     use super::*;
 
-    fn bronze_solos() -> ProgramOptimizationRequest {
+    pub(super) fn bronze_solos() -> ProgramOptimizationRequest {
         let profile = adult_profile(AdultCategory::Bronze);
         ProgramOptimizationRequest {
             season: profile.season,
@@ -1032,13 +1034,13 @@ mod tests {
         expected.retain(|_, score| *score == 120);
         assert_eq!(result.status, OptimizerStatus::OptimalProven);
         assert!(result.enumeration_complete);
-        assert_eq!(
-            result
-                .candidates
-                .into_iter()
-                .map(|c| (c.variant_indices, c.base_hundredths))
-                .collect::<BTreeMap<_, _>>(),
-            expected
-        );
+        let returned = result.candidates.len();
+        let actual: BTreeMap<_, _> = result
+            .candidates
+            .into_iter()
+            .map(|c| (c.variant_indices, c.base_hundredths))
+            .collect();
+        assert_eq!(returned, actual.len(), "duplicate ordered optimum");
+        assert_eq!(actual, expected);
     }
 }

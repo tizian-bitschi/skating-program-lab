@@ -408,9 +408,12 @@ cargo test --lib source_domain_proposal_inventory -- --ignored --nocapture
 It uses the six-slot Adult domains from `workflow_bounds` with the 100-tie
 cap and the eleven-slot Senior large full and immutable-completion domains
 from `senior_grand_prix`. Each call receives a 250 ms budget. The diagnostic
-records search setup, model posting, total time inside Pumpkin optimization
+records preflight, model posting, total time inside Pumpkin optimization
 calls, proposal-check time, first accepted time, and accepted and rejected
-counts. A rejected proposal contributes once per blocking validator rule ID,
+counts. Preflight ends at the deadline check before model construction and
+is recorded even if the budget has already expired. Model posting is a
+separate interval and is absent if construction never starts.
+A rejected proposal contributes once per blocking validator rule ID,
 even when the rule produces multiple findings on that word. A proposal can
 contribute to several rule counts. Accepted proposals include words that
 do not improve the incumbent. Returned words are counted separately.
