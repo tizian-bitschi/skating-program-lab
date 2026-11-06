@@ -233,7 +233,7 @@ fn adult_spin_role_optimizer_matches_complete_fixture_sets_and_bv() {
         &'static [&'static str],
         &'static [Option<u32>],
     );
-    let cases: [Case; 4] = [
+    let cases: [Case; 6] = [
         (
             Bronze,
             &["1T", "CSpB", "SSpB", "SSp1", "CSp1"],
@@ -253,6 +253,18 @@ fn adult_spin_role_optimizer_matches_complete_fixture_sets_and_bv() {
             Masters,
             &["1A", "FSSp2", "StSq2", "ChSp1", "CCoSp2", "CCoSp3"],
             &[Some(1310), Some(1370)],
+        ),
+        // The remaining choice is a choreographic spin or a second solo jump.
+        // The role groups admit both choices. The Adult policy requires ChSp1.
+        (
+            Gold,
+            &["1A", "FSSp2", "StSq2", "CCoSp3", "ChSp1", "1T"],
+            &[Some(1370), None],
+        ),
+        (
+            Masters,
+            &["1A", "FSSp2", "StSq2", "CCoSp3", "ChSp1", "1T"],
+            &[Some(1370), None],
         ),
     ];
     for (category, codes, scores) in cases {
