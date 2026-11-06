@@ -1,6 +1,9 @@
 #![cfg(feature = "optimizer")]
 use skating_program_lab::*;
-use std::{collections::BTreeSet, time::Duration};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    time::Duration,
+};
 
 #[path = "support/generation_defaults.rs"]
 #[allow(dead_code)]
@@ -119,6 +122,174 @@ fn ids(r: &ProgramOptimizationResult) -> BTreeSet<Vec<usize>> {
         .iter()
         .map(|c| c.variant_indices.clone())
         .collect()
+}
+
+#[test]
+fn empty_spin_role_universe_is_infeasible_without_a_proposal() {
+    let mut q = request(AdultCategory::Gold, vec![jump(JumpKind::Axel)], 1);
+    q.min_elements = 0;
+    q.max_proposals = 1;
+    q.exclusions = vec![PersonalExclusion::Variant(0)];
+    let excluded = result(&q);
+    assert_eq!(excluded.status, OptimizerStatus::InfeasibleProven);
+    assert_eq!(excluded.examined_programs, 0);
+    q.variants.clear();
+    q.exclusions.clear();
+    let absent = result(&q);
+    assert_eq!(absent.status, OptimizerStatus::InfeasibleProven);
+    assert_eq!(absent.examined_programs, 0);
+    q.policy.spins.required.push(vec![]);
+    assert!(matches!(
+        optimize_program(&ProfileRegistry::adult(), &q),
+        Err(ProgramOptimizationError::Profile(_))
+    ));
+}
+
+// With one choice from each disjoint group and exactly that many slots,
+// every word belongs to exactly one fixed-choice stratum. The fixtures have
+// order-independent BV, so the optimizer returns every feasible word in a
+// stratum as an optimum. Compare the union before testing the open choice.
+fn assert_spin_role_oracle(
+    registry: &ProfileRegistry,
+    mut q: ProgramOptimizationRequest,
+    codes: &[AssumedRecognition],
+    choices: &[Option<u32>],
+) {
+    let fixed = 0..codes.len() - choices.len();
+    let n = fixed.len() + 1;
+    let option_group: Vec<_> = (fixed.end..codes.len()).collect();
+    let mut expected_all = BTreeMap::new();
+    let mut actual_all = BTreeMap::new();
+    for (&option, &score) in option_group.iter().zip(choices) {
+        let mut required: Vec<_> = fixed.clone().collect();
+        required.push(option);
+        q.must_have = required.iter().map(|&i| vec![i]).collect();
+        let result = optimize_program_with_assumed_recognition(registry, &q, codes).unwrap();
+        if let Some(score) = score {
+            assert_eq!(
+                result.status,
+                OptimizerStatus::OptimalProven,
+                "{:?}",
+                q.profile
+            );
+            assert!(result.enumeration_complete);
+            let (_, words) = word_oracle(n, codes.len(), |word| {
+                required.iter().all(|i| word.contains(i)).then_some(score)
+            });
+            expected_all.extend(words.into_iter().map(|word| (word, score)));
+            for candidate in result.candidates {
+                assert!(actual_all
+                    .insert(candidate.variant_indices, candidate.base_hundredths)
+                    .is_none());
+            }
+        } else {
+            assert_eq!(
+                result.status,
+                OptimizerStatus::InfeasibleProven,
+                "{:?}",
+                q.profile
+            );
+            assert!(result.candidates.is_empty());
+            assert!(!result.enumeration_complete);
+        }
+    }
+    assert_eq!(actual_all, expected_all, "{:?}", q.profile);
+
+    q.must_have = fixed.map(|i| vec![i]).chain([option_group]).collect();
+    let result = optimize_program_with_assumed_recognition(registry, &q, codes).unwrap();
+    let best = expected_all.values().copied().max().unwrap();
+    expected_all.retain(|_, value| *value == best);
+    assert_eq!(
+        result.status,
+        OptimizerStatus::OptimalProven,
+        "{:?}",
+        q.profile
+    );
+    assert!(result.enumeration_complete);
+    assert_eq!(result.candidates.len(), expected_all.len());
+    let actual: BTreeMap<_, _> = result
+        .candidates
+        .into_iter()
+        .map(|c| (c.variant_indices, c.base_hundredths))
+        .collect();
+    assert_eq!(actual, expected_all, "{:?}", q.profile);
+}
+
+#[test]
+fn adult_spin_role_optimizer_matches_complete_fixture_sets_and_bv() {
+    use AdultCategory::{Bronze, Gold, Masters, Silver};
+    let registry = ProfileRegistry::adult();
+    // Fixed codes first, then alternate choices for the remaining slot.
+    // Values are literal Communication 2786 totals. CSp1 with CSpB
+    // repeats an abbreviation, and FSSpB alone misses Silver's nonflying role.
+    type Case = (
+        AdultCategory,
+        &'static [&'static str],
+        &'static [Option<u32>],
+    );
+    let cases: [Case; 4] = [
+        (
+            Bronze,
+            &["1T", "CSpB", "SSpB", "SSp1", "CSp1"],
+            &[Some(300), Some(330), None],
+        ),
+        (
+            Silver,
+            &["1T", "SSpB", "SSp1", "FSSpB"],
+            &[Some(280), Some(310), None],
+        ),
+        (
+            Gold,
+            &["1A", "FSSp2", "StSq2", "ChSp1", "CCoSp2", "CCoSp3"],
+            &[Some(1310), Some(1370)],
+        ),
+        (
+            Masters,
+            &["1A", "FSSp2", "StSq2", "ChSp1", "CCoSp2", "CCoSp3"],
+            &[Some(1310), Some(1370)],
+        ),
+    ];
+    for (category, codes, scores) in cases {
+        let slots = codes.len() - scores.len() + 1;
+        let mut codes: Vec<_> = codes.iter().copied().map(AssumedRecognition::new).collect();
+        let generated = generate_program_candidates_with_assumed_recognition(
+            &registry,
+            &generation_defaults::request(adult_profile(category)),
+            &codes,
+        )
+        .unwrap();
+        assert_eq!(generated.recognition, codes);
+        let mut variants = generated.domain.variants;
+        if category == Silver {
+            // The compound is supplied explicitly rather than inferred from solos.
+            variants[0] = axel_sequence();
+            codes[0] = AssumedRecognition::new("1T+1A+SEQ");
+        }
+        let q = request(category, variants, slots);
+        assert_spin_role_oracle(&registry, q, &codes, scores);
+    }
+}
+
+#[test]
+fn senior_spin_role_optimizer_matches_complete_fixture_sets_and_bv() {
+    let registry = ProfileRegistry::senior();
+    let codes =
+        ["2A", "FCSp4", "StSq4", "ChSq1", "ChSp1", "CCoSp3", "CCoSp4"].map(AssumedRecognition::new);
+    for category in [SeniorCategory::Women, SeniorCategory::Men] {
+        let profile = senior_profile(category);
+        let generated = generate_program_candidates_with_assumed_recognition(
+            &registry,
+            &generation_defaults::request(profile.clone()),
+            &codes,
+        )
+        .unwrap();
+        assert_eq!(generated.recognition, codes);
+        let mut q = request(AdultCategory::Gold, generated.domain.variants, 6);
+        q.profile = profile.id;
+        q.scoring_table = profile.scoring_table;
+        q.policy = senior_program_policy(category);
+        assert_spin_role_oracle(&registry, q, &codes, &[Some(2180), Some(2240)]);
+    }
 }
 
 // A source-independent exhaustive oracle: finite words, fixture eligibility and
@@ -281,8 +452,14 @@ fn all_four_profiles_handle_actual_mixed_programs_and_mandatory_roles() {
             if advanced { 850 } else { 170 }
         );
         if advanced {
+            assert!(r.applied_rules.iter().any(|rule| {
+                rule.rule_id == "spin-required-role" && rule.source == req.policy.spins.source
+            }));
+            req.must_have.clear();
             req.exclusions = vec![PersonalExclusion::FlyingEntry];
-            assert_eq!(result(&req).status, OptimizerStatus::InfeasibleProven);
+            let impossible = result(&req);
+            assert_eq!(impossible.status, OptimizerStatus::InfeasibleProven);
+            assert_eq!(impossible.examined_programs, 0);
         }
     }
 }
@@ -428,9 +605,8 @@ fn synthetic_profile_reuses_solver_and_explicit_shared_policies() {
     ));
 }
 
-#[test]
-fn assumed_silver_axel_sequence_reaches_optimizer_scoring_and_shared_validation() {
-    let sequence = ProgramVariant {
+fn axel_sequence() -> ProgramVariant {
+    ProgramVariant {
         element: PlannedElement::Jump(JumpElement::Sequence(vec![
             JumpPart::Jump(ListedJump {
                 kind: Some(JumpKind::ToeLoop),
@@ -445,11 +621,15 @@ fn assumed_silver_axel_sequence_reaches_optimizer_scoring_and_shared_validation(
             direct_transitions_assumed: true,
         },
         recognition_assumed: true,
-    };
+    }
+}
+
+#[test]
+fn assumed_silver_axel_sequence_reaches_optimizer_scoring_and_shared_validation() {
     let mut req = request(
         AdultCategory::Silver,
         vec![
-            sequence,
+            axel_sequence(),
             spin(
                 RegularSpinKind::Sit,
                 SpinEntry::NonFlying,
