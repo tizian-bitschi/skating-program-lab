@@ -719,10 +719,13 @@ pub(super) fn optimize_anchored(
     if deadline.expired() {
         return Ok(result);
     }
+    // The clause improved the measured Adult searches but delayed Senior incumbents.
+    let prune_choreographic_spin =
+        ruleset == RulesetId::IsuAdult2026_27July16 && request.policy.require_choreographic_spin;
     if request.variants.is_empty()
         && request.min_elements == 0
         && request.must_have.is_empty()
-        && !request.policy.spins.required.is_empty()
+        && (!request.policy.spins.required.is_empty() || prune_choreographic_spin)
     {
         // Without variants, preflight has not validated the policy. Preserve the
         // final check's profile errors before the role clauses prune the empty word.
@@ -761,6 +764,14 @@ pub(super) fn optimize_anchored(
         &request.variants,
         &request.policy.spins,
     );
+    // Exact counterpart of program-required-choreographic-spin in the shared
+    // validator, which requires a known choreographic spin even in a partial word.
+    if prune_choreographic_spin {
+        require_variant_group(&mut solver, &slots, &result.universe, |index| {
+            ProfileElementFamily::of(&request.variants[index].element)
+                == Some(ProfileElementFamily::ChoreographicSpin)
+        });
+    }
     #[cfg(test)]
     proposal_diagnostics::record_model(model_start.elapsed());
     // Pumpkin maximizes the remaining raw table sum. Each credited total is

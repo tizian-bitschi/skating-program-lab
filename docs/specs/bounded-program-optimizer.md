@@ -481,3 +481,39 @@ incumbents after the change were feasible with optimality unproven. These
 measurements show fewer late role rejections and more feasible incumbents
 on these requests. They do not measure internal nodes or prove faster
 optimality or tie enumeration.
+
+### Required choreographic spin
+
+For Adult recognition, the slot model posts a presence clause when the
+validated program policy requires a choreographic spin. It uses the same
+family classifier as the validator's `program-required-choreographic-spin`
+rule. That rule requires a known choreographic spin even when another
+element is unspecified. The clause includes immutable originals and runs
+over the same filtered universe as the other model constraints.
+
+The experiment used the same diagnostic command, host, fixtures, seed and
+250 ms budget as above. Each configuration ran three times against the
+`fad126a` baseline. Times are observed ranges, rounded to milliseconds.
+
+| Case | Checked proposals before → after | First verified program before → after | Runs with a verified program |
+| --- | --- | --- | --- |
+| Adult Gold full | 25 → 11 | 49–52 → 13–14 ms | 3/3 in both |
+| Adult Masters full | 26 → 8 | 46–47 → 16 ms | 3/3 in both |
+| Senior large full | 11–12 → 11–12 | 200–230 → 199–207 ms | 9/12 in both |
+| Senior large completion | 4–17 → 4–17 | 43–95 → 43–82 ms | 12/12 in both |
+
+Gold and Masters recorded 14 and 24 missing-choreographic-spin rejections
+per baseline run, respectively, and zero with the clause. The measured
+Adult incumbents were feasible with optimality unproven. Enabling the same
+clause for Senior profiles also eliminated those rejections but reduced
+verified Senior full runs from 9/12 to 0/12. The model therefore posts
+the clause only for Adult recognition.
+
+A separate prototype channeled known jump compounds to one binary
+indicator per slot and bounded their sum using the shared total compound
+cap. Senior large completion dropped from 4–17 checked proposals to 3–5
+and from 3–12 compound-count rejections to zero. Its first verified times
+were 55–66 ms against 43–95 ms on the baseline. Senior large full also
+fell from 9/12 verified runs to 0/12. The prototype was removed. These
+experiments count proposals and verified programs at the fixed budget.
+They do not measure internal nodes or establish a change in proof time.

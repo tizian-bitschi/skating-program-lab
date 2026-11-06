@@ -207,6 +207,12 @@ fn assert_spin_role_oracle(
     );
     assert!(result.enumeration_complete);
     assert_eq!(result.candidates.len(), expected_all.len());
+    if q.policy.require_choreographic_spin {
+        assert!(result.applied_rules.iter().any(|rule| {
+            rule.rule_id == "program-required-choreographic-spin"
+                && rule.source == q.policy.choreography_source
+        }));
+    }
     let actual: BTreeMap<_, _> = result
         .candidates
         .into_iter()
@@ -266,6 +272,18 @@ fn adult_spin_role_optimizer_matches_complete_fixture_sets_and_bv() {
             codes[0] = AssumedRecognition::new("1T+1A+SEQ");
         }
         let q = request(category, variants, slots);
+        if matches!(category, Gold | Masters) {
+            let mut excluded = q.clone();
+            let choreographic = codes.iter().position(|code| code.code == "ChSp1").unwrap();
+            excluded
+                .exclusions
+                .push(PersonalExclusion::Variant(choreographic));
+            excluded.max_proposals = 1;
+            let absent =
+                optimize_program_with_assumed_recognition(&registry, &excluded, &codes).unwrap();
+            assert_eq!(absent.status, OptimizerStatus::InfeasibleProven);
+            assert_eq!(absent.examined_programs, 0);
+        }
         assert_spin_role_oracle(&registry, q, &codes, scores);
     }
 }
