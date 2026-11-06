@@ -517,3 +517,54 @@ were 55–66 ms against 43–95 ms on the baseline. Senior large full also
 fell from 9/12 verified runs to 0/12. The prototype was removed. These
 experiments count proposals and verified programs at the fixed budget.
 They do not measure internal nodes or establish a change in proof time.
+
+### Combined acceptance for #103
+
+The two production changes from #108 and #109 were measured together at
+`0edcaf863c785ac328fa12cf199e1794a5a727e5`, against the diagnostics-only
+baseline `cf1343fbf82829ca10969562a71b3b48cd0bbcf8`. The diagnostic, the
+shared workload definitions and the Grand Prix fixture tree were identical
+at both revisions. The fixture tree object is
+`f7e22e77cf57b483e97b2ec6f95467ebcbf54070`.
+
+Use a separate checkout and a separate `CARGO_TARGET_DIR` per revision.
+Build each with `cargo test --offline --lib --no-run` and verify that the
+dependency lockfiles match and the test binaries differ. Run each resulting
+unit-test binary with `source_domain_proposal_inventory --ignored --nocapture`.
+The observed `Cargo.lock` SHA-256 was
+`4687dff3c4302e35738ed1b09fdc9dd9df47c6b076a3b42ab573099b5570f9e8`.
+Five paired runs alternated which revision ran first on the same Windows
+x64 host described above, with the same debug toolchain, default seed and
+250 ms per request. Times are observed minima and maxima in milliseconds,
+rounded to the nearest millisecond.
+
+| Workload | Checked proposals before → after | Runs with a verified program before → after | Time to first verified program before → after |
+| --- | --- | --- | --- |
+| Adult Bronze full | 54 → 54 | 5/5 → 5/5 | 39–55 → 37–43 |
+| Adult Silver full | 27–29 → 13–16 | 5/5 → 5/5 | 16–19 → 5–6 |
+| Adult Gold full | 93 → 9–11 | 0/5 → 5/5 | — → 14–16 |
+| Adult Masters full | 62 → 8 | 0/5 → 5/5 | — → 16–18 |
+| Senior large full, four domains | 3 → 10–12 | 0/20 → 14/20 | — → 202–234 |
+| Senior large completion, four domains | 4–16 → 4–16 | 20/20 → 20/20 | 49–124 → 44–88 |
+
+All timed runs ended by interruption. Successful runs returned
+`FeasibleUnproven`. The France Women full case still had no verified
+program in five runs. Senior full calls spent roughly 205–219 ms inside
+Pumpkin after the changes. The measurement tracks verified incumbents and
+checked proposals. It does not isolate internal nodes, measure proof time,
+or include an Adult completion benchmark.
+
+| Acceptance check | Evidence |
+| --- | --- |
+| Same domain and authoritative rule interpretation | The role clause uses `RegularSpinPolicy` and the validator's abbreviation matcher. The Adult choreographic spin clause uses `ProgramPolicy` and the validator's family classifier. Both clauses operate after exclusions and leave the final validator on the proposal path. |
+| Complete sets, credited BV and all optimal ties | [Full program tests](../../tests/program_optimizer.rs) compare independently scored sets in all six profiles. Gold and Masters also admit either a choreographic spin or a second solo jump in the request, with only the choreographic option surviving the policy. Silver supplies its compound explicitly. The tests also distinguish spin levels from abbreviation identity. |
+| Anchors, order and exclusions | [Completion tests](../../tests/program_completion.rs) compare ordered results against literal expectations with fixed originals, absolute positions, insertion gaps and both exclusion scopes. Senior fixtures exercise the contextual repeat credit and manually supplied compound alternatives. |
+| Early rejection, uncertainty and trace | Missing role alternatives and excluded choreographic spins can yield `InfeasibleProven` with zero proposals. Unknown regular-spin identities still reach final validation. Accepted results retain source-bound rule traces. |
+| Existing workflows | The Rust CI checks run the default and minimal suites, including the BV-first paths and the [12 Grand Prix TES replays](../../tests/official_replay.rs). |
+
+Keep the two measured constraints. The Senior choreographic spin and
+compound-cap prototypes did not improve Senior full search at this
+budget, despite removing late rejections. Further search experiments need
+to target the time spent inside Pumpkin and show a benefit on fixed
+workloads. Issue #104 tracks the wider integration benchmark, including
+Adult completion and measurements beyond this diagnostic slice.
