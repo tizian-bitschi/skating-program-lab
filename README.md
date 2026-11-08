@@ -48,6 +48,9 @@ printed official credit from timing verification and legacy hypothetical GOE.
 
 ## Documentation
 
+- Controlled optimizer integration acceptance: [#104 report](docs/milestone-104.md),
+  with identical-request repeated benchmarks, native observations and remaining limits.
+
 - Manual program entry point: `assess_manual_program` returns intended BV,
   independent optional GOE scenarios and indexed validation for one ordered plan.
   See the [assessment contract](docs/specs/manual-program-assessment-proposal.md)

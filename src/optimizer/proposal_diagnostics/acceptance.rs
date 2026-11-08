@@ -2,6 +2,7 @@
 use super::*;
 
 #[path = "../../../tests/support/generation_defaults.rs"]
+#[allow(dead_code)]
 mod generation_defaults;
 
 fn describe(label: &str, value: &impl std::fmt::Debug) {
