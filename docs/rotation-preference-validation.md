@@ -68,3 +68,12 @@ tests, twelve profile tests and seven rotation-preference tests (30 total), plus
 Clippy with warnings denied, formatting and diff checks. Both Standards and Spec
 reviewers cleared the correction. The full suites above were run for the original
 implementation; they were not repeated for this one-line adapter correction.
+
+## Linux CI test-helper path
+
+PR CI exposed a Windows/Linux path-resolution difference: a nested `#[path]`
+contained `automatic/../support`, whose nonexistent intermediate directory was
+rejected on Linux. The helper is now declared at the integration-test file root
+using `support/generation_defaults.rs` directly. Seven optimizer-enabled and
+three optimizer-disabled rotation tests passed locally, together with formatting,
+Clippy and diff checks. The CI workflow itself is unchanged.

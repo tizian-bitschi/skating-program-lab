@@ -1,5 +1,10 @@
 use skating_program_lab::*;
 
+#[cfg(feature = "optimizer")]
+#[path = "support/generation_defaults.rs"]
+#[allow(dead_code)]
+mod generation_defaults;
+
 fn silver(codes: &[&str], preference: RotationPreference) -> ManualBvRequest {
     let profile = adult_profile(AdultCategory::Silver);
     ManualBvRequest {
@@ -137,9 +142,6 @@ fn detailed_manual_assessment_keeps_personal_conflicts_separate() {
 #[cfg(feature = "optimizer")]
 mod automatic {
     use super::*;
-    #[path = "../support/generation_defaults.rs"]
-    #[allow(dead_code)]
-    mod generation_defaults;
 
     struct Continue;
     impl PlanningSearchControl for Continue {
