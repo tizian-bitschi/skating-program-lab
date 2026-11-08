@@ -448,3 +448,105 @@ fn advanced_adult_complete_domains_prove_literal_source_maxima() {
         );
     }
 }
+
+#[test]
+fn masters_axel_exclusion_reports_the_missing_obligation() {
+    let mut r = request(AdultCategory::Masters);
+    r.exclusions
+        .push(PlanningExclusion::JumpKind(JumpKind::Axel));
+    let PlanningSearchOutcome::Infeasible { diagnostics } =
+        search_maximum_bv(&ProfileRegistry::adult(), &r, &Continue).unwrap()
+    else {
+        panic!("expected infeasible")
+    };
+    assert!(diagnostics.iter().any(|d| d.message.contains("Axel")));
+}
+
+#[test]
+fn advanced_adult_small_inventory_matches_exhaustive_count_oracle() {
+    // Only 1T(.40) and 1A(1.10) survive. Every atomic compound consumes
+    // the same repetition stock, so enumerate all inventories (0..=2 each).
+    // Every inventory fits as <=4 solos in five slots; Masters needs an Axel.
+    for category in [AdultCategory::Gold, AdultCategory::Masters] {
+        let mut r = request(category);
+        for kind in [
+            JumpKind::Salchow,
+            JumpKind::Loop,
+            JumpKind::Flip,
+            JumpKind::Lutz,
+        ] {
+            r.exclusions.push(PlanningExclusion::JumpKind(kind));
+        }
+        for kind in [JumpKind::ToeLoop, JumpKind::Axel] {
+            r.exclusions.push(PlanningExclusion::ExactJump(ListedJump {
+                kind: Some(kind),
+                rotations: Some(2),
+            }));
+        }
+        require(&mut r, "combo", "CCoSp3V");
+        require(&mut r, "fly", "FSSpB");
+        require(&mut r, "step", "StSqB");
+        require(&mut r, "first-solo", "1T");
+        require(&mut r, "second-solo", "1T");
+        let mut oracle = 0;
+        for toes in 0..=2 {
+            for axels in 0..=2 {
+                if toes == 2 && (category != AdultCategory::Masters || axels > 0) {
+                    oracle = oracle.max(toes * 40 + axels * 110);
+                }
+            }
+        }
+        let result = proved(&r);
+        assert_eq!(result.maximum_base_hundredths, 980 + oracle);
+        let candidate = &result.alternatives[0];
+        for (input_index, required) in r.required.iter().enumerate() {
+            let i = candidate
+                .provenance
+                .iter()
+                .position(|p| {
+                    *p == PlanningProvenance::Required {
+                        id: required.id.clone(),
+                        input_index,
+                    }
+                })
+                .unwrap();
+            assert_eq!(candidate.elements[i], required.element);
+        }
+        let original = candidate.elements.clone();
+        r.required.reverse();
+        assert_eq!(proved(&r).alternatives[0].elements, original);
+    }
+}
+
+#[test]
+fn advanced_spin_roles_keep_category_foot_change_boundaries() {
+    for (category, forbidden) in [
+        (AdultCategory::Gold, "CoSp3"),
+        (AdultCategory::Masters, "FCCoSp4"),
+    ] {
+        let mut r = request(category);
+        require(&mut r, "forbidden-role", forbidden);
+        assert!(matches!(
+            search_maximum_bv(&ProfileRegistry::adult(), &r, &Continue),
+            Err(PlanningSearchError::InvalidRequest { .. })
+        ));
+    }
+    for category in [AdultCategory::Gold, AdultCategory::Masters] {
+        let mut r = request(category);
+        r.exclusions
+            .push(PlanningExclusion::SpinKind(RegularSpinKind::Combination));
+        assert!(matches!(
+            search_maximum_bv(&ProfileRegistry::adult(), &r, &Continue).unwrap(),
+            PlanningSearchOutcome::Infeasible { .. }
+        ));
+        assert_eq!(
+            search_maximum_bv(
+                &ProfileRegistry::adult(),
+                &request(category),
+                &CancelAt(PlanningSearchPhase::IncumbentFound)
+            )
+            .unwrap(),
+            PlanningSearchOutcome::Cancelled
+        );
+    }
+}

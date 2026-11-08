@@ -345,5 +345,19 @@ pub fn search_maximum_bv(
         return Ok(PlanningSearchOutcome::Infeasible { diagnostics });
     }
     atoms.retain(|a| !a.excluded(&request.exclusions));
+    if profile.jumps.require_axel
+        && !atoms
+            .iter()
+            .any(|a| a.jumps.iter().any(|j| j.kind == Some(JumpKind::Axel)))
+    {
+        return Ok(PlanningSearchOutcome::Infeasible {
+            diagnostics: vec![PlanningDiagnostic {
+                required_input_indices: vec![],
+                rule_id: None,
+                message: "Global exclusions leave no Axel to satisfy the profile obligation."
+                    .into(),
+            }],
+        });
+    }
     model::search(registry, request, profile, &policy, &atoms, control)
 }
