@@ -1,0 +1,1 @@
+PlanningSearchRequest { profile: ProfileId { name: "isu-adult-2026-27-bronze", version: "2026-07-16" }, scoring_table: Isu2786June2_2026, required: [], exclusions: [] }

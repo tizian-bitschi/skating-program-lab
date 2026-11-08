@@ -300,7 +300,7 @@ fn repetition_row(
     let mut resolved = if original.components().len() == 1 {
         single_row(table, &original, original_notation, senior)?
     } else {
-        match jump_unit_row(table, &original, original_notation, senior)? {
+        match jump_unit_row(table, &original, original_notation, senior, false)? {
             ResolvedRow::Value(row) => row,
             outcome => return Ok(outcome),
         }
@@ -347,6 +347,7 @@ fn component_is_starred(calls: &[crate::RecordedCall], index: usize) -> bool {
 fn jump_unit_kind(
     details: &crate::RecognitionDetails,
     senior: bool,
+    planned: bool,
 ) -> Result<JumpUnitShape, BaseValueError> {
     let components = details.components();
     if !(2..=4).contains(&components.len()) || details.level().is_some() {
@@ -406,11 +407,14 @@ fn jump_unit_kind(
             }
         } else if index > 0 {
             let axel = matches!(code, "1A" | "2A") || (senior && matches!(code, "3A" | "4A"));
-            later_axel |= axel;
+            later_axel |= axel && (!planned || components[index - 1].as_str() != "Eu");
             if interrupted_at.is_some_and(|boundary| index >= boundary) {
                 continue;
             }
-            if components[index - 1].as_str() == "Eu" {
+            if planned {
+                // Compound notation intends Rule 610's connection, rather than observed footwork.
+                continue;
+            } else if components[index - 1].as_str() == "Eu" {
                 if !matches!(code, "1S" | "2S" | "1F" | "2F")
                     && !(senior && matches!(code, "3S" | "4S" | "3F" | "4F"))
                 {
@@ -443,8 +447,9 @@ fn jump_unit_row(
     details: &crate::RecognitionDetails,
     notation: String,
     senior: bool,
+    planned: bool,
 ) -> Result<ResolvedRow, BaseValueError> {
-    let shape = jump_unit_kind(details, senior)?;
+    let shape = jump_unit_kind(details, senior, planned)?;
     let calls = details.calls().ok_or(BaseValueError::UnknownCalls)?;
     let mut rows = Vec::new();
     for (index, code) in details.components().iter().enumerate() {
@@ -535,7 +540,7 @@ fn table_row(
     {
         repetition_row(table, details, notation, senior)
     } else if details.components().len() > 1 {
-        jump_unit_row(table, details, notation, senior)
+        jump_unit_row(table, details, notation, senior, false)
     } else {
         single_row(table, details, notation, senior).map(ResolvedRow::Value)
     }
@@ -552,7 +557,7 @@ pub(crate) fn assumed_jump_unit_value(
     if notation != code {
         return None;
     }
-    match jump_unit_row(table, details, notation, senior).ok()? {
+    match jump_unit_row(table, details, notation, senior, true).ok()? {
         ResolvedRow::Value(row) => Some(row.base()),
         _ => None,
     }

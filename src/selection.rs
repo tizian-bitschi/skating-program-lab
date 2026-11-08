@@ -58,6 +58,18 @@ pub fn selectable_elements(
     Selection::new(registry, profile, table)?.list()
 }
 
+/// List every category-permitted atomic planned jump code, including compounds.
+/// `+` intends a same-foot connection; `+SEQ` additionally assumes a qualifying
+/// direct step into an Axel. Actual footwork and recognition remain unevaluated.
+pub fn selectable_jump_elements(
+    registry: &ProfileRegistry,
+    profile: &ProfileId,
+    table: ScoringTableId,
+) -> Result<Vec<AssumedRecognition>, ProfileSelectionError> {
+    planned_jump_elements(registry, profile, table, &mut || false)
+        .map(|choices| choices.expect("noncancellable listing"))
+}
+
 /// List choices for a registered profile with an explicit, profile-bound policy.
 pub fn selectable_elements_with_policy(
     registry: &ProfileRegistry,
@@ -101,6 +113,9 @@ pub(crate) struct Selection<'a> {
     profile: &'a RuleProfile,
     table: ScoringTableId,
     policy: ProgramPolicy,
+    checked: std::cell::RefCell<
+        std::collections::BTreeMap<String, Result<SelectableElement, ElementSelectionError>>,
+    >,
 }
 
 pub(crate) struct ResolvedIndividual {
@@ -147,6 +162,7 @@ impl<'a> Selection<'a> {
             profile,
             table,
             policy: policy.clone(),
+            checked: std::cell::RefCell::default(),
         })
     }
 
@@ -181,7 +197,14 @@ impl<'a> Selection<'a> {
     }
 
     pub(crate) fn check(&self, code: &str) -> Result<SelectableElement, ElementSelectionError> {
-        self.check_row(self.row(code)?)
+        if let Some(result) = self.checked.borrow().get(code) {
+            return result.clone();
+        }
+        let result = self.row(code).and_then(|row| self.check_row(row));
+        self.checked
+            .borrow_mut()
+            .insert(code.into(), result.clone());
+        result
     }
 
     pub(crate) fn row(&self, code: &str) -> Result<&'static CatalogRow, ElementSelectionError> {
@@ -301,4 +324,204 @@ pub(crate) fn clean_jump(code: &str) -> Option<(JumpKind, u8)> {
         _ => return None,
     };
     Some((kind, rotations.parse().ok()?))
+}
+
+/// Rule 610 connections are intentions in this domain; no executed direction is inferred.
+/// None means cancellation, never an empty or complete domain.
+pub(crate) fn planned_jump_elements(
+    registry: &ProfileRegistry,
+    profile: &ProfileId,
+    table: ScoringTableId,
+    cancelled: &mut impl FnMut() -> bool,
+) -> Result<Option<Vec<AssumedRecognition>>, ProfileSelectionError> {
+    let selected = Selection::new(registry, profile, table)?;
+    let policy = &selected.profile.jumps;
+    let mut choices = Vec::new();
+    let mut components = Vec::new();
+    for row in crate::catalog::shared_rows(table) {
+        if cancelled() {
+            return Ok(None);
+        }
+        let option = match selected.check_row(row) {
+            Ok(option) => option,
+            Err(ElementSelectionError::Profile(error)) => return Err(error),
+            Err(_) => continue,
+        };
+        if let SelectableElement {
+            kind: SelectableElementKind::SoloJump { rotations, .. },
+            ..
+        } = option
+        {
+            choices.push(AssumedRecognition::new(row.notation));
+            if rotations <= 4 || !crate::senior::selected(selected.profile, ProfileRule::Structure)
+            {
+                components.push(row.notation);
+            }
+        }
+    }
+    for length in 2..=policy.max_compound_length {
+        let mut digits = vec![0; length];
+        if components.is_empty() {
+            break;
+        }
+        loop {
+            if cancelled() {
+                return Ok(None);
+            }
+            let word: Vec<_> = digits.iter().map(|&i| components[i]).collect();
+            // An atomic choice must itself fit the program's repetition limit.
+            if word.iter().all(|code| {
+                (code.starts_with('1')
+                    && crate::senior::selected(selected.profile, ProfileRule::Repetition))
+                    || word.iter().filter(|other| *other == code).count() <= policy.max_repetitions
+            }) {
+                for euler_gap in std::iter::once(None)
+                    .chain((1..length).filter(|_| policy.max_eulers > 0).map(Some))
+                {
+                    let mut parts = Vec::new();
+                    for (index, code) in word.iter().enumerate() {
+                        if euler_gap == Some(index) {
+                            parts.push("Eu");
+                        }
+                        parts.push(code);
+                    }
+                    let code = parts.join("+");
+                    if policy.max_combinations > 0 {
+                        choices.push(AssumedRecognition::new(&code));
+                    }
+                    if policy.max_sequences > 0
+                        && word
+                            .iter()
+                            .enumerate()
+                            .skip(1)
+                            .any(|(index, code)| code.ends_with('A') && euler_gap != Some(index))
+                    {
+                        choices.push(AssumedRecognition {
+                            code: format!("{code}+SEQ"),
+                            direct_transitions_assumed: true,
+                        });
+                    }
+                }
+            }
+            let mut position = length;
+            while position > 0 {
+                position -= 1;
+                digits[position] += 1;
+                if digits[position] < components.len() {
+                    break;
+                }
+                digits[position] = 0;
+            }
+            if position == 0 && digits[0] == 0 {
+                break;
+            }
+        }
+    }
+    Ok(Some(choices))
+}
+
+#[cfg(test)]
+mod planning_tests {
+    use super::*;
+
+    #[test]
+    fn source_grammar_for_six_profiles_uses_the_real_manual_path() {
+        // Independently transcribed grammar: Adult July16 pp8–11; Rule610/612
+        // June12 pp65/71; TP Handbook July15 pp27–29. See docs/specs/planned-jump-domain.md.
+        // Literal counts include every word, internal Euler placement, and both intended structures.
+        let adult = ProfileRegistry::adult();
+        let senior = ProfileRegistry::senior();
+        for (registry, profile, count, present, absent) in [
+            (
+                &adult,
+                adult_profile(AdultCategory::Bronze),
+                30,
+                "1F+1Lo",
+                "1Lz+Eu+1S",
+            ),
+            (
+                &adult,
+                adult_profile(AdultCategory::Silver),
+                849,
+                "1Lz+1A+1T+SEQ",
+                "2T",
+            ),
+            (
+                &adult,
+                adult_profile(AdultCategory::Gold),
+                2652,
+                "2Lo+Eu+2S+1A+SEQ",
+                "2F",
+            ),
+            (
+                &adult,
+                adult_profile(AdultCategory::Masters),
+                6570,
+                "2F+2T+1A+SEQ",
+                "3T",
+            ),
+            (
+                &senior,
+                senior_profile(SeniorCategory::Women),
+                51518,
+                "5Lz",
+                "5Lz+1T",
+            ),
+            (
+                &senior,
+                senior_profile(SeniorCategory::Men),
+                51518,
+                "4Lz+1A+Eu+4F+SEQ",
+                "4Lz+Eu+1A+SEQ",
+            ),
+        ] {
+            let choices =
+                planned_jump_elements(registry, &profile.id, profile.scoring_table, &mut || false)
+                    .unwrap()
+                    .unwrap();
+            assert_eq!(choices.len(), count, "{}", profile.category);
+            assert!(choices.iter().any(|c| c.code == present), "{present}");
+            assert!(!choices.iter().any(|c| c.code == absent), "{absent}");
+            let chosen = choices.iter().find(|c| c.code == present).unwrap().clone();
+            let assessment = assess_manual_bv(
+                registry,
+                &ManualBvRequest {
+                    profile: profile.id,
+                    scoring_table: profile.scoring_table,
+                    submission: SubmissionState::Draft,
+                    elements: vec![chosen],
+                },
+            )
+            .unwrap();
+            assert!(assessment.total.exact_hundredths.is_some(), "{present}");
+            assert!(
+                !assessment
+                    .legality
+                    .validation
+                    .validation
+                    .findings
+                    .iter()
+                    .any(|f| f.kind == FindingKind::Violation && f.element_index.is_some()),
+                "{present}: {:?}",
+                assessment.legality.validation.validation.findings
+            );
+        }
+    }
+
+    #[test]
+    fn cancellation_never_returns_a_partial_repertoire() {
+        let mut polls = 0;
+        let result = planned_jump_elements(
+            &ProfileRegistry::senior(),
+            &senior_profile(SeniorCategory::Women).id,
+            ScoringTableId::Isu2786June2_2026,
+            &mut || {
+                polls += 1;
+                polls == 200
+            },
+        )
+        .unwrap();
+        assert!(result.is_none());
+        assert_eq!(polls, 200);
+    }
 }

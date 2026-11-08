@@ -12,6 +12,8 @@ pub struct AssumedRecognition {
 }
 
 pub(crate) fn spin_abbreviation(code: &str) -> Option<SpinAbbreviation> {
+    let reduced = code.ends_with('V');
+    let code = code.strip_suffix('V').unwrap_or(code);
     let (code, _) = code.split_at_checked(code.len().checked_sub(1)?)?;
     let (entry, code) = match code.strip_prefix('F') {
         Some(code) => (SpinEntry::Flying, code),
@@ -26,6 +28,10 @@ pub(crate) fn spin_abbreviation(code: &str) -> Option<SpinAbbreviation> {
         "CoSp" => RegularSpinKind::Combination,
         _ => return None,
     };
+    // Planned V denotes two basic positions only for combination spins.
+    if reduced && kind != RegularSpinKind::Combination {
+        return None;
+    }
     Some(SpinAbbreviation {
         kind,
         entry,

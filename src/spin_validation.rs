@@ -442,6 +442,7 @@ pub(crate) fn validate_profile_program_with_assumptions(
             &program.elements,
             profile,
             assumed_direct_sequences,
+            feature_credit == FeatureCreditEvaluation::AssumedRecognition,
         );
     let mut check = SpinValidator {
         findings: jump_validation.findings,

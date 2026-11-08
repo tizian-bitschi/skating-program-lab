@@ -120,3 +120,14 @@ its own program policy, use `selectable_elements_with_policy` and
 `check_selectable_element_with_policy`. Both use the same checks as manual BV
 assessment. The explicit policy must be bound to that profile; it cannot
 override a built-in policy.
+
+## Planned V combination spins
+
+Deliberately planned two-basic-position combination spins accept the published
+CoSp, CCoSp, FCoSp and FCCoSp V rows at category-permitted levels. The exact
+V row supplies the reduced BV. The ordinary abbreviation determines type
+eligibility, required roles and distinctness, so full/V pairs cannot bypass
+a repeated-spin prohibition. This selection infers neither execution errors
+nor a level downgrade. Other execution-related V forms remain outside the
+planned selection domain. Detailed evidence-based assessment is unchanged.
+

@@ -2,6 +2,91 @@ use skating_program_lab::*;
 
 const TABLE: ScoringTableId = ScoringTableId::Isu2786June2_2026;
 
+#[test]
+fn planned_euler_transitions_need_no_performance_observations() {
+    // Adult July 16 pp. 8–10; TP Handbook July 15 p. 28 (same-foot turn into Axel).
+    // SOV 2786 June 2: 1Lz .60, Eu .00, 1S .40, 1A 1.10.
+    for (code, expected) in [("1Lz+Eu+1S", 100), ("1Lz+Eu+1A", 170), ("1Lz+1S", 100)] {
+        let result = assess_manual_bv(
+            &ProfileRegistry::adult(),
+            &request(
+                adult_profile(AdultCategory::Silver).id,
+                SubmissionState::Draft,
+                &[code],
+            ),
+        )
+        .unwrap();
+        assert_eq!(result.total.exact_hundredths, Some(expected), "{code}");
+        assert!(
+            !result
+                .legality
+                .validation
+                .validation
+                .findings
+                .iter()
+                .any(|f| f.rule_id.contains("euler") && f.kind == FindingKind::Unknown),
+            "{code}"
+        );
+    }
+}
+
+#[test]
+fn euler_sequence_requires_a_separate_qualifying_step() {
+    let registry = ProfileRegistry::adult();
+    let mut input = request(
+        adult_profile(AdultCategory::Masters).id,
+        SubmissionState::Draft,
+        &["2F+Eu+1A+SEQ"],
+    );
+    input.elements[0].direct_transitions_assumed = true;
+    let invalid = assess_manual_bv(&registry, &input).unwrap();
+    assert_eq!(
+        invalid.elements[0].credited_base,
+        Err(ManualBvError::ContextUnavailable)
+    );
+    assert!(invalid
+        .legality
+        .validation
+        .validation
+        .findings
+        .iter()
+        .any(|f| f.kind == FindingKind::Violation
+            && f.explanation.contains("Axel-type second or third")));
+    input.elements[0].code = "2F+Eu+2S+1A+SEQ".into();
+    let valid = assess_manual_bv(&registry, &input).unwrap();
+    // 2786 June2: 2F1.80 + Eu0 + 2S1.30 + 1A1.10 =4.20.
+    assert_eq!(valid.total.exact_hundredths, Some(420));
+}
+
+#[test]
+fn planned_euler_does_not_bypass_category_or_program_limits() {
+    for (category, codes, text) in [
+        (
+            AdultCategory::Bronze,
+            vec!["1Lz+Eu+1S"],
+            "Euler is prohibited",
+        ),
+        (
+            AdultCategory::Silver,
+            vec!["1Lz+Eu+1S", "1F+Eu+1Lo"],
+            "Euler limit",
+        ),
+    ] {
+        let assessment = assess_manual_bv(
+            &ProfileRegistry::adult(),
+            &request(adult_profile(category).id, SubmissionState::Draft, &codes),
+        )
+        .unwrap();
+        assert!(assessment
+            .legality
+            .validation
+            .validation
+            .findings
+            .iter()
+            .any(|f| f.kind == FindingKind::Violation && f.explanation.contains(text)));
+    }
+}
+
 fn request(profile: ProfileId, submission: SubmissionState, codes: &[&str]) -> ManualBvRequest {
     ManualBvRequest {
         profile,

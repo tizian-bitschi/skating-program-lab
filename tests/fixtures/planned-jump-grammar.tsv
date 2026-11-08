@@ -1,0 +1,8 @@
+# Adult announcement 2026-07-16 pp8-11; Sports Rules effective2026-06-12 Rules610/612 pp65,70-71; TP Handbook2026-07-15 pp27-29.
+# profile|solo codes|maximum listed compound length|Euler allowed|single repetition unlimited|expected atomic count
+Bronze|1T 1S 1Lo 1F 1Lz|2|false|false|30
+Silver|1T 1S 1Lo 1F 1Lz 1A|3|true|false|849
+Gold|1T 1S 1Lo 1F 1Lz 1A 2T 2S 2Lo|3|true|false|2652
+Masters|1T 1S 1Lo 1F 1Lz 1A 2T 2S 2Lo 2F 2Lz 2A|3|true|false|6570
+Women|1T 1S 1Lo 1F 1Lz 1A 2T 2S 2Lo 2F 2Lz 2A 3T 3S 3Lo 3F 3Lz 3A 4T 4S 4Lo 4F 4Lz 4A 5T 5S 5Lo 5F 5Lz|3|true|true|51518
+Men|1T 1S 1Lo 1F 1Lz 1A 2T 2S 2Lo 2F 2Lz 2A 3T 3S 3Lo 3F 3Lz 3A 4T 4S 4Lo 4F 4Lz 4A 5T 5S 5Lo 5F 5Lz|3|true|true|51518
