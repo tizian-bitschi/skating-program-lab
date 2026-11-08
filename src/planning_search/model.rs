@@ -725,99 +725,128 @@ pub(super) fn search(
     if !control.is_cancelled(PlanningSearchPhase::MaximumProved) {
         let tag = solver.new_constraint_tag();
         solver.add_clause(vec![predicate!(objective == maximum as i32)], tag);
-        'collect: loop {
-            if control.is_cancelled(PlanningSearchPhase::Alternatives) {
-                break;
-            }
-            if alternatives.len() == 5 {
-                status = PlanningAlternativeStatus::LimitReached;
-                break;
-            }
-            // Keep exact atoms: permitted compound order aliases preserve every
-            // count coefficient and contextual solo credit, without another proof.
-            while expanded < vectors.len() {
-                let base = vectors[expanded].clone();
-                expanded += 1;
-                for (source, atom) in atoms.iter().enumerate() {
-                    if base[source] <= minimum[source] || !(atom.combination() || atom.sequence()) {
+        'collect: {
+            if !senior && request.required.is_empty() {
+                let mut forced = request.clone();
+                for (index, atom) in atoms.iter().enumerate() {
+                    if control.is_cancelled(PlanningSearchPhase::Alternatives) {
+                        break 'collect;
+                    }
+                    if atom_upper(atom, profile, &required) == 0 {
                         continue;
                     }
-                    for (target, alias) in atoms.iter().enumerate() {
-                        if control.is_cancelled(PlanningSearchPhase::Alternatives) {
-                            break 'collect;
+                    forced.required = vec![RequiredPlanningElement {
+                        id: "conditional-bound".into(),
+                        element: atom.assumption.clone(),
+                    }];
+                    let (_, _, bound) = value_upper_bound(atoms, profile, policy, &forced);
+                    // Any optimum using this atom completes the forced request, so
+                    // only a strictly lower admissible bound rules the atom out.
+                    if i64::from(bound) < i64::from(maximum) {
+                        if selected[index] != 0 {
+                            return Err(PlanningSearchError::InconsistentAssessment);
                         }
-                        if source == target || !compound_alias(atom, alias) {
-                            continue;
-                        }
-                        let mut next = base.clone();
-                        next[source] -= 1;
-                        next[target] += 1;
-                        if vectors.contains(&next) {
-                            continue;
-                        }
-                        let Some(candidate) = reconstruct(
-                            registry, request, profile, atoms, &next, maximum, control,
-                        )?
-                        else {
-                            break 'collect;
-                        };
-                        alternatives.push(candidate);
-                        vectors.push(next);
-                        if alternatives.len() == 5 {
-                            status = PlanningAlternativeStatus::LimitReached;
-                            break 'collect;
-                        }
+                        let tag = solver.new_constraint_tag();
+                        solver.add_clause(vec![predicate!(counts[index] == 0)], tag);
                     }
                 }
             }
-            // Strict supermultisets cannot share the fixed optimum in these
-            // positive-credit profiles. Retain full-vector blocking otherwise.
-            while blocked < vectors.len() {
-                let vector = &vectors[blocked];
-                let positive = atoms.iter().all(|a| a.value > 0);
-                let block: Vec<_> = counts
-                    .iter()
-                    .zip(vector)
-                    .filter_map(|(&v, &n)| {
-                        if positive {
-                            (n > 0).then(|| predicate!(v <= n - 1))
-                        } else {
-                            Some(predicate!(v != n))
-                        }
-                    })
-                    .collect();
-                let tag = solver.new_constraint_tag();
-                solver.add_clause(block, tag);
-                blocked += 1;
+            loop {
                 if control.is_cancelled(PlanningSearchPhase::Alternatives) {
-                    break 'collect;
+                    break;
                 }
-            }
-            let mut termination = CollectionCancellation(control);
-            let mut resolver = ResolutionResolver::default();
-            let next = match solver.satisfy(&mut brancher, &mut termination, &mut resolver) {
-                SatisfactionResult::Satisfiable(s) => Some(
-                    counts
+                if alternatives.len() == 5 {
+                    status = PlanningAlternativeStatus::LimitReached;
+                    break;
+                }
+                // Keep exact atoms: permitted compound order aliases preserve every
+                // count coefficient and contextual solo credit, without another proof.
+                while expanded < vectors.len() {
+                    let base = vectors[expanded].clone();
+                    expanded += 1;
+                    for (source, atom) in atoms.iter().enumerate() {
+                        if base[source] <= minimum[source]
+                            || !(atom.combination() || atom.sequence())
+                        {
+                            continue;
+                        }
+                        for (target, alias) in atoms.iter().enumerate() {
+                            if control.is_cancelled(PlanningSearchPhase::Alternatives) {
+                                break 'collect;
+                            }
+                            if source == target || !compound_alias(atom, alias) {
+                                continue;
+                            }
+                            let mut next = base.clone();
+                            next[source] -= 1;
+                            next[target] += 1;
+                            if vectors.contains(&next) {
+                                continue;
+                            }
+                            let Some(candidate) = reconstruct(
+                                registry, request, profile, atoms, &next, maximum, control,
+                            )?
+                            else {
+                                break 'collect;
+                            };
+                            alternatives.push(candidate);
+                            vectors.push(next);
+                            if alternatives.len() == 5 {
+                                status = PlanningAlternativeStatus::LimitReached;
+                                break 'collect;
+                            }
+                        }
+                    }
+                }
+                // Strict supermultisets cannot share the fixed optimum in these
+                // positive-credit profiles. Retain full-vector blocking otherwise.
+                while blocked < vectors.len() {
+                    let vector = &vectors[blocked];
+                    let positive = atoms.iter().all(|a| a.value > 0);
+                    let block: Vec<_> = counts
                         .iter()
-                        .map(|&v| s.solution().get_integer_value(v))
-                        .collect::<Vec<_>>(),
-                ),
-                SatisfactionResult::Unsatisfiable(..) => {
-                    status = PlanningAlternativeStatus::Exhausted;
-                    None
+                        .zip(vector)
+                        .filter_map(|(&v, &n)| {
+                            if positive {
+                                (n > 0).then(|| predicate!(v <= n - 1))
+                            } else {
+                                Some(predicate!(v != n))
+                            }
+                        })
+                        .collect();
+                    let tag = solver.new_constraint_tag();
+                    solver.add_clause(block, tag);
+                    blocked += 1;
+                    if control.is_cancelled(PlanningSearchPhase::Alternatives) {
+                        break 'collect;
+                    }
                 }
-                SatisfactionResult::Unknown(..) => None,
-            };
-            let Some(next) = next else { break };
-            selected = next;
-            let Some(candidate) = reconstruct(
-                registry, request, profile, atoms, &selected, maximum, control,
-            )?
-            else {
-                break;
-            };
-            alternatives.push(candidate);
-            vectors.push(selected.clone());
+                let mut termination = CollectionCancellation(control);
+                let mut resolver = ResolutionResolver::default();
+                let next = match solver.satisfy(&mut brancher, &mut termination, &mut resolver) {
+                    SatisfactionResult::Satisfiable(s) => Some(
+                        counts
+                            .iter()
+                            .map(|&v| s.solution().get_integer_value(v))
+                            .collect::<Vec<_>>(),
+                    ),
+                    SatisfactionResult::Unsatisfiable(..) => {
+                        status = PlanningAlternativeStatus::Exhausted;
+                        None
+                    }
+                    SatisfactionResult::Unknown(..) => None,
+                };
+                let Some(next) = next else { break };
+                selected = next;
+                let Some(candidate) = reconstruct(
+                    registry, request, profile, atoms, &selected, maximum, control,
+                )?
+                else {
+                    break;
+                };
+                alternatives.push(candidate);
+                vectors.push(selected.clone());
+            }
         }
     }
     Ok(PlanningSearchOutcome::ProvenMaximum(PlanningMaximum {

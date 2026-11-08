@@ -53,8 +53,8 @@ section bounds to the overall objective, so an optimal total propagates section
 limits before whole-element choices are branched. Objective-first, descending-value count branching changes search
 order only. The model checks absolute linear activity before using i32 arithmetic.
 
-The model keeps every exact atomic choice, including all 51,518 Senior jump
-choices per profile. No alias grouping is used. Shared profile policies supply
+The maximum-proof model keeps every exact atomic choice, including all 51,518
+Senior jump choices per profile. No alias grouping is used. Shared profile policies supply
 bounds and role predicates. Domain construction reuses the manual selection
 resolver and caches individual component checks within one immutable profile/table
 selection context; it still resolves every whole element and keeps its exact identity.
@@ -136,6 +136,35 @@ further vector exists. Five alternatives carry LimitReached even when there
 happen to be exactly five. Cancellation during later solving or reconstruction
 retains the maximum and every already validated alternative with Cancelled.
 Cancellation during initial reconstruction exposes no program.
+
+## Conditional Adult bounds after maximum proof (#130)
+
+For Adult requests with no required occurrences, alternative collection first
+checks each permitted atom against the proved maximum M. It hypothetically
+requires that exact atom once and reuses the admissible total bound described
+above, with the same selected repertoire, personal limits, exclusions and
+rotation preference. An atom's count is fixed to zero only when this conditional
+bound is strictly below M. A bound equal to M is retained.
+
+Every optimum containing an atom is a completion of its hypothetical required
+request. Its value is therefore at most that request's admissible bound. A bound
+below M proves that no optimum contains the atom; pruning cannot remove an
+optimal composition. The selected maximum representative must remain feasible;
+an inconsistent bound is an implementation error. Compound identity, transition
+assumptions, multiplicities, reconstruction and manual assessment are unchanged.
+
+The guard is deliberately limited to Adult requests whose required list is
+empty. Senior contextual credit and requests with required occurrences keep the
+existing collection path. Before calling the bound helper, atoms whose original
+count upper bound is zero are skipped. Each remaining forced request contains
+one individually permitted atom; the guard avoids invalid hypothetical required
+multisets and their capacity arithmetic.
+
+This preprocessing starts after MaximumProved and polls Alternatives for each
+atom. Cancellation retains the already validated maximum representative and
+returns Cancelled collection status. The public API and five-alternative limit
+are unchanged; five results still mean LimitReached, including when exactly
+five optima exist. See the [implementation evidence](../adult-bound-pruning.md).
 
 Legacy ordered completion and evidence-based entry points retain their contracts.
 
