@@ -6,6 +6,7 @@ const ADULT: RulesetId = RulesetId::IsuAdult2026_27July16;
 
 fn draft(profile: RuleProfile, codes: &[&str]) -> ManualBvRequest {
     ManualBvRequest {
+        personal_limits: PersonalLimits::default(),
         rotation_preference: RotationPreference::default(),
         profile: profile.id,
         scoring_table: TABLE,

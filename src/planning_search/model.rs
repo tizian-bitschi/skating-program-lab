@@ -821,6 +821,7 @@ pub(super) fn search(
         }
     }
     Ok(PlanningSearchOutcome::ProvenMaximum(PlanningMaximum {
+        personal_limits: request.personal_limits.clone(),
         rotation_preference: request.rotation_preference,
         profile: request.profile.clone(),
         scoring_table: request.scoring_table,

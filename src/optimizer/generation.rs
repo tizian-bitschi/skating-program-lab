@@ -20,6 +20,7 @@ pub struct PersonalSkillLimits {
 /// explicit evidence templates and manual candidates retain their input order.
 #[derive(Debug, Clone)]
 pub struct CandidateGenerationRequest {
+    pub personal_limits: PersonalLimits,
     pub rotation_preference: RotationPreference,
     pub season: Season,
     pub profile: ProfileId,
@@ -68,6 +69,7 @@ pub struct CandidateOmission {
 
 #[derive(Debug, Clone)]
 pub struct CandidateGenerationAudit {
+    pub personal_limits: PersonalLimits,
     pub rotation_preference: RotationPreference,
     pub profile: ProfileId,
     pub scoring_table: ScoringTableId,
@@ -109,7 +111,7 @@ struct Generator<'a> {
     request: &'a CandidateGenerationRequest,
     policy: ProgramPolicy,
     result: CandidateGenerationResult,
-    assumed_values: Option<&'a [BaseValue]>,
+    assumed_values: Option<&'a [Option<BaseValue>]>,
 }
 impl Generator<'_> {
     /// false stops expansion; true includes omissions and duplicates.
@@ -129,6 +131,18 @@ impl Generator<'_> {
             self.result.audit.manual_definitions_checked += 1;
         } else {
             self.result.audit.attempted_definitions += 1;
+        }
+        if !self
+            .request
+            .personal_limits
+            .conflicts(&variant.element, &variant.evidence, 0)
+            .is_empty()
+        {
+            self.result.audit.omissions.push(CandidateOmission {
+                variant,
+                reason: "Excluded by personal repertoire maxima.".into(),
+            });
+            return Ok(true);
         }
         let reason = self.check(&variant, manual)?;
         if let Some(reason) = reason {
@@ -204,7 +218,9 @@ impl Generator<'_> {
                 self.request.scoring_table,
                 &self.policy,
                 variant,
-                values[index].clone(),
+                values[index]
+                    .clone()
+                    .expect("permitted assumed variant has a resolved value"),
                 EvaluationScope::AssumedRecognition,
             )
         } else {
@@ -392,7 +408,7 @@ pub fn generate_program_candidates_with_assumed_recognition(
                     });
                 }
                 request.manual_variants.push(variant);
-                values.push(resolved.value);
+                values.push(Some(resolved.value));
                 indices.push(index);
             }
         }
@@ -401,12 +417,20 @@ pub fn generate_program_candidates_with_assumed_recognition(
         for (index, (variant, assumption)) in
             request.manual_variants.iter().zip(recognition).enumerate()
         {
-            selection
-                .check_assumption(&variant.element, assumption)
-                .map_err(|error| E::InvalidManualVariant {
-                    index,
-                    reason: error.reason(&assumption.code),
-                })?;
+            // Capped jumps are checked structurally by resolve_variants before omission.
+            if !matches!(variant.element, PlannedElement::Jump(_))
+                || request
+                    .personal_limits
+                    .conflicts(&variant.element, &variant.evidence, index)
+                    .is_empty()
+            {
+                selection
+                    .check_assumption(&variant.element, assumption)
+                    .map_err(|error| E::InvalidManualVariant {
+                        index,
+                        reason: error.reason(&assumption.code),
+                    })?;
+            }
             indices.push(index);
         }
         let ruleset = registry
@@ -419,6 +443,7 @@ pub fn generate_program_candidates_with_assumed_recognition(
             &mut request.manual_variants,
             recognition,
             ruleset,
+            &request.personal_limits,
         )
         .map_err(|error| match error {
             ProgramOptimizationError::UnsupportedVariant(index) => E::InvalidManualVariant {
@@ -458,7 +483,7 @@ pub fn generate_program_candidates_with_assumed_recognition(
 fn generate_candidates(
     registry: &ProfileRegistry,
     request: &CandidateGenerationRequest,
-    assumed_values: Option<&[BaseValue]>,
+    assumed_values: Option<&[Option<BaseValue>]>,
 ) -> Result<CandidateGenerationResult, CandidateGenerationError> {
     use CandidateGenerationError as E;
     let profile = registry
@@ -544,6 +569,7 @@ fn generate_candidates(
         result: CandidateGenerationResult {
             variants: vec![],
             audit: CandidateGenerationAudit {
+                personal_limits: request.personal_limits.clone(),
                 rotation_preference: request.rotation_preference,
                 profile: profile.id.clone(),
                 scoring_table: request.scoring_table,

@@ -20,6 +20,7 @@ fn an_incumbent_notification_requires_completed_manual_assessment() {
         incumbents: Cell::new(0),
     };
     let request = PlanningSearchRequest {
+        personal_limits: PersonalLimits::default(),
         rotation_preference: RotationPreference::default(),
         profile: adult_profile(AdultCategory::Bronze).id,
         scoring_table: ScoringTableId::Isu2786June2_2026,
@@ -66,6 +67,7 @@ fn six_profiles_preserve_required_occurrences_and_global_component_exclusions() 
         ),
     ] {
         let mut request = PlanningSearchRequest {
+            personal_limits: PersonalLimits::default(),
             rotation_preference: RotationPreference::default(),
             profile: profile.id,
             scoring_table: profile.scoring_table,
@@ -125,6 +127,7 @@ fn six_profiles_preserve_required_occurrences_and_global_component_exclusions() 
             let assessed = assess_manual_bv(
                 &registry,
                 &ManualBvRequest {
+                    personal_limits: PersonalLimits::default(),
                     rotation_preference: RotationPreference::default(),
                     profile: request.profile.clone(),
                     scoring_table: request.scoring_table,

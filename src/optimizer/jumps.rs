@@ -1,6 +1,8 @@
 //! Bounded, category-aware jump-only optimization.
 use super::*;
-use crate::{Finding, JumpPart, RotationPreference, SourceReference};
+use crate::{
+    ElementPlanEvidence, Finding, JumpPart, PersonalLimits, RotationPreference, SourceReference,
+};
 use std::time::Duration;
 
 mod model;
@@ -9,6 +11,7 @@ mod model;
 /// must be listed explicitly and may contain only allowed, non-excluded jumps.
 #[derive(Debug, Clone)]
 pub struct JumpOptimizerRequest {
+    pub personal_limits: PersonalLimits,
     pub rotation_preference: RotationPreference,
     pub category: AdultCategory,
     pub ruleset: RulesetId,
@@ -174,6 +177,19 @@ fn checked_profile_candidate(
     }))
 }
 
+fn personal_limits_allow(request: &JumpOptimizerRequest, element: &JumpElement) -> bool {
+    request
+        .personal_limits
+        .conflicts(
+            &PlannedElement::Jump(element.clone()),
+            &ElementPlanEvidence::Jump {
+                direct_transitions_assumed: false,
+            },
+            0,
+        )
+        .is_empty()
+}
+
 fn request_allows(
     request: &JumpOptimizerRequest,
     elements: &[JumpElement],
@@ -182,6 +198,9 @@ fn request_allows(
         return Ok(false);
     }
     for element in elements {
+        if !personal_limits_allow(request, element) {
+            return Ok(false);
+        }
         if crate::rotation::conflict(
             &PlannedElement::Jump(element.clone()),
             0,
@@ -219,6 +238,7 @@ pub fn optimize_jumps(
 /// The same finite-domain solver controls as the legacy request, with profile selection.
 #[derive(Debug, Clone)]
 pub struct ProfileJumpOptimizerRequest {
+    pub personal_limits: PersonalLimits,
     pub rotation_preference: RotationPreference,
     pub profile: crate::ProfileId,
     pub scoring_table: ScoringTableId,
@@ -238,6 +258,7 @@ impl ProfileJumpOptimizerRequest {
     fn search_controls(&self, profile: &crate::RuleProfile) -> JumpOptimizerRequest {
         // The internal legacy carrier supplies domain controls only; policy comes from profile.
         JumpOptimizerRequest {
+            personal_limits: self.personal_limits.clone(),
             rotation_preference: self.rotation_preference,
             category: AdultCategory::Bronze,
             ruleset: profile.scoring.recognition_ruleset,
@@ -344,6 +365,7 @@ mod tests {
             RotationPreference::AllowMixedDirections,
         ] {
             let request = ProfileJumpOptimizerRequest {
+                personal_limits: PersonalLimits::default(),
                 rotation_preference: preference,
                 profile: profile.id.clone(),
                 scoring_table: profile.scoring_table,
@@ -406,6 +428,7 @@ mod tests {
         ];
         for (category, expected) in fixtures {
             let request = JumpOptimizerRequest {
+                personal_limits: PersonalLimits::default(),
                 rotation_preference: RotationPreference::default(),
                 category,
                 ruleset: BRONZE_RULESET,
@@ -442,6 +465,7 @@ mod tests {
         let pair =
             JumpElement::Combination(vec![JumpPart::Jump(a.clone()), JumpPart::Jump(t.clone())]);
         let mut request = JumpOptimizerRequest {
+            personal_limits: PersonalLimits::default(),
             rotation_preference: RotationPreference::default(),
             category: AdultCategory::Gold,
             ruleset: BRONZE_RULESET,

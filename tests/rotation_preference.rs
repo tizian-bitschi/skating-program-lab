@@ -10,6 +10,7 @@ fn silver(codes: &[&str], preference: RotationPreference) -> ManualBvRequest {
     ManualBvRequest {
         profile: profile.id,
         scoring_table: profile.scoring_table,
+        personal_limits: PersonalLimits::default(),
         rotation_preference: preference,
         submission: SubmissionState::Complete,
         elements: codes.iter().map(|c| AssumedRecognition::new(*c)).collect(),
@@ -106,6 +107,7 @@ fn detailed_manual_assessment_keeps_personal_conflicts_separate() {
         }),
     ]));
     let mut r = ManualProgramRequest {
+        personal_limits: PersonalLimits::default(),
         rotation_preference: RotationPreference::default(),
         profile: p.id,
         scoring_table: p.scoring_table,
@@ -154,6 +156,7 @@ mod automatic {
         PlanningSearchRequest {
             profile: p.id,
             scoring_table: p.scoring_table,
+            personal_limits: PersonalLimits::default(),
             rotation_preference: preference,
             required: vec![],
             exclusions: vec![],
@@ -199,6 +202,7 @@ mod automatic {
                     &ManualBvRequest {
                         profile: r.profile.clone(),
                         scoring_table: r.scoring_table,
+                        personal_limits: PersonalLimits::default(),
                         rotation_preference: preference,
                         submission: SubmissionState::Complete,
                         elements: candidate.elements,
@@ -262,6 +266,7 @@ mod automatic {
     fn completion(original: Vec<CompletionEntry>) -> ProgramCompletionRequest {
         let p = adult_profile(AdultCategory::Silver);
         ProgramCompletionRequest {
+            personal_limits: PersonalLimits::default(),
             rotation_preference: RotationPreference::default(),
             season: p.season,
             profile: p.id,
@@ -344,6 +349,7 @@ mod automatic {
         let registry = ProfileRegistry::adult();
         let p = adult_profile(AdultCategory::Silver);
         let mut r = ProgramOptimizationRequest {
+            personal_limits: PersonalLimits::default(),
             rotation_preference: RotationPreference::default(),
             season: p.season,
             profile: p.id,

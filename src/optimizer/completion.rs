@@ -20,6 +20,7 @@ pub struct CompletionInsertionPolicy {
 
 #[derive(Debug, Clone)]
 pub struct ProgramCompletionRequest {
+    pub personal_limits: PersonalLimits,
     pub rotation_preference: RotationPreference,
     pub season: Season,
     pub profile: ProfileId,
@@ -95,6 +96,7 @@ pub struct ProgramCompletionResult {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ProgramCompletionError {
+    PersonalLimitConflict(Vec<PersonalLimitConflict>),
     RotationPreferenceConflict(Vec<RotationPreferenceConflict>),
     InvalidRequest(&'static str),
     Profile(ProfileSelectionError),
@@ -111,6 +113,7 @@ fn manual(
     submission: SubmissionState,
 ) -> ManualProgramRequest {
     ManualProgramRequest {
+        personal_limits: request.personal_limits.clone(),
         rotation_preference: request.rotation_preference,
         profile: request.profile.clone(),
         scoring_table: request.scoring_table,
@@ -200,6 +203,7 @@ fn validate_request(
             || domain.audit.profile != request.profile
             || domain.audit.scoring_table != request.scoring_table
             || domain.audit.rotation_preference != request.rotation_preference
+            || domain.audit.personal_limits != request.personal_limits
         {
             return Err(E::InvalidRequest("generated domain does not match request"));
         }
@@ -229,6 +233,19 @@ fn check_global_conflicts(
     assumed: bool,
 ) -> Result<(), ProgramCompletionError> {
     use ProgramCompletionError as E;
+    let personal_conflicts: Vec<_> = request
+        .original
+        .iter()
+        .enumerate()
+        .flat_map(|(i, e)| {
+            request
+                .personal_limits
+                .conflicts(&e.entry.planned, &e.entry.evidence, i)
+        })
+        .collect();
+    if !personal_conflicts.is_empty() {
+        return Err(E::PersonalLimitConflict(personal_conflicts));
+    }
     let rotation_conflicts = crate::rotation::conflicts(
         request.original.iter().map(|e| &e.entry.planned),
         request.rotation_preference,
@@ -323,6 +340,7 @@ fn prepare_search(
     });
     variants.extend(request.original.iter().map(|e| variant(&e.entry)));
     let search_request = ProgramOptimizationRequest {
+        personal_limits: request.personal_limits.clone(),
         rotation_preference: request.rotation_preference,
         season: request.season,
         profile: request.profile.clone(),
@@ -481,11 +499,27 @@ pub fn complete_program_with_assumed_recognition(
         .map_err(E::Profile)?
         .scoring
         .recognition_ruleset;
+    // Jump identities are fixed before SOV resolution; spin levels come from the selection.
+    let jump_conflicts: Vec<_> = request
+        .original
+        .iter()
+        .enumerate()
+        .filter(|(_, original)| matches!(original.entry.planned, PlannedElement::Jump(_)))
+        .flat_map(|(i, original)| {
+            request
+                .personal_limits
+                .conflicts(&original.entry.planned, &original.entry.evidence, i)
+        })
+        .collect();
+    if !jump_conflicts.is_empty() {
+        return Err(E::PersonalLimitConflict(jump_conflicts));
+    }
     let mut values = programs::resolve_variants(
         request.scoring_table,
         &mut request.variants,
         variant_recognition,
         ruleset,
+        &request.personal_limits,
     )
     .map_err(E::Optimization)?;
     for (original, recognition) in request.original.iter_mut().zip(original_recognition) {
@@ -505,7 +539,7 @@ pub fn complete_program_with_assumed_recognition(
                 "original SOV code is unsupported or does not match the plan",
             ))?;
         original.entry.evidence = evidence;
-        values.push(value);
+        values.push(Some(value));
     }
     let mut result = complete(registry, &request, Some(&values), start)?;
     result.assumptions = programs::ASSUMED_SCOPE;
@@ -516,7 +550,7 @@ pub fn complete_program_with_assumed_recognition(
 fn complete(
     registry: &ProfileRegistry,
     request: &ProgramCompletionRequest,
-    assumed_values: Option<&[BaseValue]>,
+    assumed_values: Option<&[Option<BaseValue>]>,
     start: Instant,
 ) -> Result<ProgramCompletionResult, ProgramCompletionError> {
     use ProgramCompletionError as E;
@@ -526,9 +560,14 @@ fn complete(
     let absolute = validate_request(request, profile)?;
     let assumed = assumed_values.is_some();
     check_global_conflicts(request, assumed)?;
-    let original_values = assumed_values.map(|values| &values[request.variants.len()..]);
+    let original_values: Option<Vec<_>> = assumed_values.map(|values| {
+        values[request.variants.len()..]
+            .iter()
+            .map(|value| value.clone().expect("original has a resolved value"))
+            .collect()
+    });
     let (original_assessment, values) =
-        prepare_originals(registry, request, profile, original_values)?;
+        prepare_originals(registry, request, profile, original_values.as_deref())?;
     let (search_request, placement) = prepare_search(request, profile, values, absolute, assumed);
     let search = programs::optimize_anchored(
         registry,

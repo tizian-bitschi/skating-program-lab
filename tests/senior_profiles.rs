@@ -557,6 +557,7 @@ fn manual_assessment_uses_context_without_rewriting_supplied_recognition() {
         });
     }
     let request = ManualProgramRequest {
+        personal_limits: PersonalLimits::default(),
         rotation_preference: RotationPreference::default(),
         profile: senior_profile(SeniorCategory::Women).id,
         scoring_table: TABLE,
@@ -705,6 +706,7 @@ fn generator_mixed_solver_and_locked_completion_resolve_senior_identity() {
     let generated = generate_program_candidates(
         &registry,
         &CandidateGenerationRequest {
+            personal_limits: PersonalLimits::default(),
             rotation_preference: RotationPreference::default(),
             season: profile.season,
             profile: profile.id.clone(),
@@ -737,6 +739,7 @@ fn generator_mixed_solver_and_locked_completion_resolve_senior_identity() {
     let mixed = optimize_program(
         &registry,
         &ProgramOptimizationRequest {
+            personal_limits: PersonalLimits::default(),
             rotation_preference: RotationPreference::default(),
             season: profile.season,
             profile: profile.id.clone(),
@@ -809,6 +812,7 @@ fn generator_mixed_solver_and_locked_completion_resolve_senior_identity() {
         })
         .collect::<Vec<_>>();
     let request = ProgramCompletionRequest {
+        personal_limits: PersonalLimits::default(),
         rotation_preference: RotationPreference::default(),
         season: profile.season,
         profile: profile.id,
@@ -994,6 +998,7 @@ fn mixed_senior_optimizer_produces_a_valid_complete_program() {
     let result = optimize_program(
         &ProfileRegistry::senior(),
         &ProgramOptimizationRequest {
+            personal_limits: PersonalLimits::default(),
             rotation_preference: RotationPreference::default(),
             season: profile.season,
             profile: profile.id.clone(),
@@ -1082,6 +1087,7 @@ mod eleven_slots {
             })
             .collect();
         ProgramCompletionRequest {
+            personal_limits: PersonalLimits::default(),
             rotation_preference: RotationPreference::default(),
             season: profile.season,
             profile: profile.id,
@@ -1258,6 +1264,7 @@ mod eleven_slots {
             recognition_assumed: true,
         });
         let mut full = ProgramOptimizationRequest {
+            personal_limits: PersonalLimits::default(),
             rotation_preference: RotationPreference::default(),
             season: req.season,
             profile: req.profile,

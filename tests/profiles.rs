@@ -580,6 +580,7 @@ fn synthetic_profile_uses_existing_solver_and_preserves_identity_and_bounds() {
     let mut registry = ProfileRegistry::adult();
     registry.register(custom.clone()).unwrap();
     let request = ProfileJumpOptimizerRequest {
+        personal_limits: PersonalLimits::default(),
         rotation_preference: RotationPreference::default(),
         profile: custom.id.clone(),
         scoring_table: TABLE,
@@ -614,6 +615,7 @@ fn synthetic_profile_uses_existing_solver_and_preserves_identity_and_bounds() {
         vec![solo(JumpKind::ToeLoop, 1)]
     );
     let adult_request = ProfileJumpOptimizerRequest {
+        personal_limits: PersonalLimits::default(),
         rotation_preference: RotationPreference::default(),
         profile: adult_profile(AdultCategory::Silver).id,
         ..request.clone()
@@ -642,6 +644,7 @@ fn synthetic_profile_uses_existing_solver_and_preserves_identity_and_bounds() {
             .sources
     );
     let excluded = ProfileJumpOptimizerRequest {
+        personal_limits: PersonalLimits::default(),
         rotation_preference: RotationPreference::default(),
         excluded_kinds: vec![JumpKind::ToeLoop],
         ..request.clone()
@@ -655,6 +658,7 @@ fn synthetic_profile_uses_existing_solver_and_preserves_identity_and_bounds() {
     unsupported.bindings[0].mechanism = RuleMechanism::Unsupported("future".into());
     registry.register(unsupported.clone()).unwrap();
     let rejected = ProfileJumpOptimizerRequest {
+        personal_limits: PersonalLimits::default(),
         rotation_preference: RotationPreference::default(),
         profile: unsupported.id.clone(),
         ..request

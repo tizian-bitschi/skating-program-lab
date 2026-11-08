@@ -4,6 +4,8 @@
 
 #[cfg(all(test, feature = "optimizer"))]
 extern crate self as skating_program_lab;
+mod personal_limits;
+pub use personal_limits::*;
 
 use std::{fmt, str::FromStr};
 

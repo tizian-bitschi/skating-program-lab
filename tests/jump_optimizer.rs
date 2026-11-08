@@ -19,6 +19,7 @@ fn combo(first: &ListedJump, second: &ListedJump) -> JumpElement {
 }
 fn request(category: AdultCategory, jumps: Vec<ListedJump>) -> JumpOptimizerRequest {
     JumpOptimizerRequest {
+        personal_limits: PersonalLimits::default(),
         rotation_preference: RotationPreference::default(),
         category,
         ruleset: RulesetId::IsuAdult2026_27July16,
@@ -279,4 +280,31 @@ fn full_clean_masters_universe_does_not_require_exhaustive_generation() {
     assert_eq!(result.status, OptimizerStatus::OptimalProven);
     assert_eq!(result.candidates[0].base_hundredths, 1260);
     assert!(result.examined_subsections < 100_000);
+}
+
+#[test]
+fn personal_rotation_caps_filter_every_supplied_jump_occurrence() {
+    let one = jump(JumpKind::Lutz, 1);
+    let two = jump(JumpKind::Lutz, 2);
+    let toe = jump(JumpKind::ToeLoop, 1);
+    let mut q = request(
+        AdultCategory::Gold,
+        vec![one.clone(), two.clone(), toe.clone()],
+    );
+    q.max_elements = 1;
+    q.combinations = vec![combo(&two, &toe), combo(&one, &toe)];
+    q.rotation_preference = RotationPreference::AllowMixedDirections;
+    q.personal_limits.jump_rotations.push(JumpRotationLimit {
+        kind: JumpKind::Lutz,
+        maximum: JumpRotationClass::Single,
+    });
+    let result = optimize_jumps(&q).unwrap();
+    // 1Lz + 1T = 0.60 + 0.40 beats either permitted solo.
+    assert_eq!(result.status, OptimizerStatus::OptimalProven);
+    assert!(result.candidates.iter().all(|c| c.base_hundredths == 100));
+    assert!(!result.universe.contains(&solo(&two)));
+    assert!(!result.universe.contains(&combo(&two, &toe)));
+    q.excluded_kinds.push(JumpKind::Lutz);
+    let result = optimize_jumps(&q).unwrap();
+    assert!(result.candidates.iter().all(|c| c.base_hundredths == 40));
 }

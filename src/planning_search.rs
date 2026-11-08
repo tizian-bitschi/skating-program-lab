@@ -18,6 +18,7 @@ pub enum PlanningExclusion {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PlanningSearchRequest {
+    pub personal_limits: PersonalLimits,
     pub rotation_preference: RotationPreference,
     pub profile: ProfileId,
     pub scoring_table: ScoringTableId,
@@ -51,6 +52,7 @@ pub struct PlanningDiagnostic {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PlanningSearchError {
+    PersonalLimitConflict(Vec<PersonalLimitConflict>),
     RotationPreferenceConflict(Vec<RotationPreferenceConflict>),
     InvalidRequest {
         reason: &'static str,
@@ -88,6 +90,7 @@ pub enum PlanningAlternativeStatus {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PlanningMaximum {
+    pub personal_limits: PersonalLimits,
     pub rotation_preference: RotationPreference,
     pub profile: ProfileId,
     pub scoring_table: ScoringTableId,
@@ -150,6 +153,7 @@ fn manual(
     submission: SubmissionState,
 ) -> ManualBvRequest {
     ManualBvRequest {
+        personal_limits: request.personal_limits.clone(),
         rotation_preference: request.rotation_preference,
         profile: request.profile.clone(),
         scoring_table: request.scoring_table,
@@ -169,6 +173,7 @@ fn domain(
         &request.profile,
         request.scoring_table,
         request.rotation_preference,
+        &request.personal_limits,
         &mut || control.is_cancelled(PlanningSearchPhase::Domain),
     )
     .map_err(PlanningSearchError::Profile)?
@@ -176,11 +181,16 @@ fn domain(
         return Ok(None);
     };
     assumptions.extend(
-        selectable_elements(registry, &request.profile, request.scoring_table)
-            .map_err(PlanningSearchError::Profile)?
-            .into_iter()
-            .filter(|s| !matches!(s.kind, SelectableElementKind::SoloJump { .. }))
-            .map(|s| AssumedRecognition::new(s.row.notation)),
+        selectable_elements_with_limits(
+            registry,
+            &request.profile,
+            request.scoring_table,
+            &request.personal_limits,
+        )
+        .map_err(PlanningSearchError::Profile)?
+        .into_iter()
+        .filter(|s| !matches!(s.kind, SelectableElementKind::SoloJump { .. }))
+        .map(|s| AssumedRecognition::new(s.row.notation)),
     );
     assumptions.sort_by(|a, b| {
         a.code.cmp(&b.code).then(
@@ -292,6 +302,11 @@ pub fn search_maximum_bv(
         &manual(request, required_inputs, SubmissionState::Draft),
     )
     .map_err(PlanningSearchError::Profile)?;
+    if !required_assessment.personal_conflicts.is_empty() {
+        return Err(PlanningSearchError::PersonalLimitConflict(
+            required_assessment.personal_conflicts,
+        ));
+    }
     if !required_assessment.rotation_conflicts.is_empty() {
         return Err(PlanningSearchError::RotationPreferenceConflict(
             required_assessment.rotation_conflicts,

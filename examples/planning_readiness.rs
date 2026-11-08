@@ -85,6 +85,7 @@ mod measured {
             _ => panic!("unknown profile"),
         };
         let mut request = PlanningSearchRequest {
+            personal_limits: PersonalLimits::default(),
             rotation_preference: RotationPreference::default(),
             profile: profile.id,
             scoring_table: profile.scoring_table,
