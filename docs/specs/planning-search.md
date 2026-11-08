@@ -94,8 +94,10 @@ targets. Infeasibility requires a supported contradiction or solver proof.
 Control polls identify Domain, Model, Solve, IncumbentFound, Reconstruction,
 MaximumProved and Alternatives phases. A stopped proof returns Cancelled and no
 program. No timeout or search-node budget is imposed. The incumbent phase reveals
-only a raw solver-incumbent lifecycle state, never its program or value and never
-a claim that reconstruction has been checked. MaximumProved occurs after a
+only an internal candidate lifecycle state after shared reconstruction and manual
+assessment have passed, never its program or value. A reconstruction error stops
+the search as an error; it does not silently discard a candidate. Reconstruction
+cancellation emits no incumbent notification. MaximumProved occurs after a
 returned representative has passed manual assessment. Alternative collection
 has its own Exhausted, LimitReached or Cancelled status. After proving the optimum and validating its first representative, the model
 fixes credited BV to the proved value and enumerates up to five distinct
