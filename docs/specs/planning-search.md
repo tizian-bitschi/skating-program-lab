@@ -56,8 +56,18 @@ program. No timeout or search-node budget is imposed. The incumbent phase reveal
 only a raw solver-incumbent lifecycle state, never its program or value and never
 a claim that reconstruction has been checked. MaximumProved occurs after a
 returned representative has passed manual assessment. Alternative collection
-has its own Exhausted, LimitReached or Cancelled status. The first slice returns
-one proved representative with LimitReached; #124 collects up to five distinct
-whole-element multisets.
+has its own Exhausted, LimitReached or Cancelled status. After proving the optimum and validating its first representative, the model
+fixes credited BV to the proved value and enumerates up to five distinct
+whole-element multisets. A nogood excludes the complete atomic count vector,
+including zero counts; auxiliary assignments and required-ID swaps never create
+another composition. Exact compound codes, transition assumptions and repeated
+occurrences remain part of identity. Count and value branching and reconstruction
+use deterministic repertoire order.
+
+Fewer than five alternatives carry Exhausted only after the solver proves no
+further vector exists. Five alternatives carry LimitReached even when there
+happen to be exactly five. Cancellation during later solving or reconstruction
+retains the maximum and every already validated alternative with Cancelled.
+Cancellation during initial reconstruction exposes no program.
 
 Legacy ordered completion and evidence-based entry points retain their contracts.
