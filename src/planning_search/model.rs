@@ -269,7 +269,20 @@ pub(super) fn search(
     atoms: &[Atom],
     control: &impl PlanningSearchControl,
 ) -> Result<PlanningSearchOutcome, PlanningSearchError> {
-    let senior = crate::senior::selected(profile, ProfileRule::Repetition);
+    // A new mechanism must explicitly choose a safe bound/model, rather than
+    // silently inheriting the additive case. Category identities are irrelevant.
+    let senior = match &profile.binding(ProfileRule::Repetition).mechanism {
+        RuleMechanism::JumpPlanV1 => false,
+        RuleMechanism::SeniorJumpPlanV1 => true,
+        RuleMechanism::AdultScoringV1
+        | RuleMechanism::SeniorScoringV1
+        | RuleMechanism::Unsupported(_) => {
+            return Err(PlanningSearchError::UnsupportedCoverage {
+                profile: request.profile.clone(),
+                reason: "Complete count search has no bound for the repetition mechanism.",
+            });
+        }
+    };
     let required: Vec<_> = request
         .required
         .iter()
@@ -726,7 +739,28 @@ pub(super) fn search(
         let tag = solver.new_constraint_tag();
         solver.add_clause(vec![predicate!(objective == maximum as i32)], tag);
         'collect: {
-            if !senior && request.required.is_empty() {
+            if request.required.is_empty() {
+                let mut rejected_components = Vec::new();
+                if senior {
+                    // Component presence leaves solo/compound placement open;
+                    // its optimistic credit must not assume a solo repeat loss.
+                    let nonjump_bound = i64::from(upper) - i64::from(jump_bound);
+                    for atom in atoms
+                        .iter()
+                        .filter(|a| matches!(a.element, PlannedElement::Jump(JumpElement::Solo(_))))
+                    {
+                        if control.is_cancelled(PlanningSearchPhase::Alternatives) {
+                            break 'collect;
+                        }
+                        let component = &atom.jumps[0];
+                        let bound = super::senior_bound::component_upper_bound(
+                            atoms, profile, request, component,
+                        );
+                        if i64::from(bound) + nonjump_bound < i64::from(maximum) {
+                            rejected_components.push(component.clone());
+                        }
+                    }
+                }
                 let mut forced = request.clone();
                 for (index, atom) in atoms.iter().enumerate() {
                     if control.is_cancelled(PlanningSearchPhase::Alternatives) {
@@ -735,14 +769,18 @@ pub(super) fn search(
                     if atom_upper(atom, profile, &required) == 0 {
                         continue;
                     }
-                    forced.required = vec![RequiredPlanningElement {
-                        id: "conditional-bound".into(),
-                        element: atom.assumption.clone(),
-                    }];
-                    let (_, _, bound) = value_upper_bound(atoms, profile, policy, &forced);
+                    let cannot_reach_maximum =
+                        atom.jumps.iter().any(|j| rejected_components.contains(j)) || {
+                            forced.required = vec![RequiredPlanningElement {
+                                id: "conditional-bound".into(),
+                                element: atom.assumption.clone(),
+                            }];
+                            let (_, _, bound) = value_upper_bound(atoms, profile, policy, &forced);
+                            i64::from(bound) < i64::from(maximum)
+                        };
                     // Any optimum using this atom completes the forced request, so
                     // only a strictly lower admissible bound rules the atom out.
-                    if i64::from(bound) < i64::from(maximum) {
+                    if cannot_reach_maximum {
                         if selected[index] != 0 {
                             return Err(PlanningSearchError::InconsistentAssessment);
                         }

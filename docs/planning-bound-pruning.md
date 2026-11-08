@@ -1,18 +1,70 @@
-# Adult conditional-bound pruning (#130)
+# Profile-driven conditional-bound pruning (#130)
 
 Issue: [#130](https://github.com/tizian-bitschi/skating-program-lab/issues/130).
 Baseline: `40ea327651e8c771e8d8a3f5f7f22d6f34eb0333`.
 
-The production change applies only after maximum proof to Adult requests with
+The production change applies after maximum proof to every supported profile with
 no required occurrences. It reuses the existing admissible bound for one
 hypothetically required exact atom. A bound strictly below the proved maximum
 fixes that atom's count to zero. Equality remains permitted. The complete
-[argument and cancellation contract](specs/planning-search.md#conditional-adult-bounds-after-maximum-proof-130)
+[argument and cancellation contract](specs/planning-search.md#conditional-profile-bounds-after-maximum-proof-130)
 are part of the planning-search specification.
 
 The public API still returns at most five alternatives. Required-occurrence
-requests and Senior retain the prior path. There are no environment switches,
+requests retain the prior path. There are no environment switches,
 alternative branchers or diagnostic logging in the production implementation.
+
+## All-category and future-category behavior
+
+All six current profiles use the shared conditional-atom check. Senior repetition
+mechanisms additionally use a cheap component-presence bound before exact atom
+checks. It imposes only component minima, leaving placement open; it never
+assumes that a component must be a solo. Optional nonquint losses stay optimistic
+and repeated-quint losses remain mandatory. This reduces expensive full Senior
+queries from thousands to the surviving atoms while preserving all optima.
+
+There is no pruning whitelist of profile names or category enums. The model's
+repetition-mechanism dispatch is exhaustive: adding a new `RuleMechanism` requires
+an explicit model/bound decision at compile time. A future category using an
+existing supported mechanism inherits pruning once its profile is admitted.
+Current `search_maximum_bv` coverage and `built_in_program_policy` still admit
+the six verified built-ins. Adding a category therefore also needs profile,
+policy-adapter and source/coverage validation; this change does not silently
+accept arbitrary custom profiles or new rules.
+
+## Complete-set measurements across all six profiles
+
+A diagnostic source archive of the final implementation replaces only the two
+private five-result stop checks with an effectively unlimited count. The public
+production API is unchanged. Each empty default request runs three times in a
+fresh native Release process, serially, using separate target directories for
+production and diagnostic builds. Source, profile, table, preferences and scoring
+are identical. Every run proves exhaustion, validates each program and rejects
+duplicate exact identities. Sorted identity files match across all three repeats.
+
+| Profile | Exact optimal compositions | Median complete search ms |
+| --- | ---: | ---: |
+| Bronze | 5 | 9.294 |
+| Silver | 230 | 119.750 |
+| Gold | 526 | 449.772 |
+| Masters | 244 | 311.113 |
+| Senior Women | 200 | 1411.537 |
+| Senior Men | 200 | 1451.051 |
+
+The six medians add to about 3.75 seconds for 1405 category-specific compositions;
+this is not a separately measured batch latency. Compilation is excluded.
+All observations are in [all-profiles-complete.csv](../benchmarks/planning-readiness/observations-issue-130/all-profiles-complete.csv).
+The diagnostic full-set oracle also matches exact equality for Gold, Masters
+and both Senior profiles, including Euler and transition assumptions. The
+production tests compare capped results against those complete oracle sets.
+
+The final capped public requests retain five results and LimitReached for all
+six profiles. Median totals are Bronze 9.456 ms, Silver 17.549 ms, Gold 30.009 ms,
+Masters 54.744 ms, Women 329.267 ms and Men 326.547 ms. The corresponding baseline
+medians are 9.502, 18.318, 33.590, 1198.007, 316.802 and 325.437 ms. Senior's first
+five remain about 0.33 seconds; complete collection is the expensive workload
+this generalization targets. Source manifest hashes and all 36 before/after
+observations are in [all-profiles-five.csv](../benchmarks/planning-readiness/observations-issue-130/all-profiles-five.csv).
 
 ## Regression evidence
 
@@ -34,9 +86,16 @@ Gold/Masters jump partitions and nonjump choices from the public atomic grammar
 and catalogue. Its resource and spin-role checks do not use Pumpkin or the
 conditional-bound helper. It retains Euler budgets, internal compound order,
 transition assumptions and repeated occurrences. The complete oracles contain
-526 Gold and 244 Masters exact optima. The production tests verify that the five
+526 Gold and 244 Masters exact optima. Senior independently enumerates all five
+ways to select four equal-value quint kinds, their 50 jump partitions and four
+nonjump variants, giving 200 optima per profile. The production tests verify that the five
 returned identities are unique members of these sets, with correct BV, legal
 assessment and LimitReached status. They do not bypass the public result cap.
+
+`tests/planning_bound_pruning_senior.rs` covers both Senior profiles, post-proof
+cancellation, the credited winner with no required occurrences, and mandatory
+80% credit for repeated quint solos. The source-derived credited-winner fixture
+distinguishes a component in a compound from a forced solo occurrence.
 
 During the preceding isolated investigation, an uncapped diagnostic copy also
 matched those entire sets: Gold 526 jump partitions times one nonjump choice;
@@ -49,7 +108,7 @@ Existing search, personal-limit, rotation, required-occurrence, Senior and
 cancellation tests remain applicable. The implementation adds no new rule or
 scoring interpretation.
 
-## Identical-request Release measurements
+## Initial Adult-only Release measurements
 
 Recorded 2026-11-08 on Windows, Intel Core i9-13900K, Rust 1.99.1, Pumpkin 0.5.0.
 The existing `planning_readiness` example runs each empty Adult request in a
