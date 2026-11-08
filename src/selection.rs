@@ -331,10 +331,15 @@ pub(crate) fn planned_jump_elements(
         if cancelled() {
             return Ok(None);
         }
-        if let Ok(SelectableElement {
+        let option = match selected.check_row(row) {
+            Ok(option) => option,
+            Err(ElementSelectionError::Profile(error)) => return Err(error),
+            Err(_) => continue,
+        };
+        if let SelectableElement {
             kind: SelectableElementKind::SoloJump { rotations, .. },
             ..
-        }) = selected.check_row(row)
+        } = option
         {
             choices.push(AssumedRecognition::new(row.notation));
             if rotations <= 4 || !crate::senior::selected(selected.profile, ProfileRule::Structure)
