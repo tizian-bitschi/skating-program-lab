@@ -18,6 +18,7 @@ pub enum PlanningExclusion {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PlanningSearchRequest {
+    pub rotation_preference: RotationPreference,
     pub profile: ProfileId,
     pub scoring_table: ScoringTableId,
     pub required: Vec<RequiredPlanningElement>,
@@ -50,6 +51,7 @@ pub struct PlanningDiagnostic {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PlanningSearchError {
+    RotationPreferenceConflict(Vec<RotationPreferenceConflict>),
     InvalidRequest {
         reason: &'static str,
         diagnostics: Vec<PlanningDiagnostic>,
@@ -86,6 +88,7 @@ pub enum PlanningAlternativeStatus {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PlanningMaximum {
+    pub rotation_preference: RotationPreference,
     pub profile: ProfileId,
     pub scoring_table: ScoringTableId,
     pub maximum_base_hundredths: u32,
@@ -147,6 +150,7 @@ fn manual(
     submission: SubmissionState,
 ) -> ManualBvRequest {
     ManualBvRequest {
+        rotation_preference: request.rotation_preference,
         profile: request.profile.clone(),
         scoring_table: request.scoring_table,
         submission,
@@ -164,6 +168,7 @@ fn domain(
         registry,
         &request.profile,
         request.scoring_table,
+        request.rotation_preference,
         &mut || control.is_cancelled(PlanningSearchPhase::Domain),
     )
     .map_err(PlanningSearchError::Profile)?
@@ -281,6 +286,17 @@ pub fn search_maximum_bv(
         }
     }
     if request.exclusions.iter().any(|e| matches!(e,PlanningExclusion::ExactJump(j) if j.kind.is_none() || j.rotations.is_none_or(|r| r==0))) { return Err(invalid("Exact jump exclusions require a kind and positive rotation count.", vec![])); }
+    let required_inputs = request.required.iter().map(|r| r.element.clone()).collect();
+    let required_assessment = assess_manual_bv(
+        registry,
+        &manual(request, required_inputs, SubmissionState::Draft),
+    )
+    .map_err(PlanningSearchError::Profile)?;
+    if !required_assessment.rotation_conflicts.is_empty() {
+        return Err(PlanningSearchError::RotationPreferenceConflict(
+            required_assessment.rotation_conflicts,
+        ));
+    }
     let Some(mut atoms) = domain(registry, request, profile, control)? else {
         return Ok(PlanningSearchOutcome::Cancelled);
     };

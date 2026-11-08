@@ -139,6 +139,7 @@ pub fn full(
 ) -> ProgramOptimizationRequest {
     let p = senior_profile(category(source));
     ProgramOptimizationRequest {
+        rotation_preference: RotationPreference::default(),
         season: p.season,
         profile: p.id,
         scoring_table: p.scoring_table,
@@ -323,6 +324,7 @@ pub fn completion(
         vec![]
     };
     ProgramCompletionRequest {
+        rotation_preference: RotationPreference::default(),
         season: p.season,
         profile: p.id,
         scoring_table: p.scoring_table,

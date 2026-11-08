@@ -58,15 +58,16 @@ pub fn selectable_elements(
     Selection::new(registry, profile, table)?.list()
 }
 
-/// List every category-permitted atomic planned jump code, including compounds.
+/// List every profile- and preference-permitted atomic planned jump code.
 /// `+` intends a same-foot connection; `+SEQ` additionally assumes a qualifying
 /// direct step into an Axel. Actual footwork and recognition remain unevaluated.
 pub fn selectable_jump_elements(
     registry: &ProfileRegistry,
     profile: &ProfileId,
     table: ScoringTableId,
+    rotation_preference: RotationPreference,
 ) -> Result<Vec<AssumedRecognition>, ProfileSelectionError> {
-    planned_jump_elements(registry, profile, table, &mut || false)
+    planned_jump_elements(registry, profile, table, rotation_preference, &mut || false)
         .map(|choices| choices.expect("noncancellable listing"))
 }
 
@@ -332,6 +333,7 @@ pub(crate) fn planned_jump_elements(
     registry: &ProfileRegistry,
     profile: &ProfileId,
     table: ScoringTableId,
+    rotation_preference: RotationPreference,
     cancelled: &mut impl FnMut() -> bool,
 ) -> Result<Option<Vec<AssumedRecognition>>, ProfileSelectionError> {
     let selected = Selection::new(registry, profile, table)?;
@@ -417,7 +419,25 @@ pub(crate) fn planned_jump_elements(
             }
         }
     }
-    Ok(Some(choices))
+    if rotation_preference == RotationPreference::AllowMixedDirections {
+        return Ok(Some(choices));
+    }
+    let mut filtered = Vec::with_capacity(choices.len());
+    for choice in choices {
+        if cancelled() {
+            return Ok(None);
+        }
+        let (element, _, _, _) = crate::manual_bv::resolve_selection(
+            &selected,
+            table,
+            selected.profile.scoring.recognition_ruleset,
+            &choice,
+        );
+        if crate::rotation::conflict(&element, 0, rotation_preference).is_none() {
+            filtered.push(choice);
+        }
+    }
+    Ok(Some(filtered))
 }
 
 #[cfg(test)]
@@ -475,10 +495,15 @@ mod planning_tests {
                 "4Lz+Eu+1A+SEQ",
             ),
         ] {
-            let choices =
-                planned_jump_elements(registry, &profile.id, profile.scoring_table, &mut || false)
-                    .unwrap()
-                    .unwrap();
+            let choices = planned_jump_elements(
+                registry,
+                &profile.id,
+                profile.scoring_table,
+                RotationPreference::AllowMixedDirections,
+                &mut || false,
+            )
+            .unwrap()
+            .unwrap();
             assert_eq!(choices.len(), count, "{}", profile.category);
             assert!(choices.iter().any(|c| c.code == present), "{present}");
             assert!(!choices.iter().any(|c| c.code == absent), "{absent}");
@@ -486,6 +511,7 @@ mod planning_tests {
             let assessment = assess_manual_bv(
                 registry,
                 &ManualBvRequest {
+                    rotation_preference: RotationPreference::default(),
                     profile: profile.id,
                     scoring_table: profile.scoring_table,
                     submission: SubmissionState::Draft,
@@ -515,6 +541,7 @@ mod planning_tests {
             &ProfileRegistry::senior(),
             &senior_profile(SeniorCategory::Women).id,
             ScoringTableId::Isu2786June2_2026,
+            RotationPreference::default(),
             &mut || {
                 polls += 1;
                 polls == 200
@@ -523,5 +550,38 @@ mod planning_tests {
         .unwrap();
         assert!(result.is_none());
         assert_eq!(polls, 200);
+    }
+
+    #[test]
+    fn cancellation_during_preference_filtering_returns_no_partial_choices() {
+        let registry = ProfileRegistry::adult();
+        let p = adult_profile(AdultCategory::Silver);
+        let mut expansion_polls = 0;
+        planned_jump_elements(
+            &registry,
+            &p.id,
+            p.scoring_table,
+            RotationPreference::AllowMixedDirections,
+            &mut || {
+                expansion_polls += 1;
+                false
+            },
+        )
+        .unwrap()
+        .unwrap();
+        let mut polls = 0;
+        let result = planned_jump_elements(
+            &registry,
+            &p.id,
+            p.scoring_table,
+            RotationPreference::SameDirection,
+            &mut || {
+                polls += 1;
+                polls > expansion_polls
+            },
+        )
+        .unwrap();
+        assert!(result.is_none());
+        assert_eq!(polls, expansion_polls + 1);
     }
 }

@@ -237,6 +237,7 @@ fn assess_assumed_program(
         .into_iter()
         .unzip();
     let request = ManualProgramRequest {
+        rotation_preference: RotationPreference::default(),
         profile: program.profile.clone(),
         scoring_table: program.scoring_table,
         policy: policy.clone(),

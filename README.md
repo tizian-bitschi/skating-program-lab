@@ -6,7 +6,7 @@ An open-source Rust library for planning technical figure skating programs. The 
 
 With the default `optimizer` feature, `search_maximum_bv` proves the best
 theoretical Adult Bronze, Silver, Gold, Masters or Senior Women/Men composition
-from complete profile-selected choices,
+from complete profile- and preference-selected choices,
 exact required occurrences and semantic exclusions. It runs until proof or
 cooperative cancellation. It returns up to five equally optimal whole-element compositions, with
 separate maximum-proof and alternative-exhaustion status. See the [planning-search contract](docs/specs/planning-search.md).
@@ -14,9 +14,14 @@ separate maximum-proof and alternative-exhaustion status. See the [planning-sear
 For theoretical program construction, use `assess_manual_bv` to calculate
 base value from ordered SOV codes and check composition without supplying
 spin or step feature evidence. See the [assumed-recognition API](docs/specs/assumed-recognition.md).
-`selectable_jump_elements` lists the complete category-permitted atomic jump
-code intentions, including mixed sequences and Euler connections, with no
-1,000-variant cap. See the [planned jump grammar](docs/specs/planned-jump-domain.md).
+`selectable_jump_elements` lists profile- and preference-permitted atomic jump
+code intentions, including sequences and Euler connections, with no
+1,000-variant cap. `RotationPreference::default()` restricts each compound to
+same-direction connections; `AllowMixedDirections` explicitly opts into the
+broader theoretical repertoire. Manual assessment preserves BV and reports
+personal conflicts separately from rule findings. See the
+[rotation preference](docs/specs/rotation-preference-proposal.md) and
+[planned jump grammar](docs/specs/planned-jump-domain.md).
 The [manual category workflow](docs/manual-category-planning.md) explains selection,
 credited values and the distinction between drafts, violations and unsupported choices.
 Prepare a `GoeScenarioPlan` from the selected codes to run

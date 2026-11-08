@@ -557,6 +557,7 @@ fn manual_assessment_uses_context_without_rewriting_supplied_recognition() {
         });
     }
     let request = ManualProgramRequest {
+        rotation_preference: RotationPreference::default(),
         profile: senior_profile(SeniorCategory::Women).id,
         scoring_table: TABLE,
         policy: senior_program_policy(SeniorCategory::Women),
@@ -704,6 +705,7 @@ fn generator_mixed_solver_and_locked_completion_resolve_senior_identity() {
     let generated = generate_program_candidates(
         &registry,
         &CandidateGenerationRequest {
+            rotation_preference: RotationPreference::default(),
             season: profile.season,
             profile: profile.id.clone(),
             scoring_table: TABLE,
@@ -735,6 +737,7 @@ fn generator_mixed_solver_and_locked_completion_resolve_senior_identity() {
     let mixed = optimize_program(
         &registry,
         &ProgramOptimizationRequest {
+            rotation_preference: RotationPreference::default(),
             season: profile.season,
             profile: profile.id.clone(),
             scoring_table: TABLE,
@@ -806,6 +809,7 @@ fn generator_mixed_solver_and_locked_completion_resolve_senior_identity() {
         })
         .collect::<Vec<_>>();
     let request = ProgramCompletionRequest {
+        rotation_preference: RotationPreference::default(),
         season: profile.season,
         profile: profile.id,
         scoring_table: TABLE,
@@ -990,6 +994,7 @@ fn mixed_senior_optimizer_produces_a_valid_complete_program() {
     let result = optimize_program(
         &ProfileRegistry::senior(),
         &ProgramOptimizationRequest {
+            rotation_preference: RotationPreference::default(),
             season: profile.season,
             profile: profile.id.clone(),
             scoring_table: TABLE,
@@ -1077,6 +1082,7 @@ mod eleven_slots {
             })
             .collect();
         ProgramCompletionRequest {
+            rotation_preference: RotationPreference::default(),
             season: profile.season,
             profile: profile.id,
             scoring_table: TABLE,
@@ -1252,6 +1258,7 @@ mod eleven_slots {
             recognition_assumed: true,
         });
         let mut full = ProgramOptimizationRequest {
+            rotation_preference: RotationPreference::default(),
             season: req.season,
             profile: req.profile,
             scoring_table: TABLE,

@@ -6,6 +6,7 @@ use crate::*;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ManualBvRequest {
+    pub rotation_preference: RotationPreference,
     pub profile: ProfileId,
     pub scoring_table: ScoringTableId,
     pub submission: SubmissionState,
@@ -35,6 +36,7 @@ pub struct ManualBvElement {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ManualBvAssessment {
+    pub rotation_conflicts: Vec<RotationPreferenceConflict>,
     pub elements: Vec<ManualBvElement>,
     pub total: AssessmentAggregate,
     pub legality: ProgramLegalityReport,
@@ -140,6 +142,10 @@ pub(crate) fn assess_selections(
     )?;
     Ok((
         ManualBvAssessment {
+            rotation_conflicts: crate::rotation::conflicts(
+                program.elements.iter(),
+                request.rotation_preference,
+            ),
             elements,
             total,
             legality,

@@ -1,6 +1,6 @@
 //! Bounded, category-aware jump-only optimization.
 use super::*;
-use crate::{Finding, JumpPart, SourceReference};
+use crate::{Finding, JumpPart, RotationPreference, SourceReference};
 use std::time::Duration;
 
 mod model;
@@ -9,6 +9,7 @@ mod model;
 /// must be listed explicitly and may contain only allowed, non-excluded jumps.
 #[derive(Debug, Clone)]
 pub struct JumpOptimizerRequest {
+    pub rotation_preference: RotationPreference,
     pub category: AdultCategory,
     pub ruleset: RulesetId,
     pub scoring_table: ScoringTableId,
@@ -181,6 +182,15 @@ fn request_allows(
         return Ok(false);
     }
     for element in elements {
+        if crate::rotation::conflict(
+            &PlannedElement::Jump(element.clone()),
+            0,
+            request.rotation_preference,
+        )
+        .is_some()
+        {
+            return Ok(false);
+        }
         if matches!(element, JumpElement::Combination(_)) && !request.combinations.contains(element)
         {
             return Ok(false);
@@ -209,6 +219,7 @@ pub fn optimize_jumps(
 /// The same finite-domain solver controls as the legacy request, with profile selection.
 #[derive(Debug, Clone)]
 pub struct ProfileJumpOptimizerRequest {
+    pub rotation_preference: RotationPreference,
     pub profile: crate::ProfileId,
     pub scoring_table: ScoringTableId,
     pub allowed_jumps: Vec<ListedJump>,
@@ -227,6 +238,7 @@ impl ProfileJumpOptimizerRequest {
     fn search_controls(&self, profile: &crate::RuleProfile) -> JumpOptimizerRequest {
         // The internal legacy carrier supplies domain controls only; policy comes from profile.
         JumpOptimizerRequest {
+            rotation_preference: self.rotation_preference,
             category: AdultCategory::Bronze,
             ruleset: profile.scoring.recognition_ruleset,
             scoring_table: self.scoring_table,
@@ -325,6 +337,35 @@ mod tests {
     use super::*;
 
     #[test]
+    fn profile_adapter_preserves_both_rotation_preferences() {
+        let profile = crate::adult_profile(AdultCategory::Silver);
+        for preference in [
+            RotationPreference::SameDirection,
+            RotationPreference::AllowMixedDirections,
+        ] {
+            let request = ProfileJumpOptimizerRequest {
+                rotation_preference: preference,
+                profile: profile.id.clone(),
+                scoring_table: profile.scoring_table,
+                allowed_jumps: vec![],
+                combinations: vec![],
+                exclusions: vec![],
+                excluded_kinds: vec![],
+                max_elements: 4,
+                require_nonempty: false,
+                max_search_nodes: 100,
+                enumerate_equal_optima: false,
+                max_solutions: 1,
+                time_limit: None,
+            };
+            assert_eq!(
+                request.search_controls(&profile).rotation_preference,
+                preference
+            );
+        }
+    }
+
+    #[test]
     fn each_small_domain_matches_independent_feasibility_fixtures() {
         let a = ListedJump {
             kind: Some(JumpKind::Axel),
@@ -365,6 +406,7 @@ mod tests {
         ];
         for (category, expected) in fixtures {
             let request = JumpOptimizerRequest {
+                rotation_preference: RotationPreference::default(),
                 category,
                 ruleset: BRONZE_RULESET,
                 scoring_table: BRONZE_TABLE,
@@ -400,6 +442,7 @@ mod tests {
         let pair =
             JumpElement::Combination(vec![JumpPart::Jump(a.clone()), JumpPart::Jump(t.clone())]);
         let mut request = JumpOptimizerRequest {
+            rotation_preference: RotationPreference::default(),
             category: AdultCategory::Gold,
             ruleset: BRONZE_RULESET,
             scoring_table: BRONZE_TABLE,

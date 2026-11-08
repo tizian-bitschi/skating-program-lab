@@ -92,6 +92,7 @@ pub fn optimization(
     slots: usize,
 ) -> ProgramOptimizationRequest {
     ProgramOptimizationRequest {
+        rotation_preference: q.rotation_preference,
         season: q.season,
         profile: q.profile.clone(),
         scoring_table: q.scoring_table,

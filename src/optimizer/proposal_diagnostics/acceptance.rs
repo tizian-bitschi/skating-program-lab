@@ -88,6 +88,7 @@ fn controlled_acceptance() {
         let first = generated.domain.variants[0].clone();
         let choices = generated.recognition;
         let completion = ProgramCompletionRequest {
+            rotation_preference: RotationPreference::default(),
             season: q.season,
             profile: q.profile.clone(),
             scoring_table: q.scoring_table,

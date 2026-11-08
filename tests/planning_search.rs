@@ -3,6 +3,7 @@ use skating_program_lab::*;
 
 fn request(category: AdultCategory) -> PlanningSearchRequest {
     PlanningSearchRequest {
+        rotation_preference: RotationPreference::default(),
         profile: adult_profile(category).id,
         scoring_table: ScoringTableId::Isu2786June2_2026,
         required: vec![],
@@ -306,44 +307,59 @@ fn complete_public_repertoire_matches_an_independent_small_exhaustive_oracle() {
         }
         best
     }
-    let mut r = request(AdultCategory::Bronze);
-    for (id, code) in [
-        ("camel", "CCSp1"),
-        ("layback", "CLSp1"),
-        ("choreo", "ChSq1"),
+    for (preference, atoms, alternatives, status) in [
+        (
+            RotationPreference::SameDirection,
+            &atoms[..4],
+            3,
+            PlanningAlternativeStatus::Exhausted,
+        ),
+        (
+            RotationPreference::AllowMixedDirections,
+            &atoms[..],
+            5,
+            PlanningAlternativeStatus::LimitReached,
+        ),
     ] {
-        require(&mut r, id, code);
+        let mut r = request(AdultCategory::Bronze);
+        r.rotation_preference = preference;
+        for (id, code) in [
+            ("camel", "CCSp1"),
+            ("layback", "CLSp1"),
+            ("choreo", "ChSq1"),
+        ] {
+            require(&mut r, id, code);
+        }
+        r.exclusions = [
+            JumpKind::Loop,
+            JumpKind::Flip,
+            JumpKind::Lutz,
+            JumpKind::Axel,
+        ]
+        .into_iter()
+        .map(PlanningExclusion::JumpKind)
+        .collect();
+        let result = proved(&r);
+        assert_eq!(
+            result.maximum_base_hundredths,
+            830 + exhaustive(atoms, 0, 0, 0, 0)
+        );
+        let c = &result.alternatives[0];
+        let reassessed = assess_manual_bv(
+            &ProfileRegistry::adult(),
+            &ManualBvRequest {
+                rotation_preference: preference,
+                profile: r.profile,
+                scoring_table: r.scoring_table,
+                submission: SubmissionState::Complete,
+                elements: c.elements.clone(),
+            },
+        )
+        .unwrap();
+        assert_eq!(c.assessment, reassessed);
+        assert_eq!(result.alternative_status, status);
+        assert_eq!(result.alternatives.len(), alternatives);
     }
-    r.exclusions = [
-        JumpKind::Loop,
-        JumpKind::Flip,
-        JumpKind::Lutz,
-        JumpKind::Axel,
-    ]
-    .into_iter()
-    .map(PlanningExclusion::JumpKind)
-    .collect();
-    let result = proved(&r);
-    assert_eq!(
-        result.maximum_base_hundredths,
-        830 + exhaustive(&atoms, 0, 0, 0, 0)
-    );
-    let c = &result.alternatives[0];
-    let reassessed = assess_manual_bv(
-        &ProfileRegistry::adult(),
-        &ManualBvRequest {
-            profile: r.profile,
-            scoring_table: r.scoring_table,
-            submission: SubmissionState::Complete,
-            elements: c.elements.clone(),
-        },
-    )
-    .unwrap();
-    assert_eq!(c.assessment, reassessed);
-    assert_eq!(
-        result.alternative_status,
-        PlanningAlternativeStatus::LimitReached
-    );
 }
 
 #[test]
@@ -386,6 +402,7 @@ fn profile_slots_are_maxima_and_excluded_jumps_do_not_have_to_be_filled() {
 fn required_sequences_and_euler_units_remain_whole_and_exact() {
     for (code, direct) in [("1F+1A+1Lo+SEQ", true), ("1F+Eu+1Lo", false)] {
         let mut r = request(AdultCategory::Silver);
+        r.rotation_preference = RotationPreference::AllowMixedDirections;
         require(&mut r, "unit", code);
         r.required[0].element.direct_transitions_assumed = direct;
         let result = proved(&r);

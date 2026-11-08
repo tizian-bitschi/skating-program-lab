@@ -4,6 +4,7 @@ const TABLE: ScoringTableId = ScoringTableId::Isu2786June2_2026;
 
 fn request(profile: ProfileId, codes: &[&str]) -> ManualBvRequest {
     ManualBvRequest {
+        rotation_preference: RotationPreference::default(),
         profile,
         scoring_table: TABLE,
         submission: SubmissionState::Complete,

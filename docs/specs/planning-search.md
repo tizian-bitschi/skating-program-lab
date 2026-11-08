@@ -7,9 +7,16 @@ stable caller ID and an exact `AssumedRecognition`; their input order does not
 constrain placement. Exclusions name jump kinds, exact listed jumps and named
 regular-spin kinds. Duplicate IDs are invalid requests.
 
+`request.rotation_preference` selects the personal connection restriction.
+`RotationPreference::default()` permits same-direction compounds;
+`AllowMixedDirections` explicitly requests the broader theoretical repertoire.
+The result records this choice in `PlanningMaximum.rotation_preference`.
+Required personal conflicts are separate errors, not competition violations or
+proofs of rule infeasibility. See the [rotation contract](rotation-preference-proposal.md).
+
 ## Count model and equivalence argument
 
-The repertoire comes from profile-filtered individual selection and complete
+The repertoire comes from profile- and preference-filtered individual selection and complete
 planned jump generation, without a caller shortlist or a variant ceiling.
 Each atomic whole element has one bounded integer occurrence count. Required
 occurrences impose lower bounds on their exact element, including its transition

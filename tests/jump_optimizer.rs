@@ -19,6 +19,7 @@ fn combo(first: &ListedJump, second: &ListedJump) -> JumpElement {
 }
 fn request(category: AdultCategory, jumps: Vec<ListedJump>) -> JumpOptimizerRequest {
     JumpOptimizerRequest {
+        rotation_preference: RotationPreference::default(),
         category,
         ruleset: RulesetId::IsuAdult2026_27July16,
         scoring_table: ScoringTableId::Isu2786June2_2026,

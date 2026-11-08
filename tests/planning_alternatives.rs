@@ -10,6 +10,7 @@ impl PlanningSearchControl for Continue {
 
 fn restricted(allowed: &[JumpKind]) -> PlanningSearchRequest {
     PlanningSearchRequest {
+        rotation_preference: RotationPreference::AllowMixedDirections,
         profile: adult_profile(AdultCategory::Bronze).id,
         scoring_table: ScoringTableId::Isu2786June2_2026,
         required: ["CCSp1", "CLSp1", "ChSq1"]
@@ -263,6 +264,7 @@ fn more_than_five_maxima_match_an_independent_bounded_atomic_oracle() {
         let assessment = assess_manual_bv(
             &ProfileRegistry::adult(),
             &ManualBvRequest {
+                rotation_preference: RotationPreference::AllowMixedDirections,
                 profile: request.profile.clone(),
                 scoring_table: request.scoring_table,
                 submission: SubmissionState::Complete,
