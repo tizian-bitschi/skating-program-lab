@@ -1,6 +1,6 @@
 # Theoretical maximum-BV planning search
 
-Issue #121 implements the Bronze and Silver part of #117. The public seam is
+Issues #121 and #122 implement the four Adult categories in #117. The public seam is
 `search_maximum_bv(registry, request, control)`. Required occurrences contain a
 stable caller ID and an exact `AssumedRecognition`; their input order does not
 constrain placement. Exclusions name jump kinds, exact listed jumps and named
@@ -14,13 +14,13 @@ Each atomic whole element has one bounded integer occurrence count. Required
 occurrences impose lower bounds on their exact element, including its transition
 assumption. Compounds remain indivisible.
 
-The Bronze/Silver theoretical rules inspect only family totals, component
+The Adult theoretical rules inspect only family totals, component
 repetitions, compound/sequence/three-jump/Euler totals, the coexistence of an
 Euler combination with a sequence, spin abbreviation distinctness, and required
 spin roles. These are functions of the multiset of whole elements. Internal
 compound order and exact spin abbreviation stay in the atomic element. No
 execution-feature ordering or timing bonus enters this workflow. Credited BV is
-the sum of the published whole-element values in these two profiles.
+the sum of the published whole-element values in these four profiles.
 
 Consequently mapping an ordered feasible program to counts preserves every
 supported composition condition and its objective. Conversely, sorting the
@@ -33,13 +33,18 @@ never a reason to report impossibility.
 An admissible bound reserves required jump components and spin abbreviations,
 then relaxes compound packing to the remaining profile-derived listed-jump
 capacity and repetition stock. The spin bound considers distinct abbreviations
-and mandatory roles, with required exact values reserved. Independent subsection
+and mandatory roles, with required exact values reserved. Mandatory choreographic
+spins reserve a slot in the overall spin allowance before the regular-spin bound
+is calculated. Required exact step and choreographic choices consume their family
+slots. Gold and Masters use the shared role predicates, including their different
+foot-change restrictions. Masters retains the profile Axel obligation; an exclusion
+removing every Axel produces an explicit diagnostic. Independent subsection
 value bounds strengthen Pumpkin propagation without removing any feasible
 composition. Objective-first, descending-value count branching changes search
 order only. The model checks absolute linear activity before using i32 arithmetic.
 
 The initial model keeps every exact atomic choice. No alias reduction is
-necessary for Bronze/Silver. Later category work must establish its contextual
+necessary for Adult profiles. Later category work must establish its contextual
 credit and reduction argument separately. Shared profile policies supply the
 bounds and role predicates; the search does not define another category policy.
 
@@ -71,3 +76,4 @@ retains the maximum and every already validated alternative with Cancelled.
 Cancellation during initial reconstruction exposes no program.
 
 Legacy ordered completion and evidence-based entry points retain their contracts.
+

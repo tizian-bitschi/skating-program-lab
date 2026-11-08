@@ -250,14 +250,18 @@ pub fn search_maximum_bv(
     let profile = registry
         .resolve(&request.profile, request.scoring_table)
         .map_err(PlanningSearchError::Profile)?;
-    if ![AdultCategory::Bronze, AdultCategory::Silver]
-        .iter()
-        .any(|c| adult_profile(*c) == *profile)
+    if ![
+        AdultCategory::Bronze,
+        AdultCategory::Silver,
+        AdultCategory::Gold,
+        AdultCategory::Masters,
+    ]
+    .iter()
+    .any(|c| adult_profile(*c) == *profile)
     {
         return Err(PlanningSearchError::UnsupportedCoverage {
             profile: request.profile.clone(),
-            reason:
-                "Complete planning search currently supports built-in Bronze and Silver profiles.",
+            reason: "Complete planning search currently supports built-in Adult profiles.",
         });
     }
     let policy = crate::profiles::resolve_program_policy(profile, None)
@@ -341,5 +345,19 @@ pub fn search_maximum_bv(
         return Ok(PlanningSearchOutcome::Infeasible { diagnostics });
     }
     atoms.retain(|a| !a.excluded(&request.exclusions));
+    if profile.jumps.require_axel
+        && !atoms
+            .iter()
+            .any(|a| a.jumps.iter().any(|j| j.kind == Some(JumpKind::Axel)))
+    {
+        return Ok(PlanningSearchOutcome::Infeasible {
+            diagnostics: vec![PlanningDiagnostic {
+                required_input_indices: vec![],
+                rule_id: None,
+                message: "Global exclusions leave no Axel to satisfy the profile obligation."
+                    .into(),
+            }],
+        });
+    }
     model::search(registry, request, profile, &policy, &atoms, control)
 }

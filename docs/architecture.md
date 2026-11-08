@@ -13,7 +13,7 @@ The core is intended for native and eventual WebAssembly use. Correctness and tr
 | Path | Responsibility and interface |
 | --- | --- |
 | `src/lib.rs` | Public re-exports, ruleset and table identities, source references. |
-| `src/planning_search.rs`, `src/planning_search/model.rs` | Complete theoretical Bronze/Silver repertoire, exact required occurrences, semantic exclusions and bounded atomic-count Pumpkin proof, followed by shared manual-BV reconstruction. |
+| `src/planning_search.rs`, `src/planning_search/model.rs` | Complete theoretical Adult repertoire, exact required occurrences, semantic exclusions and bounded atomic-count Pumpkin proof, followed by shared manual-BV reconstruction. |
 | `src/plan.rs` | Ordered `Program` and intended elements; incomplete plans are representable. |
 | `src/assessment.rs` | Additive manual-program entry point; combines existing validation and scoring while preserving intended and supplied-recognition stages, optional GOE and incomplete aggregates. |
 | `src/legality.rs` | Additive stage-aware coverage report built from shared plan validation, explicit profile policies and unevaluated-rule inventory. |
@@ -68,3 +68,4 @@ constraints. It reconstructs provenance and reuses manual assessment for returne
 completions; see [ADR 0003](adr/0003-immutable-program-completion.md).
 
 The versioned `AdultDefinition` in `profiles.rs` is the single built-in policy-data contract for jump, spin and mixed-program adapters. Family sources are explicit. Validators record source-bound `AppliedRule` entries while checking evidence; the optimizer distinguishes this trace from its available-rule inventory.
+

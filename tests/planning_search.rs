@@ -270,13 +270,7 @@ fn cancellation_before_proof_exposes_no_program_and_after_proof_retains_it() {
 }
 
 #[test]
-fn unsupported_profiles_and_unknown_versions_are_not_infeasible() {
-    for category in [AdultCategory::Gold, AdultCategory::Masters] {
-        assert!(matches!(
-            search_maximum_bv(&ProfileRegistry::adult(), &request(category), &Continue),
-            Err(PlanningSearchError::UnsupportedCoverage { .. })
-        ));
-    }
+fn unknown_versions_are_not_infeasible() {
     let mut r = request(AdultCategory::Bronze);
     r.profile.version = "unknown".into();
     assert!(matches!(
@@ -409,5 +403,150 @@ fn required_sequences_and_euler_units_remain_whole_and_exact() {
             .validation
             .findings
             .is_empty());
+    }
+}
+
+#[test]
+fn gold_exact_nonjump_requirements_consume_their_family_slots() {
+    let mut r = request(AdultCategory::Gold);
+    for kind in [
+        JumpKind::ToeLoop,
+        JumpKind::Salchow,
+        JumpKind::Loop,
+        JumpKind::Flip,
+        JumpKind::Lutz,
+        JumpKind::Axel,
+    ] {
+        r.exclusions.push(PlanningExclusion::JumpKind(kind));
+    }
+    require(&mut r, "combination", "CCoSp3V");
+    require(&mut r, "flying", "FSSpB");
+    require(&mut r, "step", "StSqB");
+    // Communication 2786 pp. 7, 9, 14: 270 + 200 + 160 + 350.
+    let result = proved(&r);
+    assert_eq!(result.maximum_base_hundredths, 980);
+    assert_eq!(result.alternatives[0].elements.len(), 4);
+    for required in &r.required {
+        assert!(result.alternatives[0].elements.contains(&required.element));
+    }
+}
+
+#[test]
+fn advanced_adult_complete_domains_prove_literal_source_maxima() {
+    for (category, expected) in [(AdultCategory::Gold, 2420), (AdultCategory::Masters, 3340)] {
+        let started = std::time::Instant::now();
+        let result = proved(&request(category));
+        eprintln!("{category:?}: proved {expected} in {:?}", started.elapsed());
+        // Eight listed jumps, repetition <=2. Gold: 2*(2Lo+2S+2T+1A)=1080;
+        // Masters: 2*(2A+2Lz+2F+2Lo)=1780. Communication 2786.
+        // Gold regular spins 360+360, StSq2 270, ChSp1 350.
+        // Masters CCoSp4 420 + FLSp4/FCSp4 380, StSq4 410, ChSp1 350.
+        assert_eq!(result.maximum_base_hundredths, expected);
+        assert_eq!(
+            result.alternatives[0].assessment.total.exact_hundredths,
+            Some(i64::from(expected))
+        );
+    }
+}
+
+#[test]
+fn masters_axel_exclusion_reports_the_missing_obligation() {
+    let mut r = request(AdultCategory::Masters);
+    r.exclusions
+        .push(PlanningExclusion::JumpKind(JumpKind::Axel));
+    let PlanningSearchOutcome::Infeasible { diagnostics } =
+        search_maximum_bv(&ProfileRegistry::adult(), &r, &Continue).unwrap()
+    else {
+        panic!("expected infeasible")
+    };
+    assert!(diagnostics.iter().any(|d| d.message.contains("Axel")));
+}
+
+#[test]
+fn advanced_adult_small_inventory_matches_exhaustive_count_oracle() {
+    // Only 1T(.40) and 1A(1.10) survive. Every atomic compound consumes
+    // the same repetition stock, so enumerate all inventories (0..=2 each).
+    // Every inventory fits as <=4 solos in five slots; Masters needs an Axel.
+    for category in [AdultCategory::Gold, AdultCategory::Masters] {
+        let mut r = request(category);
+        for kind in [
+            JumpKind::Salchow,
+            JumpKind::Loop,
+            JumpKind::Flip,
+            JumpKind::Lutz,
+        ] {
+            r.exclusions.push(PlanningExclusion::JumpKind(kind));
+        }
+        for kind in [JumpKind::ToeLoop, JumpKind::Axel] {
+            r.exclusions.push(PlanningExclusion::ExactJump(ListedJump {
+                kind: Some(kind),
+                rotations: Some(2),
+            }));
+        }
+        require(&mut r, "combo", "CCoSp3V");
+        require(&mut r, "fly", "FSSpB");
+        require(&mut r, "step", "StSqB");
+        require(&mut r, "first-solo", "1T");
+        require(&mut r, "second-solo", "1T");
+        let mut oracle = 0;
+        for toes in 0..=2 {
+            for axels in 0..=2 {
+                if toes == 2 && (category != AdultCategory::Masters || axels > 0) {
+                    oracle = oracle.max(toes * 40 + axels * 110);
+                }
+            }
+        }
+        let result = proved(&r);
+        assert_eq!(result.maximum_base_hundredths, 980 + oracle);
+        let candidate = &result.alternatives[0];
+        for (input_index, required) in r.required.iter().enumerate() {
+            let i = candidate
+                .provenance
+                .iter()
+                .position(|p| {
+                    *p == PlanningProvenance::Required {
+                        id: required.id.clone(),
+                        input_index,
+                    }
+                })
+                .unwrap();
+            assert_eq!(candidate.elements[i], required.element);
+        }
+        let original = candidate.elements.clone();
+        r.required.reverse();
+        assert_eq!(proved(&r).alternatives[0].elements, original);
+    }
+}
+
+#[test]
+fn advanced_spin_roles_keep_category_foot_change_boundaries() {
+    for (category, forbidden) in [
+        (AdultCategory::Gold, "CoSp3"),
+        (AdultCategory::Masters, "FCCoSp4"),
+    ] {
+        let mut r = request(category);
+        require(&mut r, "forbidden-role", forbidden);
+        assert!(matches!(
+            search_maximum_bv(&ProfileRegistry::adult(), &r, &Continue),
+            Err(PlanningSearchError::InvalidRequest { .. })
+        ));
+    }
+    for category in [AdultCategory::Gold, AdultCategory::Masters] {
+        let mut r = request(category);
+        r.exclusions
+            .push(PlanningExclusion::SpinKind(RegularSpinKind::Combination));
+        assert!(matches!(
+            search_maximum_bv(&ProfileRegistry::adult(), &r, &Continue).unwrap(),
+            PlanningSearchOutcome::Infeasible { .. }
+        ));
+        assert_eq!(
+            search_maximum_bv(
+                &ProfileRegistry::adult(),
+                &request(category),
+                &CancelAt(PlanningSearchPhase::IncumbentFound)
+            )
+            .unwrap(),
+            PlanningSearchOutcome::Cancelled
+        );
     }
 }
