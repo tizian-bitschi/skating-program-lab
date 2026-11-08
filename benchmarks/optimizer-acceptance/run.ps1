@@ -7,7 +7,7 @@ param(
 $ErrorActionPreference = 'Stop'
 $root = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
 function Git([string[]]$Arguments) {
-    $value = & git -C $root @Arguments
+    $value = & git.exe -C $root @Arguments
     if ($LASTEXITCODE -ne 0) { throw "git failed: $Arguments" }
     return $value
 }
@@ -65,3 +65,4 @@ try {
 } finally { $env:ACCEPTANCE_MANIFEST = $previousManifest }
 if ((Get-FileHash (Join-Path $output 'before-inputs.txt')).Hash -ne (Get-FileHash (Join-Path $output 'after-inputs.txt')).Hash) { throw 'Runtime request manifests differ' }
 "Retained observations, exact requests and detached instrumented checkouts: $output"
+
