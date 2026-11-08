@@ -178,6 +178,7 @@ struct Validator<'a> {
     applied_rules: Vec<AppliedRule>,
     credit_blocks: JumpCreditBlocks,
     assumed_direct_sequences: &'a [usize],
+    planned_transitions: bool,
     policy: &'a crate::JumpPolicy,
     findings: Vec<Finding>,
     occurrences: Vec<(JumpKind, u8)>,
@@ -190,12 +191,17 @@ struct Validator<'a> {
     axel_unknown: bool,
 }
 impl<'a> Validator<'a> {
-    fn new(profile: &'a crate::RuleProfile, assumed_direct_sequences: &'a [usize]) -> Self {
+    fn new(
+        profile: &'a crate::RuleProfile,
+        assumed_direct_sequences: &'a [usize],
+        planned_transitions: bool,
+    ) -> Self {
         Self {
             profile,
             applied_rules: vec![],
             credit_blocks: JumpCreditBlocks::default(),
             assumed_direct_sequences,
+            planned_transitions,
             policy: &profile.jumps,
             findings: vec![],
             occurrences: vec![],
@@ -381,7 +387,7 @@ impl<'a> Validator<'a> {
                             Some(i),
                             "Euler must be between listed jumps.",
                         );
-                    } else {
+                    } else if !self.planned_transitions {
                         self.add(FindingKind::Unknown, Rule::Euler, Some(index), Some(i), "The plan does not establish the foot transition after Euler or the panel consequence.");
                     }
                 }
@@ -411,7 +417,7 @@ impl<'a> Validator<'a> {
                 _ => {}
             }
         }
-        if !sequence {
+        if !sequence && !self.planned_transitions {
             for (i, pair) in parts.windows(2).enumerate() {
                 if let [JumpPart::Jump(_), JumpPart::Jump(next)] = pair {
                     if !matches!(next.kind, Some(JumpKind::ToeLoop | JumpKind::Loop)) {
@@ -499,7 +505,23 @@ impl<'a> Validator<'a> {
                 },
             );
             let later = &listed[1..];
-            if !later.iter().any(|j| j.kind == Some(JumpKind::Axel)) {
+            let qualifying_axel = if self.planned_transitions {
+                parts.windows(2).any(|pair| {
+                    matches!(
+                        pair,
+                        [
+                            JumpPart::Jump(_),
+                            JumpPart::Jump(ListedJump {
+                                kind: Some(JumpKind::Axel),
+                                ..
+                            })
+                        ]
+                    )
+                })
+            } else {
+                later.iter().any(|j| j.kind == Some(JumpKind::Axel))
+            };
+            if !qualifying_axel {
                 self.add(
                     if later.iter().any(|j| j.kind.is_none()) {
                         FindingKind::Unknown
@@ -711,15 +733,16 @@ pub(crate) fn validate_elements(
     elements: &[PlannedElement],
     profile: &crate::RuleProfile,
 ) -> ValidationResult {
-    validate_elements_traced(elements, profile, &[]).0
+    validate_elements_traced(elements, profile, &[], false).0
 }
 
 pub(crate) fn validate_elements_traced(
     elements: &[PlannedElement],
     profile: &crate::RuleProfile,
     assumed_direct_sequences: &[usize],
+    planned_transitions: bool,
 ) -> (ValidationResult, Vec<AppliedRule>, JumpCreditBlocks) {
-    let mut validator = Validator::new(profile, assumed_direct_sequences);
+    let mut validator = Validator::new(profile, assumed_direct_sequences, planned_transitions);
     if crate::senior::selected(profile, Rule::Count) {
         validator.apply(Rule::Count, None, None);
         if elements.len() > crate::senior::DEFINITION.max_elements {
