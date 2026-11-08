@@ -250,14 +250,18 @@ pub fn search_maximum_bv(
     let profile = registry
         .resolve(&request.profile, request.scoring_table)
         .map_err(PlanningSearchError::Profile)?;
-    if ![AdultCategory::Bronze, AdultCategory::Silver]
-        .iter()
-        .any(|c| adult_profile(*c) == *profile)
+    if ![
+        AdultCategory::Bronze,
+        AdultCategory::Silver,
+        AdultCategory::Gold,
+        AdultCategory::Masters,
+    ]
+    .iter()
+    .any(|c| adult_profile(*c) == *profile)
     {
         return Err(PlanningSearchError::UnsupportedCoverage {
             profile: request.profile.clone(),
-            reason:
-                "Complete planning search currently supports built-in Bronze and Silver profiles.",
+            reason: "Complete planning search currently supports built-in Adult profiles.",
         });
     }
     let policy = crate::profiles::resolve_program_policy(profile, None)

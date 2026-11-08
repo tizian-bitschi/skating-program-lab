@@ -270,13 +270,7 @@ fn cancellation_before_proof_exposes_no_program_and_after_proof_retains_it() {
 }
 
 #[test]
-fn unsupported_profiles_and_unknown_versions_are_not_infeasible() {
-    for category in [AdultCategory::Gold, AdultCategory::Masters] {
-        assert!(matches!(
-            search_maximum_bv(&ProfileRegistry::adult(), &request(category), &Continue),
-            Err(PlanningSearchError::UnsupportedCoverage { .. })
-        ));
-    }
+fn unknown_versions_are_not_infeasible() {
     let mut r = request(AdultCategory::Bronze);
     r.profile.version = "unknown".into();
     assert!(matches!(
@@ -409,5 +403,48 @@ fn required_sequences_and_euler_units_remain_whole_and_exact() {
             .validation
             .findings
             .is_empty());
+    }
+}
+
+#[test]
+fn gold_exact_nonjump_requirements_consume_their_family_slots() {
+    let mut r = request(AdultCategory::Gold);
+    for kind in [
+        JumpKind::ToeLoop,
+        JumpKind::Salchow,
+        JumpKind::Loop,
+        JumpKind::Flip,
+        JumpKind::Lutz,
+        JumpKind::Axel,
+    ] {
+        r.exclusions.push(PlanningExclusion::JumpKind(kind));
+    }
+    require(&mut r, "combination", "CCoSp3V");
+    require(&mut r, "flying", "FSSpB");
+    require(&mut r, "step", "StSqB");
+    // Communication 2786 pp. 7, 9, 14: 270 + 200 + 160 + 350.
+    let result = proved(&r);
+    assert_eq!(result.maximum_base_hundredths, 980);
+    assert_eq!(result.alternatives[0].elements.len(), 4);
+    for required in &r.required {
+        assert!(result.alternatives[0].elements.contains(&required.element));
+    }
+}
+
+#[test]
+fn advanced_adult_complete_domains_prove_literal_source_maxima() {
+    for (category, expected) in [(AdultCategory::Gold, 2420), (AdultCategory::Masters, 3340)] {
+        let started = std::time::Instant::now();
+        let result = proved(&request(category));
+        eprintln!("{category:?}: proved {expected} in {:?}", started.elapsed());
+        // Eight listed jumps, repetition <=2. Gold: 2*(2Lo+2S+2T+1A)=1080;
+        // Masters: 2*(2A+2Lz+2F+2Lo)=1780. Communication 2786.
+        // Gold regular spins 360+360, StSq2 270, ChSp1 350.
+        // Masters CCoSp4 420 + FLSp4/FCSp4 380, StSq4 410, ChSp1 350.
+        assert_eq!(result.maximum_base_hundredths, expected);
+        assert_eq!(
+            result.alternatives[0].assessment.total.exact_hundredths,
+            Some(i64::from(expected))
+        );
     }
 }

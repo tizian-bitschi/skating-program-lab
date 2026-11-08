@@ -113,6 +113,13 @@ fn value_upper_bound(
         best
     }
     let mut required_spins: Vec<_> = required.iter().filter_map(|a| a.spin).collect();
+    let required_choreographic_spins = required
+        .iter()
+        .filter(|a| a.family() == ProfileElementFamily::ChoreographicSpin)
+        .count();
+    // Choreographic spins consume the same overall spin allowance.
+    let choreographic_slots =
+        required_choreographic_spins.max(usize::from(policy.require_choreographic_spin));
     spin_values.retain(|(s, _)| !required_spins.contains(s));
     let spin_bound = required
         .iter()
@@ -123,17 +130,21 @@ fn value_upper_bound(
             &spin_values,
             &policy.spins,
             &mut required_spins,
-            policy.spins.max_spins - required.iter().filter(|a| a.spin.is_some()).count(),
+            policy.spins.max_spins
+                - required.iter().filter(|a| a.spin.is_some()).count()
+                - choreographic_slots,
         )
         .max(0);
     let family_bound = |family, cap: usize| {
-        atoms
-            .iter()
-            .filter(|a| a.family() == family)
-            .map(|a| a.value)
-            .max()
-            .unwrap_or(0)
-            * cap as i32
+        let reserved: Vec<_> = required.iter().filter(|a| a.family() == family).collect();
+        reserved.iter().map(|a| a.value).sum::<i32>()
+            + atoms
+                .iter()
+                .filter(|a| a.family() == family)
+                .map(|a| a.value)
+                .max()
+                .unwrap_or(0)
+                * (cap - reserved.len()) as i32
     };
     let total = jump_bound
         + spin_bound
