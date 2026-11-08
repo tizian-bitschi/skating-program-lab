@@ -44,6 +44,17 @@ fn senior_two_identical_advanced_solos_receive_exact_contextual_credit() {
             result.alternatives[0].assessment.total.exact_hundredths,
             Some(3460)
         );
+        let credits: Vec<_> = result.alternatives[0]
+            .elements
+            .iter()
+            .zip(&result.alternatives[0].assessment.elements)
+            .filter(|(e, _)| e.code == "3A")
+            .map(|(_, e)| match &e.credited_base {
+                Ok(BaseValueOutcome::Value(v)) => v.hundredths,
+                _ => panic!("expected credit"),
+            })
+            .collect();
+        assert_eq!(credits, [800, 640]);
     }
 }
 
@@ -122,6 +133,22 @@ fn senior_empty_complete_domain_matches_literal_component_bound() {
         // four distinct quints(5600). Two compounds permit nine components;
         // quints remain solos. Non-jumps add 1910. No solo repetition loss applies.
         assert_eq!(result.maximum_base_hundredths, 13310);
+        assert_eq!(result.alternatives.len(), 5);
+        assert_eq!(
+            result.alternative_status,
+            PlanningAlternativeStatus::LimitReached
+        );
+        let identities: std::collections::HashSet<Vec<_>> = result
+            .alternatives
+            .iter()
+            .map(|a| {
+                a.elements
+                    .iter()
+                    .map(|e| (&e.code, e.direct_transitions_assumed))
+                    .collect()
+            })
+            .collect();
+        assert_eq!(identities.len(), 5);
         assert!(result.alternatives[0]
             .assessment
             .legality
@@ -170,6 +197,12 @@ fn senior_maximizes_credited_value_instead_of_the_raw_catalog_sum() {
         // One remaining solo: raw 5Lz=1400 beats 4A=1250, but its credited
         // repeat is1120. Thus raw maximum5060 differs from credited maximum4910.
         assert_eq!(result.maximum_base_hundredths, 4910);
+        // Two equal-value combination abbreviations × two flying abbreviations.
+        assert_eq!(result.alternatives.len(), 4);
+        assert_eq!(
+            result.alternative_status,
+            PlanningAlternativeStatus::Exhausted
+        );
         assert!(result.alternatives[0]
             .elements
             .iter()
@@ -226,4 +259,26 @@ fn senior_preserves_required_v_spin_euler_and_exact_multiplicities() {
         .iter()
         .all(|p| matches!(p, PlanningProvenance::Required { .. })));
     assert!(first.elements.iter().any(|e| e.code == "CCoSp4V"));
+}
+
+#[test]
+fn senior_required_regular_spins_cannot_displace_mandatory_choreographic_spin() {
+    let profile = senior_profile(SeniorCategory::Women);
+    let request = PlanningSearchRequest {
+        profile: profile.id,
+        scoring_table: profile.scoring_table,
+        required: ["CCoSp4", "FCSp4", "FSSp4"]
+            .into_iter()
+            .enumerate()
+            .map(|(i, code)| RequiredPlanningElement {
+                id: i.to_string(),
+                element: AssumedRecognition::new(code),
+            })
+            .collect(),
+        exclusions: vec![],
+    };
+    assert!(matches!(
+        search_maximum_bv(&ProfileRegistry::senior(), &request, &Continue).unwrap(),
+        PlanningSearchOutcome::Infeasible { .. }
+    ));
 }

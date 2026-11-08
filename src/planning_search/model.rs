@@ -138,9 +138,9 @@ fn value_upper_bound(
             &spin_values,
             &policy.spins,
             &mut required_spins,
-            policy.spins.max_spins
-                - required.iter().filter(|a| a.spin.is_some()).count()
-                - choreographic_slots,
+            policy.spins.max_spins.saturating_sub(
+                required.iter().filter(|a| a.spin.is_some()).count() + choreographic_slots,
+            ),
         )
         .max(0);
     let family_bound = |family, cap: usize| {
@@ -301,6 +301,8 @@ pub(super) fn search(
     let sequence_count = solver.new_bounded_integer(0, profile.jumps.max_sequences as i32);
     let euler_combination_count = solver.new_bounded_integer(0, profile.jumps.max_compounds as i32);
     let objective = solver.new_bounded_integer(0, upper);
+    let jump_value = solver.new_bounded_integer(0, jump_bound);
+    let spin_value = solver.new_bounded_integer(0, spin_bound);
     let advanced: Vec<_> = if senior {
         atoms
             .iter()
@@ -484,18 +486,6 @@ pub(super) fn search(
             max_elements as i32,
         );
     }
-    if !senior {
-        constrain(
-            &|a| if a.jumps.is_empty() { 0 } else { a.value },
-            0,
-            jump_bound,
-        );
-    }
-    constrain(
-        &|a| if a.spin.is_some() { a.value } else { 0 },
-        0,
-        spin_bound,
-    );
     for (aggregate, select) in [
         (
             sequence_count,
@@ -553,21 +543,30 @@ pub(super) fn search(
             solver.add_clause(vec![predicate!(aggregate >= 2), predicate!(flag == 0)], tag);
         }
     }
-    if senior {
+    for (aggregate, jumps) in [(jump_value, true), (spin_value, false)] {
         let mut terms: Vec<_> = atoms
             .iter()
             .zip(&counts)
-            .filter(|(a, _)| !a.jumps.is_empty())
+            .filter(|(a, _)| {
+                if jumps {
+                    !a.jumps.is_empty()
+                } else {
+                    a.spin.is_some()
+                }
+            })
             .map(|(a, v)| v.scaled(a.value))
             .collect();
-        terms.extend(
-            advanced
-                .iter()
-                .map(|(_, loss, _, _, _, reduced)| reduced.scaled(-loss)),
-        );
+        if jumps {
+            terms.extend(
+                advanced
+                    .iter()
+                    .map(|(_, loss, _, _, _, reduced)| reduced.scaled(-loss)),
+            );
+        }
+        terms.push(aggregate.scaled(-1));
         let tag = solver.new_constraint_tag();
         solver
-            .add_constraint(pumpkin_solver::less_than_or_equals(terms, jump_bound, tag))
+            .add_constraint(pumpkin_solver::equals(terms, 0, tag))
             .post();
     }
     for (high_only, cap) in [
@@ -586,18 +585,18 @@ pub(super) fn search(
                 .post();
         }
     }
-    // Exact catalog values; absolute activity was checked before construction.
+    // Exact credited section totals strengthen propagation across the full repertoire.
     let mut terms: Vec<_> = atoms
         .iter()
         .zip(&counts)
+        .filter(|(a, _)| a.jumps.is_empty() && a.spin.is_none())
         .map(|(a, v)| v.scaled(a.value))
         .collect();
-    terms.extend(
-        advanced
-            .iter()
-            .map(|(_, loss, _, _, _, reduced)| reduced.scaled(-loss)),
-    );
-    terms.push(objective.scaled(-1));
+    terms.extend([
+        jump_value.scaled(1),
+        spin_value.scaled(1),
+        objective.scaled(-1),
+    ]);
     let tag = solver.new_constraint_tag();
     solver
         .add_constraint(pumpkin_solver::equals(terms, 0, tag))
@@ -611,7 +610,7 @@ pub(super) fn search(
             .cmp(&a.value)
             .then(a.assumption.code.cmp(&b.assumption.code))
     });
-    let mut variables = vec![objective];
+    let mut variables = vec![objective, jump_value, spin_value];
     variables.extend(ordered.into_iter().map(|(_, v)| *v));
     variables.extend([sequence_count, euler_combination_count]);
     variables.extend(
@@ -656,10 +655,23 @@ pub(super) fn search(
     };
     let mut alternatives = vec![first];
     let mut status = PlanningAlternativeStatus::Cancelled;
+    let mut vectors = vec![selected.clone()];
+    let mut expanded = 0;
+    let mut blocked = 0;
+    let minimum: Vec<_> = atoms
+        .iter()
+        .map(|a| {
+            request
+                .required
+                .iter()
+                .filter(|r| r.element == a.assumption)
+                .count() as i32
+        })
+        .collect();
     if !control.is_cancelled(PlanningSearchPhase::MaximumProved) {
         let tag = solver.new_constraint_tag();
         solver.add_clause(vec![predicate!(objective == maximum as i32)], tag);
-        loop {
+        'collect: loop {
             if control.is_cancelled(PlanningSearchPhase::Alternatives) {
                 break;
             }
@@ -667,16 +679,66 @@ pub(super) fn search(
                 status = PlanningAlternativeStatus::LimitReached;
                 break;
             }
-            // Block the whole-element multiset, never auxiliary assignments or IDs.
-            let tag = solver.new_constraint_tag();
-            solver.add_clause(
-                counts
+            // Keep exact atoms: permitted compound order aliases preserve every
+            // count coefficient and contextual solo credit, without another proof.
+            while expanded < vectors.len() {
+                let base = vectors[expanded].clone();
+                expanded += 1;
+                for (source, atom) in atoms.iter().enumerate() {
+                    if base[source] <= minimum[source] || !(atom.combination() || atom.sequence()) {
+                        continue;
+                    }
+                    for (target, alias) in atoms.iter().enumerate() {
+                        if control.is_cancelled(PlanningSearchPhase::Alternatives) {
+                            break 'collect;
+                        }
+                        if source == target || !compound_alias(atom, alias) {
+                            continue;
+                        }
+                        let mut next = base.clone();
+                        next[source] -= 1;
+                        next[target] += 1;
+                        if vectors.contains(&next) {
+                            continue;
+                        }
+                        let Some(candidate) = reconstruct(
+                            registry, request, profile, atoms, &next, maximum, control,
+                        )?
+                        else {
+                            break 'collect;
+                        };
+                        alternatives.push(candidate);
+                        vectors.push(next);
+                        if alternatives.len() == 5 {
+                            status = PlanningAlternativeStatus::LimitReached;
+                            break 'collect;
+                        }
+                    }
+                }
+            }
+            // Strict supermultisets cannot share the fixed optimum in these
+            // positive-credit profiles. Retain full-vector blocking otherwise.
+            while blocked < vectors.len() {
+                let vector = &vectors[blocked];
+                let positive = atoms.iter().all(|a| a.value > 0);
+                let block: Vec<_> = counts
                     .iter()
-                    .zip(&selected)
-                    .map(|(&v, &n)| predicate!(v != n))
-                    .collect::<Vec<_>>(),
-                tag,
-            );
+                    .zip(vector)
+                    .filter_map(|(&v, &n)| {
+                        if positive {
+                            (n > 0).then(|| predicate!(v <= n - 1))
+                        } else {
+                            Some(predicate!(v != n))
+                        }
+                    })
+                    .collect();
+                let tag = solver.new_constraint_tag();
+                solver.add_clause(block, tag);
+                blocked += 1;
+                if control.is_cancelled(PlanningSearchPhase::Alternatives) {
+                    break 'collect;
+                }
+            }
             let mut termination = CollectionCancellation(control);
             let mut resolver = ResolutionResolver::default();
             let next = match solver.satisfy(&mut brancher, &mut termination, &mut resolver) {
@@ -701,6 +763,7 @@ pub(super) fn search(
                 break;
             };
             alternatives.push(candidate);
+            vectors.push(selected.clone());
         }
     }
     Ok(PlanningSearchOutcome::ProvenMaximum(PlanningMaximum {
@@ -710,6 +773,17 @@ pub(super) fn search(
         alternatives,
         alternative_status: status,
     }))
+}
+
+fn compound_alias(a: &Atom, b: &Atom) -> bool {
+    a.combination() == b.combination()
+        && a.sequence() == b.sequence()
+        && a.eulers == b.eulers
+        && a.value == b.value
+        && a.jumps.len() == b.jumps.len()
+        && a.jumps.iter().all(|j| {
+            a.jumps.iter().filter(|x| *x == j).count() == b.jumps.iter().filter(|x| *x == j).count()
+        })
 }
 
 struct CollectionCancellation<'a, C>(&'a C);

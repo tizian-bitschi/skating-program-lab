@@ -1,6 +1,6 @@
 # Theoretical maximum-BV planning search
 
-Issues #121–#123 implement the four Adult categories and both source-bound Senior
+Issues #121â€“#123 implement the four Adult categories and both source-bound Senior
 profiles in #117. The public seam is
 `search_maximum_bv(registry, request, control)`. Required occurrences contain a
 stable caller ID and an exact `AssumedRecognition`; their input order does not
@@ -41,7 +41,9 @@ slots. Gold and Masters use the shared role predicates, including their differen
 foot-change restrictions. Masters retains the profile Axel obligation; an exclusion
 removing every Axel produces an explicit diagnostic. Independent subsection
 value bounds strengthen Pumpkin propagation without removing any feasible
-composition. Objective-first, descending-value count branching changes search
+composition. Exact credited-jump and regular-spin subtotal variables link these
+section bounds to the overall objective, so an optimal total propagates section
+limits before whole-element choices are branched. Objective-first, descending-value count branching changes search
 order only. The model checks absolute linear activity before using i32 arithmetic.
 
 The model keeps every exact atomic choice, including all 51,518 Senior jump
@@ -97,11 +99,28 @@ a claim that reconstruction has been checked. MaximumProved occurs after a
 returned representative has passed manual assessment. Alternative collection
 has its own Exhausted, LimitReached or Cancelled status. After proving the optimum and validating its first representative, the model
 fixes credited BV to the proved value and enumerates up to five distinct
-whole-element multisets. A nogood excludes the complete atomic count vector,
-including zero counts; auxiliary assignments and required-ID swaps never create
-another composition. Exact compound codes, transition assumptions and repeated
+whole-element multisets. At fixed optimum, a sparse nogood requires at least one selected atomic count
+to decrease. This is equivalent to excluding its complete count vector in the
+positive-value built-in profiles: any strict supermultiset increases credited BV.
+Adult credit is additive; a second identical advanced Senior solo adds its
+positive 80% value, and adding a compound cannot introduce a two-solo loss.
+Illegal third advanced occurrences remain forbidden. Thus no other optimum is
+removed. If a nonpositive atomic value is ever present, collection falls back to
+complete-vector inequalities, including zero counts. Auxiliary assignments and
+required-ID swaps never create another composition. Exact compound codes, transition assumptions and repeated
 occurrences remain part of identity. Count and value branching and reconstruction
 use deterministic repertoire order.
+
+Before another SAT solve, collection traverses order aliases of confirmed whole
+compounds. An alias has the same combination/sequence family, Euler count, raw
+value and exact listed-component multiset, and is already in the permitted domain.
+Replacing one occurrence above its exact required minimum preserves every model
+coefficient and the Senior solo-credit context. Full count vectors suppress
+duplicates, and shared reconstruction/manual assessment confirms each candidate.
+This breadth-first traversal changes collection order only; it does not group or
+prune atoms. If fewer than five are found, every emitted vector is blocked before
+the complete fixed-objective SAT search resumes. Cancellation keeps only already
+validated alternatives.
 
 Fewer than five alternatives carry Exhausted only after the solver proves no
 further vector exists. Five alternatives carry LimitReached even when there
