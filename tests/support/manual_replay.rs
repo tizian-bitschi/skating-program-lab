@@ -103,6 +103,7 @@ fn complete_source_linked_manual_envelope_keeps_movement_evidence_missing() {
         .collect();
     let registry = ProfileRegistry::senior();
     let request = ManualProgramRequest {
+        personal_limits: PersonalLimits::default(),
         rotation_preference: RotationPreference::default(),
         profile: senior_profile(SeniorCategory::Women).id,
         scoring_table: TABLE,

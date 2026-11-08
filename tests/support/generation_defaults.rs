@@ -3,6 +3,7 @@ use skating_program_lab::*;
 // Empty finite selections: callers must choose every candidate family explicitly.
 pub fn request(profile: RuleProfile) -> CandidateGenerationRequest {
     CandidateGenerationRequest {
+        personal_limits: PersonalLimits::default(),
         rotation_preference: RotationPreference::default(),
         season: profile.season,
         profile: profile.id,

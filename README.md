@@ -22,6 +22,12 @@ broader theoretical repertoire. Manual assessment preserves BV and reports
 personal conflicts separately from rule findings. See the
 [rotation preference](docs/specs/rotation-preference-proposal.md) and
 [planned jump grammar](docs/specs/planned-jump-domain.md).
+`PersonalLimits` caps each exact regular-spin abbreviation at Basic or level 1–4
+and each jump kind at a listed rotation class (Single through Quintuple).
+Selection, generation, optimization and immutable completion share these limits;
+manual assessment reports personal conflicts separately from BV and competition
+legality. Empty limits preserve existing behavior. See the
+[personal limits contract](docs/specs/personal-limits.md).
 The [manual category workflow](docs/manual-category-planning.md) explains selection,
 credited values and the distinction between drafts, violations and unsupported choices.
 Prepare a `GoeScenarioPlan` from the selected codes to run

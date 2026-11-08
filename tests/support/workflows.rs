@@ -92,6 +92,7 @@ pub fn optimization(
     slots: usize,
 ) -> ProgramOptimizationRequest {
     ProgramOptimizationRequest {
+        personal_limits: PersonalLimits::default(),
         rotation_preference: q.rotation_preference,
         season: q.season,
         profile: q.profile.clone(),

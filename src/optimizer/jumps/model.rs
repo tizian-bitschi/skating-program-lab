@@ -57,14 +57,40 @@ fn universe(
 ) -> Result<Vec<JumpElement>, JumpOptimizerError> {
     let mut universe = Vec::new();
     for jump in &request.allowed_jumps {
-        jump_code(jump)?;
         let element = JumpElement::Solo(jump.clone());
+        if !request
+            .personal_limits
+            .conflicts(
+                &PlannedElement::Jump(element.clone()),
+                &ElementPlanEvidence::Jump {
+                    direct_transitions_assumed: false,
+                },
+                0,
+            )
+            .is_empty()
+        {
+            continue;
+        }
+        jump_code(jump)?;
         if request_allows(request, std::slice::from_ref(&element))? && !universe.contains(&element)
         {
             universe.push(element);
         }
     }
     for element in &request.combinations {
+        if !request
+            .personal_limits
+            .conflicts(
+                &PlannedElement::Jump(element.clone()),
+                &ElementPlanEvidence::Jump {
+                    direct_transitions_assumed: false,
+                },
+                0,
+            )
+            .is_empty()
+        {
+            continue;
+        }
         if !matches!(element, JumpElement::Combination(_)) {
             return Err(JumpOptimizerError::UnsupportedVariant);
         }
@@ -358,6 +384,7 @@ mod tests {
     #[test]
     fn stopped_with_valid_incumbent_is_not_proven() {
         let request = JumpOptimizerRequest {
+            personal_limits: PersonalLimits::default(),
             rotation_preference: RotationPreference::default(),
             category: AdultCategory::Bronze,
             ruleset: BRONZE_RULESET,

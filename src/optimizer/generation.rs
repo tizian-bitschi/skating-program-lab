@@ -20,6 +20,7 @@ pub struct PersonalSkillLimits {
 /// explicit evidence templates and manual candidates retain their input order.
 #[derive(Debug, Clone)]
 pub struct CandidateGenerationRequest {
+    pub personal_limits: PersonalLimits,
     pub rotation_preference: RotationPreference,
     pub season: Season,
     pub profile: ProfileId,
@@ -68,6 +69,7 @@ pub struct CandidateOmission {
 
 #[derive(Debug, Clone)]
 pub struct CandidateGenerationAudit {
+    pub personal_limits: PersonalLimits,
     pub rotation_preference: RotationPreference,
     pub profile: ProfileId,
     pub scoring_table: ScoringTableId,
@@ -129,6 +131,18 @@ impl Generator<'_> {
             self.result.audit.manual_definitions_checked += 1;
         } else {
             self.result.audit.attempted_definitions += 1;
+        }
+        if !self
+            .request
+            .personal_limits
+            .conflicts(&variant.element, &variant.evidence, 0)
+            .is_empty()
+        {
+            self.result.audit.omissions.push(CandidateOmission {
+                variant,
+                reason: "Excluded by personal repertoire maxima.".into(),
+            });
+            return Ok(true);
         }
         let reason = self.check(&variant, manual)?;
         if let Some(reason) = reason {
@@ -544,6 +558,7 @@ fn generate_candidates(
         result: CandidateGenerationResult {
             variants: vec![],
             audit: CandidateGenerationAudit {
+                personal_limits: request.personal_limits.clone(),
                 rotation_preference: request.rotation_preference,
                 profile: profile.id.clone(),
                 scoring_table: request.scoring_table,
