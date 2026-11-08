@@ -177,6 +177,19 @@ fn checked_profile_candidate(
     }))
 }
 
+fn personal_limits_allow(request: &JumpOptimizerRequest, element: &JumpElement) -> bool {
+    request
+        .personal_limits
+        .conflicts(
+            &PlannedElement::Jump(element.clone()),
+            &ElementPlanEvidence::Jump {
+                direct_transitions_assumed: false,
+            },
+            0,
+        )
+        .is_empty()
+}
+
 fn request_allows(
     request: &JumpOptimizerRequest,
     elements: &[JumpElement],
@@ -185,17 +198,7 @@ fn request_allows(
         return Ok(false);
     }
     for element in elements {
-        if !request
-            .personal_limits
-            .conflicts(
-                &PlannedElement::Jump(element.clone()),
-                &ElementPlanEvidence::Jump {
-                    direct_transitions_assumed: false,
-                },
-                0,
-            )
-            .is_empty()
-        {
+        if !personal_limits_allow(request, element) {
             return Ok(false);
         }
         if crate::rotation::conflict(

@@ -601,3 +601,65 @@ fn assumed_generation_filters_all_supported_v_levels_and_preserves_input_indices
     );
     assert_eq!(generated.domain.audit.personal_limits, q.personal_limits);
 }
+
+#[cfg(feature = "optimizer")]
+#[test]
+fn assumed_explicit_generation_omits_capped_adult_compound_with_original_indices() {
+    let mut q = generation_defaults::request(adult_profile(AdultCategory::Bronze));
+    q.manual_variants = vec![
+        ProgramVariant {
+            element: PlannedElement::Jump(JumpElement::Combination(vec![
+                JumpPart::Jump(ListedJump {
+                    kind: Some(JumpKind::Lutz),
+                    rotations: Some(3),
+                }),
+                JumpPart::Jump(ListedJump {
+                    kind: Some(JumpKind::ToeLoop),
+                    rotations: Some(2),
+                }),
+            ])),
+            evidence: ElementPlanEvidence::Jump {
+                direct_transitions_assumed: false,
+            },
+            recognition_assumed: false,
+        },
+        ProgramVariant {
+            element: PlannedElement::Jump(JumpElement::Solo(ListedJump {
+                kind: Some(JumpKind::ToeLoop),
+                rotations: Some(1),
+            })),
+            evidence: ElementPlanEvidence::Jump {
+                direct_transitions_assumed: false,
+            },
+            recognition_assumed: false,
+        },
+    ];
+    q.personal_limits.jump_rotations.push(JumpRotationLimit {
+        kind: JumpKind::Lutz,
+        maximum: JumpRotationClass::Double,
+    });
+    q.manual_variants.push(ProgramVariant {
+        element: PlannedElement::Jump(JumpElement::Solo(ListedJump {
+            kind: Some(JumpKind::Lutz),
+            rotations: Some(3),
+        })),
+        evidence: ElementPlanEvidence::Jump {
+            direct_transitions_assumed: false,
+        },
+        recognition_assumed: false,
+    });
+    let codes = ["3Lz+2T", "1T", "3Lz"].map(AssumedRecognition::new);
+    let r =
+        generate_program_candidates_with_assumed_recognition(&ProfileRegistry::adult(), &q, &codes)
+            .unwrap();
+    assert_eq!(r.input_indices, [1]);
+    assert_eq!(r.recognition, [codes[1].clone()]);
+    assert_eq!(r.domain.variants.len(), 1);
+    assert_eq!(r.domain.audit.manual_definitions_checked, 3);
+    assert!(r
+        .domain
+        .audit
+        .omissions
+        .iter()
+        .any(|o| o.variant.element == q.manual_variants[0].element));
+}

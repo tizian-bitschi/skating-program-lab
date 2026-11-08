@@ -111,7 +111,7 @@ struct Generator<'a> {
     request: &'a CandidateGenerationRequest,
     policy: ProgramPolicy,
     result: CandidateGenerationResult,
-    assumed_values: Option<&'a [BaseValue]>,
+    assumed_values: Option<&'a [Option<BaseValue>]>,
 }
 impl Generator<'_> {
     /// false stops expansion; true includes omissions and duplicates.
@@ -218,7 +218,9 @@ impl Generator<'_> {
                 self.request.scoring_table,
                 &self.policy,
                 variant,
-                values[index].clone(),
+                values[index]
+                    .clone()
+                    .expect("permitted assumed variant has a resolved value"),
                 EvaluationScope::AssumedRecognition,
             )
         } else {
@@ -406,7 +408,7 @@ pub fn generate_program_candidates_with_assumed_recognition(
                     });
                 }
                 request.manual_variants.push(variant);
-                values.push(resolved.value);
+                values.push(Some(resolved.value));
                 indices.push(index);
             }
         }
@@ -415,12 +417,20 @@ pub fn generate_program_candidates_with_assumed_recognition(
         for (index, (variant, assumption)) in
             request.manual_variants.iter().zip(recognition).enumerate()
         {
-            selection
-                .check_assumption(&variant.element, assumption)
-                .map_err(|error| E::InvalidManualVariant {
-                    index,
-                    reason: error.reason(&assumption.code),
-                })?;
+            // Capped jumps are checked structurally by resolve_variants before omission.
+            if !matches!(variant.element, PlannedElement::Jump(_))
+                || request
+                    .personal_limits
+                    .conflicts(&variant.element, &variant.evidence, index)
+                    .is_empty()
+            {
+                selection
+                    .check_assumption(&variant.element, assumption)
+                    .map_err(|error| E::InvalidManualVariant {
+                        index,
+                        reason: error.reason(&assumption.code),
+                    })?;
+            }
             indices.push(index);
         }
         let ruleset = registry
@@ -433,6 +443,7 @@ pub fn generate_program_candidates_with_assumed_recognition(
             &mut request.manual_variants,
             recognition,
             ruleset,
+            &request.personal_limits,
         )
         .map_err(|error| match error {
             ProgramOptimizationError::UnsupportedVariant(index) => E::InvalidManualVariant {
@@ -472,7 +483,7 @@ pub fn generate_program_candidates_with_assumed_recognition(
 fn generate_candidates(
     registry: &ProfileRegistry,
     request: &CandidateGenerationRequest,
-    assumed_values: Option<&[BaseValue]>,
+    assumed_values: Option<&[Option<BaseValue>]>,
 ) -> Result<CandidateGenerationResult, CandidateGenerationError> {
     use CandidateGenerationError as E;
     let profile = registry

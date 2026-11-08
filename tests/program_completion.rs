@@ -1408,3 +1408,94 @@ fn fixed_triple_lutz_reports_the_original_conflict_before_completion() {
         }]
     );
 }
+
+#[test]
+fn assumed_completion_filters_capped_adult_compound_and_keeps_original_diagnostics() {
+    let mut q = request();
+    q.original.clear();
+    q.profile = adult_profile(AdultCategory::Bronze).id;
+    q.policy = adult_program_policy(AdultCategory::Bronze);
+    let mut capped = jump(JumpKind::Lutz);
+    capped.element = PlannedElement::Jump(JumpElement::Combination(vec![
+        JumpPart::Jump(ListedJump {
+            kind: Some(JumpKind::Lutz),
+            rotations: Some(3),
+        }),
+        JumpPart::Jump(ListedJump {
+            kind: Some(JumpKind::ToeLoop),
+            rotations: Some(2),
+        }),
+    ]));
+    q.variants = vec![capped.clone(), jump(JumpKind::ToeLoop)];
+    q.personal_limits.jump_rotations.push(JumpRotationLimit {
+        kind: JumpKind::Lutz,
+        maximum: JumpRotationClass::Double,
+    });
+    q.min_additions = 1;
+    q.max_additions = 1;
+    q.insertion.boundaries = vec![0];
+    let codes = ["3Lz+2T", "1T"].map(AssumedRecognition::new);
+    let r = complete_program_with_assumed_recognition(&ProfileRegistry::adult(), &q, &[], &codes)
+        .unwrap();
+    assert_eq!(r.status, OptimizerStatus::OptimalProven);
+    assert!(r.candidates.iter().all(|c| matches!(
+        c.provenance.as_slice(),
+        [CompletionProvenance::Inserted {
+            variant_index: 1,
+            ..
+        }]
+    )));
+    q.original.push(CompletionEntry {
+        id: "capped".into(),
+        locked: true,
+        entry: ManualProgramEntry {
+            planned: capped.element,
+            evidence: capped.evidence,
+            intended_recognition: None,
+            scenario: None,
+        },
+    });
+    q.insertion.boundaries = vec![0, 1];
+    let Err(ProgramCompletionError::PersonalLimitConflict(c)) =
+        complete_program_with_assumed_recognition(
+            &ProfileRegistry::adult(),
+            &q,
+            &codes[..1],
+            &codes,
+        )
+    else {
+        panic!("immutable original conflict")
+    };
+    assert_eq!(c[0].element_index, 0);
+    assert_eq!(c[0].component_index, Some(0));
+}
+
+#[test]
+fn assumed_completion_checks_original_spin_limit_after_resolving_selected_level() {
+    let mut q = request();
+    for original in &mut q.original {
+        original.entry.intended_recognition = None;
+    }
+    q.personal_limits.spin_levels.push(SpinLevelLimit {
+        abbreviation: SpinAbbreviation {
+            kind: RegularSpinKind::Sit,
+            entry: SpinEntry::NonFlying,
+            change_foot: false,
+        },
+        maximum: Level::Basic,
+    });
+    let original_codes = ["1A", "SSpB"].map(AssumedRecognition::new);
+    let addition_codes = ["1T", "1S"].map(AssumedRecognition::new);
+    let r = complete_program_with_assumed_recognition(
+        &ProfileRegistry::adult(),
+        &q,
+        &original_codes,
+        &addition_codes,
+    )
+    .unwrap();
+    assert_eq!(r.status, OptimizerStatus::OptimalProven);
+    assert!(r
+        .candidates
+        .iter()
+        .all(|c| c.assessment.personal_conflicts.is_empty()));
+}

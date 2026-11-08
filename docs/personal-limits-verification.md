@@ -16,11 +16,11 @@ cargo test --offline
 cargo test --offline --no-default-features
 ```
 
-The final default-feature inventory contains 402 tests: 400 passed across the
+The final default-feature inventory contains 406 tests: 404 passed across the
 full suite and final focused regressions; two existing wall-clock diagnostic
 benchmarks remain ignored. No-default-features passed all 264 tests. The final
-focused runs include all 12 personal-limit tests, all eight finite jump tests,
-all 22 completion tests and the two personal mixed-optimizer regressions.
+focused runs include all 13 personal-limit tests, all eight finite jump tests,
+all 24 completion tests and all 17 mixed-optimizer tests.
 No numerical historical fixture changed.
 
 The full default suite completed successfully in the implementation tool
@@ -82,3 +82,39 @@ wall-clock diagnostic benchmarks were not repeated. The new limited-domain
 integration tests independently verify Bronze 10.20 and both Senior maxima
 21.70 with Basic-spin and Single-jump maxima, plus impossible-repertoire,
 required-conflict, manual-assessment and immutable-provenance behavior.
+
+## Review fixes
+
+The assumed-recognition optimizer, explicit generation adapter and completion
+adapter now discard capped optional jumps before profile-specific scoring.
+Sparse assumed values preserve input indices, variant exclusions and required
+alternative groups without placeholder base values. Discarded compounds still
+validate their exact code and shape using shared scoring grammar. Fixed jump
+conflicts retain original indices; fixed spin limits use the selected SOV level
+after assumed evidence resolution. The finite jump adapter shares one private
+personal-limit predicate for early universe filtering and request checks.
+
+Red-first public regressions reproduced Adult Bronze `3Lz+2T` failing before a
+Double-Lutz cap could remove it. They verify the surviving `1T` at original index
+1 and 0.40 BV, compatible required groups, explicit required conflicts, malformed
+or mismatched compounds, generation omissions/provenance and immutable conflicts.
+Additional checks cover capped explicit solo generation and a fixed SSp1 evidence
+entry selected as SSpB under a Basic cap.
+
+Review verification artifacts are retained in the review-fix worktree under
+`target/issue-128-review-verification/`:
+
+- `build.txt`, `fmt.txt`, `clippy.txt`: required checks passed.
+- `default-tests.txt`: complete default suite, 403 passed and two existing ignored
+  diagnostic benchmarks.
+- `no-default-tests.txt`: complete minimal suite, 264 passed.
+- `final-adapter-tests.txt`: final personal-limit and completion suites, 37 passed,
+  including the additional fixed-spin regression and final adapter refinements.
+
+The final default inventory is 406 tests: the full suite and final focused runs
+cover all 404 passing tests, with two existing ignored diagnostics. No numerical
+historical fixture changed. No benchmark request/domain expectation changed, so
+the earlier Release smoke remains applicable and was not repeated. A transient
+Z3 artifact-download HTTP 403 in the initial PR solver-comparison job cleared on
+rerun; the parent task verified the complete initial CI run succeeded. No CI
+configuration changed.

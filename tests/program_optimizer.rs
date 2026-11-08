@@ -1065,3 +1065,61 @@ fn personal_limits_remove_unneeded_unsupported_optional_variants_before_scoring(
         Err(ProgramOptimizationError::UnsupportedVariant(0))
     ));
 }
+
+#[test]
+fn assumed_personal_caps_filter_compounds_before_adult_scoring() {
+    let mut compound = jump(JumpKind::Lutz);
+    compound.element = PlannedElement::Jump(JumpElement::Combination(vec![
+        JumpPart::Jump(ListedJump {
+            kind: Some(JumpKind::Lutz),
+            rotations: Some(3),
+        }),
+        JumpPart::Jump(ListedJump {
+            kind: Some(JumpKind::ToeLoop),
+            rotations: Some(2),
+        }),
+    ]));
+    let mut q = request(
+        AdultCategory::Bronze,
+        vec![compound, jump(JumpKind::ToeLoop)],
+        1,
+    );
+    q.personal_limits.jump_rotations.push(JumpRotationLimit {
+        kind: JumpKind::Lutz,
+        maximum: JumpRotationClass::Double,
+    });
+    let codes = ["3Lz+2T", "1T"].map(AssumedRecognition::new);
+    for required in [vec![], vec![vec![0, 1]], vec![vec![1], vec![0, 1]]] {
+        q.must_have = required;
+        let r = optimize_program_with_assumed_recognition(&ProfileRegistry::adult(), &q, &codes)
+            .unwrap();
+        assert_eq!(r.status, OptimizerStatus::OptimalProven);
+        assert_eq!(r.universe, [1]);
+        assert_eq!(r.excluded_variants, [0]);
+        assert!(r
+            .candidates
+            .iter()
+            .all(|c| c.variant_indices == [1] && c.base_hundredths == 40));
+    }
+    q.must_have = vec![vec![0]];
+    assert!(
+        matches!(optimize_program_with_assumed_recognition(&ProfileRegistry::adult(), &q, &codes), Err(ProgramOptimizationError::PersonalLimitConflict(c)) if c[0].element_index == 0 && c[0].component_index == Some(0))
+    );
+    let valid_compound = q.variants[0].element.clone();
+    q.variants[0].element =
+        PlannedElement::Jump(JumpElement::Combination(vec![JumpPart::Jump(ListedJump {
+            kind: Some(JumpKind::Lutz),
+            rotations: Some(3),
+        })]));
+    let malformed = ["3Lz", "1T"].map(AssumedRecognition::new);
+    assert!(matches!(
+        optimize_program_with_assumed_recognition(&ProfileRegistry::adult(), &q, &malformed),
+        Err(ProgramOptimizationError::UnsupportedVariant(0))
+    ));
+    q.variants[0].element = valid_compound;
+    let mismatched = ["3F+2T", "1T"].map(AssumedRecognition::new);
+    assert!(matches!(
+        optimize_program_with_assumed_recognition(&ProfileRegistry::adult(), &q, &mismatched),
+        Err(ProgramOptimizationError::UnsupportedVariant(0))
+    ));
+}
