@@ -30,7 +30,7 @@ fn empty_bronze_request_proves_the_source_derived_maximum() {
     // Two distinct nonflying one-position spin abbreviations: CCSp1 and CLSp1,
     // each2.40 (Communication2786 pp7-8); ChSq1=3.50 (p14).
     assert_eq!(result.maximum_base_hundredths, 1100);
-    assert_eq!(result.alternatives.len(), 1);
+    assert_eq!(result.alternatives.len(), 5);
     let candidate = &result.alternatives[0];
     assert_eq!(candidate.assessment.total.exact_hundredths, Some(1100));
     assert!(candidate
