@@ -10,6 +10,8 @@ use std::{fmt, str::FromStr};
 mod execution;
 pub use execution::*;
 
+mod rotation;
+pub use rotation::{RotationPreference, RotationPreferenceConflict};
 mod plan;
 mod plan_recognition;
 mod senior;

@@ -97,6 +97,7 @@ fn request(
 ) -> ProgramOptimizationRequest {
     let profile = adult_profile(category);
     ProgramOptimizationRequest {
+        rotation_preference: RotationPreference::default(),
         season: profile.season,
         profile: profile.id,
         scoring_table: profile.scoring_table,
@@ -824,6 +825,7 @@ fn optimize_gold_sov_selections_without_spin_or_step_proof() {
         let manual = assess_manual_bv(
             &registry,
             &ManualBvRequest {
+                rotation_preference: RotationPreference::default(),
                 profile: q.profile.clone(),
                 scoring_table: q.scoring_table,
                 submission: SubmissionState::Complete,
@@ -868,6 +870,7 @@ fn assumed_senior_full_program_matches_manual_bv() {
     let manual = assess_manual_bv(
         &registry,
         &ManualBvRequest {
+            rotation_preference: RotationPreference::default(),
             profile: q.profile,
             scoring_table: q.scoring_table,
             submission: SubmissionState::Complete,

@@ -44,6 +44,7 @@ pub enum PersonalExclusion {
 
 #[derive(Debug, Clone)]
 pub struct ProgramOptimizationRequest {
+    pub rotation_preference: RotationPreference,
     pub season: Season,
     pub profile: ProfileId,
     pub scoring_table: ScoringTableId,
@@ -112,6 +113,7 @@ pub struct ProgramOptimizationResult {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ProgramOptimizationError {
+    RotationPreferenceConflict(Vec<RotationPreferenceConflict>),
     InvalidRequest(&'static str),
     Profile(ProfileSelectionError),
     UnsupportedVariant(usize),
@@ -679,16 +681,34 @@ pub(super) fn optimize_anchored(
                 sources.push(src);
             }
         }
-        if request
-            .exclusions
-            .iter()
-            .any(|x| excluded_in_scope(variant, x, i, assumed_values.is_some()))
+        if crate::rotation::conflict(&variant.element, i, request.rotation_preference).is_some()
+            || request
+                .exclusions
+                .iter()
+                .any(|x| excluded_in_scope(variant, x, i, assumed_values.is_some()))
         {
             excluded_variants.push(i);
         } else {
             universe.push(i);
             values.push(i32::from(value.hundredths));
             universe_values.push((i, value));
+        }
+    }
+    for group in &request.must_have {
+        if !group.is_empty() {
+            let conflicts: Vec<_> = group
+                .iter()
+                .filter_map(|&i| {
+                    crate::rotation::conflict(
+                        &request.variants[i].element,
+                        i,
+                        request.rotation_preference,
+                    )
+                })
+                .collect();
+            if conflicts.len() == group.len() {
+                return Err(E::RotationPreferenceConflict(conflicts));
+            }
         }
     }
     if assumed_values.is_some() {
@@ -1103,6 +1123,7 @@ mod tests {
     pub(super) fn bronze_solos() -> ProgramOptimizationRequest {
         let profile = adult_profile(AdultCategory::Bronze);
         ProgramOptimizationRequest {
+            rotation_preference: RotationPreference::default(),
             season: profile.season,
             profile: profile.id,
             scoring_table: profile.scoring_table,

@@ -1,7 +1,12 @@
 # Planned jump domain
 
-`selectable_jump_elements(registry, profile, table)` returns uncapped exact
+`selectable_jump_elements(registry, profile, table, rotation_preference)` returns uncapped exact
 `AssumedRecognition` choices for atomic solo jumps, combinations and sequences.
+`RotationPreference::default()` selects same-direction compounds. Explicit
+`AllowMixedDirections` selects the broader theoretical connection grammar below.
+The preference is separate from profile eligibility and panel recognition.
+The [rotation contract](rotation-preference-proposal.md) defines the transition
+table, manual conflicts and propagation across search and completion.
 It uses the same profile and SOV selection as `assess_manual_bv`. The internal
 enumerator polls cancellation during catalog and compound expansion; cancellation
 returns no partial repertoire. The legacy bounded evidence generator retains its
@@ -40,7 +45,7 @@ atomic alternatives in the repertoire do not imply their joint compatibility.
 The independent `tests/fixtures/planned-jump-grammar.tsv` transcribes the six
 profile alphabets, listed lengths, Euler and repetition policies. The test
 expands that grammar independently and compares the entire public code set.
-Expected sizes are 30 Bronze, 849 Silver, 2,652 Gold, 6,570 Masters and 51,518
+With explicit `AllowMixedDirections`, expected sizes are 30 Bronze, 849 Silver, 2,652 Gold, 6,570 Masters and 51,518
 for each Senior profile. Senior single jumps have no two-occurrence restriction;
 double and advanced jumps do. Senior published quint solos remain present while
 quints inside compounds remain prohibited (Handbook pp. 27–29; Rule 612 p. 71).

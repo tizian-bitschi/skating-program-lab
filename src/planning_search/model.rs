@@ -65,11 +65,24 @@ fn value_upper_bound(
             .iter()
             .filter(|a| matches!(a.element, PlannedElement::Jump(JumpElement::Solo(_))))
             .collect();
+        // Same-direction compounds only add T/Lo, an Euler continuation, or
+        // sequence Axels beyond their first jump. A sequence excludes a separate
+        // Euler combination, and its internal Euler shares the listed-jump cap.
+        let is_head =
+            |jump: &ListedJump| !matches!(jump.kind, Some(JumpKind::ToeLoop | JumpKind::Loop));
+        let mut heads_left = if request.rotation_preference == RotationPreference::SameDirection {
+            let sequence_extra =
+                profile.jumps.max_sequences * (profile.jumps.max_compound_length - 1);
+            (profile.jumps.max_jumps + sequence_extra.max(profile.jumps.max_eulers))
+                .saturating_sub(required_jumps.iter().filter(|j| is_head(j)).count())
+        } else {
+            usize::MAX
+        };
         let mut components: Vec<_> = solos
             .iter()
             .flat_map(|a| {
                 std::iter::repeat_n(
-                    a.value,
+                    (a.value, is_head(&a.jumps[0])),
                     profile.jumps.max_repetitions
                         - required_jumps.iter().filter(|j| ***j == a.jumps[0]).count(),
                 )
@@ -83,6 +96,15 @@ fn value_upper_bound(
             .sum::<i32>()
             + components
                 .into_iter()
+                .filter_map(|(value, head)| {
+                    if head && heads_left == 0 {
+                        return None;
+                    }
+                    if head {
+                        heads_left -= 1;
+                    }
+                    Some(value)
+                })
                 .take(listed_slots - required_jumps.len())
                 .sum::<i32>()
     };
@@ -799,6 +821,7 @@ pub(super) fn search(
         }
     }
     Ok(PlanningSearchOutcome::ProvenMaximum(PlanningMaximum {
+        rotation_preference: request.rotation_preference,
         profile: request.profile.clone(),
         scoring_table: request.scoring_table,
         maximum_base_hundredths: maximum,

@@ -89,6 +89,7 @@ fn planned_euler_does_not_bypass_category_or_program_limits() {
 
 fn request(profile: ProfileId, submission: SubmissionState, codes: &[&str]) -> ManualBvRequest {
     ManualBvRequest {
+        rotation_preference: RotationPreference::default(),
         profile,
         scoring_table: TABLE,
         submission,
@@ -456,6 +457,7 @@ fn manual_entry_points_agree_on_clean_senior_repetition() {
     let strict = assess_manual_program(
         &registry,
         &ManualProgramRequest {
+            rotation_preference: RotationPreference::default(),
             profile: input.profile,
             scoring_table: TABLE,
             policy,

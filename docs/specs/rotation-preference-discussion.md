@@ -1,7 +1,8 @@
 # Rotation preference: design discussion
 
 Status: product understanding confirmed by the user on 2026-11-08. The concrete
-public API proposal is pending approval. See [implementation proposal](rotation-preference-proposal.md).
+public API changes were subsequently approved and implemented. See the
+[rotation contract](rotation-preference-proposal.md).
 
 Prototype: branch `codex/prototype-rotation-preference`, commit `438e748`,
 `src/planning_search/rotation-preference.prototype.html`.
@@ -37,6 +38,6 @@ deriving feet or rotational direction. Selection and maximum-BV search share the
 planned jump enumerator. Completion consumes an explicit finite variant domain
 and immutable originals. Manual BV assesses exact ordered selections.
 
-Public request structs and function signatures will need a concrete design;
-public API changes remain unapproved. The HTML prototype covers eight illustrative
+Public request structs and function signatures follow the approved rotation
+contract. The HTML prototype covers eight illustrative
 connections and is not a complete transition model or an optimizer proof.

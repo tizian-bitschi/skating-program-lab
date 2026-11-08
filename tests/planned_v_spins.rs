@@ -37,6 +37,7 @@ fn all_planned_combination_v_levels_have_the_published_value_and_named_type() {
             let result = assess_manual_bv(
                 &registry,
                 &ManualBvRequest {
+                    rotation_preference: RotationPreference::default(),
                     profile: profile.clone(),
                     scoring_table: TABLE,
                     submission: SubmissionState::Draft,
@@ -60,6 +61,7 @@ fn planned_v_spins_keep_published_values_and_spin_roles() {
         let result = assess_manual_bv(
             &registry,
             &ManualBvRequest {
+                rotation_preference: RotationPreference::default(),
                 profile: profile.clone(),
                 scoring_table: TABLE,
                 submission: SubmissionState::Complete,
@@ -93,6 +95,7 @@ fn full_and_v_cannot_disguise_a_repeated_spin_abbreviation() {
         let result = assess_manual_bv(
             &registry,
             &ManualBvRequest {
+                rotation_preference: RotationPreference::default(),
                 profile: adult_profile(AdultCategory::Silver).id,
                 scoring_table: TABLE,
                 submission: SubmissionState::Complete,

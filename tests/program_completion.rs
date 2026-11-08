@@ -156,6 +156,7 @@ fn sit() -> ProgramVariant {
 fn request() -> ProgramCompletionRequest {
     let p = adult_profile(AdultCategory::Silver);
     ProgramCompletionRequest {
+        rotation_preference: RotationPreference::default(),
         season: p.season,
         profile: p.id,
         scoring_table: p.scoring_table,
@@ -531,6 +532,7 @@ fn different_original_recognition_evidence_remains_distinct_in_visible_ties() {
 fn generated_domain_audit_is_preserved_and_bound_to_supplied_variants() {
     let mut req = request();
     let generator = CandidateGenerationRequest {
+        rotation_preference: RotationPreference::default(),
         season: req.season,
         profile: req.profile.clone(),
         scoring_table: req.scoring_table,
@@ -817,6 +819,7 @@ fn gold_code_domain_completion_matches_manual_bv_and_order_oracle() {
         let manual = assess_manual_bv(
             &registry,
             &ManualBvRequest {
+                rotation_preference: RotationPreference::default(),
                 profile: q.profile.clone(),
                 scoring_table: q.scoring_table,
                 submission: SubmissionState::Complete,
@@ -968,6 +971,7 @@ fn assumed_senior_completion_keeps_distinct_equal_bv_choices() {
         let manual = assess_manual_bv(
             &registry,
             &ManualBvRequest {
+                rotation_preference: RotationPreference::default(),
                 profile: q.profile.clone(),
                 scoring_table: q.scoring_table,
                 submission: SubmissionState::Complete,
@@ -1094,6 +1098,7 @@ fn assumed_senior_completion_credits_the_second_axel_in_each_allowed_gap() {
         let manual = assess_manual_bv(
             &registry,
             &ManualBvRequest {
+                rotation_preference: RotationPreference::default(),
                 profile: q.profile.clone(),
                 scoring_table: q.scoring_table,
                 submission: SubmissionState::Complete,
@@ -1232,6 +1237,7 @@ fn assumed_senior_completion_matches_eleven_slot_credited_oracle() {
                 assert_eq!(expected.iter().copied().map(u32::from).sum::<u32>(), 4760 + best_delta);
                 assert_eq!(candidate.per_element.iter().map(|v| v.hundredths).collect::<Vec<_>>(), expected);
                 let manual = assess_manual_bv(&registry, &ManualBvRequest {
+rotation_preference: RotationPreference::default(),
                     profile: q.profile.clone(), scoring_table: q.scoring_table,
                     submission: SubmissionState::Complete, elements: selections,
                 }).unwrap();

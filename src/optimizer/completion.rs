@@ -20,6 +20,7 @@ pub struct CompletionInsertionPolicy {
 
 #[derive(Debug, Clone)]
 pub struct ProgramCompletionRequest {
+    pub rotation_preference: RotationPreference,
     pub season: Season,
     pub profile: ProfileId,
     pub scoring_table: ScoringTableId,
@@ -94,6 +95,7 @@ pub struct ProgramCompletionResult {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ProgramCompletionError {
+    RotationPreferenceConflict(Vec<RotationPreferenceConflict>),
     InvalidRequest(&'static str),
     Profile(ProfileSelectionError),
     GlobalExclusionConflict(Vec<String>),
@@ -109,6 +111,7 @@ fn manual(
     submission: SubmissionState,
 ) -> ManualProgramRequest {
     ManualProgramRequest {
+        rotation_preference: request.rotation_preference,
         profile: request.profile.clone(),
         scoring_table: request.scoring_table,
         policy: request.policy.clone(),
@@ -196,6 +199,7 @@ fn validate_request(
         if domain.variants != request.variants
             || domain.audit.profile != request.profile
             || domain.audit.scoring_table != request.scoring_table
+            || domain.audit.rotation_preference != request.rotation_preference
         {
             return Err(E::InvalidRequest("generated domain does not match request"));
         }
@@ -225,6 +229,13 @@ fn check_global_conflicts(
     assumed: bool,
 ) -> Result<(), ProgramCompletionError> {
     use ProgramCompletionError as E;
+    let rotation_conflicts = crate::rotation::conflicts(
+        request.original.iter().map(|e| &e.entry.planned),
+        request.rotation_preference,
+    );
+    if !rotation_conflicts.is_empty() {
+        return Err(E::RotationPreferenceConflict(rotation_conflicts));
+    }
     let conflicts: Vec<_> = request
         .original
         .iter()
@@ -312,6 +323,7 @@ fn prepare_search(
     });
     variants.extend(request.original.iter().map(|e| variant(&e.entry)));
     let search_request = ProgramOptimizationRequest {
+        rotation_preference: request.rotation_preference,
         season: request.season,
         profile: request.profile.clone(),
         scoring_table: request.scoring_table,

@@ -20,6 +20,7 @@ pub struct PersonalSkillLimits {
 /// explicit evidence templates and manual candidates retain their input order.
 #[derive(Debug, Clone)]
 pub struct CandidateGenerationRequest {
+    pub rotation_preference: RotationPreference,
     pub season: Season,
     pub profile: ProfileId,
     pub scoring_table: ScoringTableId,
@@ -67,6 +68,7 @@ pub struct CandidateOmission {
 
 #[derive(Debug, Clone)]
 pub struct CandidateGenerationAudit {
+    pub rotation_preference: RotationPreference,
     pub profile: ProfileId,
     pub scoring_table: ScoringTableId,
     pub sources: Vec<SourceReference>,
@@ -137,6 +139,15 @@ impl Generator<'_> {
                 .audit
                 .omissions
                 .push(CandidateOmission { variant, reason });
+            return Ok(true);
+        }
+        if crate::rotation::conflict(&variant.element, 0, self.request.rotation_preference)
+            .is_some()
+        {
+            self.result.audit.omissions.push(CandidateOmission {
+                variant,
+                reason: "Excluded by the personal same-direction preference.".into(),
+            });
             return Ok(true);
         }
         if self.request.exclusions.iter().any(|x| {
@@ -533,6 +544,7 @@ fn generate_candidates(
         result: CandidateGenerationResult {
             variants: vec![],
             audit: CandidateGenerationAudit {
+                rotation_preference: request.rotation_preference,
                 profile: profile.id.clone(),
                 scoring_table: request.scoring_table,
                 sources: profile.sources.clone(),

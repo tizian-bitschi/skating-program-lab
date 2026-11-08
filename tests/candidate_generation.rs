@@ -4,6 +4,7 @@ use skating_program_lab::*;
 fn request(c: AdultCategory) -> CandidateGenerationRequest {
     let p = adult_profile(c);
     CandidateGenerationRequest {
+        rotation_preference: RotationPreference::default(),
         season: p.season,
         profile: p.id,
         scoring_table: p.scoring_table,
@@ -291,6 +292,7 @@ fn generated_variants_feed_existing_optimizer_unchanged() {
     let result = optimize_program(
         &ProfileRegistry::adult(),
         &ProgramOptimizationRequest {
+            rotation_preference: RotationPreference::default(),
             season: q.season,
             profile: q.profile,
             scoring_table: q.scoring_table,

@@ -85,6 +85,9 @@ fn universe(
         }
         validate_compound_source(request, element, profile)?;
         value(element, request)?;
+        if !request_allows(request, std::slice::from_ref(element))? {
+            continue;
+        }
         if !universe.contains(element) {
             universe.push(element.clone());
         }
@@ -355,6 +358,7 @@ mod tests {
     #[test]
     fn stopped_with_valid_incumbent_is_not_proven() {
         let request = JumpOptimizerRequest {
+            rotation_preference: RotationPreference::default(),
             category: AdultCategory::Bronze,
             ruleset: BRONZE_RULESET,
             scoring_table: BRONZE_TABLE,

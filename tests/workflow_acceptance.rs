@@ -96,6 +96,7 @@ fn recheck(
     let r = assess_manual_program(
         &ProfileRegistry::adult(),
         &ManualProgramRequest {
+            rotation_preference: RotationPreference::default(),
             profile: q.profile.clone(),
             scoring_table: q.scoring_table,
             policy: q.policy.clone(),
@@ -204,6 +205,7 @@ fn generated_completion_preserves_two_anchors_and_every_oracle_tie() {
     let d = generate_program_candidates(&ProfileRegistry::adult(), &g).unwrap();
     let q = workflows::optimization(&g, d.variants.clone(), 4);
     let request = ProgramCompletionRequest {
+        rotation_preference: RotationPreference::default(),
         season: q.season,
         profile: q.profile.clone(),
         scoring_table: q.scoring_table,

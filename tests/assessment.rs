@@ -95,6 +95,7 @@ fn fixture(category: AdultCategory) -> ManualProgramRequest {
         scenario: None,
     });
     ManualProgramRequest {
+        rotation_preference: RotationPreference::default(),
         profile: adult_profile(category).id,
         scoring_table: ScoringTableId::Isu2786June2_2026,
         policy: adult_program_policy(category),

@@ -11,6 +11,7 @@ fn senior_two_identical_advanced_solos_receive_exact_contextual_credit() {
     for category in [SeniorCategory::Women, SeniorCategory::Men] {
         let profile = senior_profile(category);
         let request = PlanningSearchRequest {
+            rotation_preference: RotationPreference::AllowMixedDirections,
             profile: profile.id,
             scoring_table: profile.scoring_table,
             required: ["3A", "3A", "1A"]
@@ -62,6 +63,7 @@ fn senior_two_identical_advanced_solos_receive_exact_contextual_credit() {
 fn senior_single_jump_types_can_occur_three_times_and_limits_are_not_fill_targets() {
     let profile = senior_profile(SeniorCategory::Women);
     let mut request = PlanningSearchRequest {
+        rotation_preference: RotationPreference::AllowMixedDirections,
         profile: profile.id,
         scoring_table: profile.scoring_table,
         required: vec![],
@@ -90,6 +92,7 @@ fn senior_advanced_compound_occurrence_prevents_two_solo_reduction() {
     let profile = senior_profile(SeniorCategory::Men);
     let required = ["3A", "1A+3A+SEQ", "1T", "1T", "1T", "1S"];
     let request = PlanningSearchRequest {
+        rotation_preference: RotationPreference::AllowMixedDirections,
         profile: profile.id,
         scoring_table: profile.scoring_table,
         required: required
@@ -119,6 +122,7 @@ fn senior_empty_complete_domain_matches_literal_component_bound() {
     for category in [SeniorCategory::Women, SeniorCategory::Men] {
         let profile = senior_profile(category);
         let request = PlanningSearchRequest {
+            rotation_preference: RotationPreference::AllowMixedDirections,
             profile: profile.id,
             scoring_table: profile.scoring_table,
             required: vec![],
@@ -163,6 +167,7 @@ fn senior_maximizes_credited_value_instead_of_the_raw_catalog_sum() {
     for category in [SeniorCategory::Women, SeniorCategory::Men] {
         let profile = senior_profile(category);
         let request = PlanningSearchRequest {
+            rotation_preference: RotationPreference::AllowMixedDirections,
             profile: profile.id,
             scoring_table: profile.scoring_table,
             required: ["5Lz", "1A+1S", "1Lo+1T", "1F", "1Lz"]
@@ -221,6 +226,7 @@ fn senior_maximizes_credited_value_instead_of_the_raw_catalog_sum() {
 fn senior_preserves_required_v_spin_euler_and_exact_multiplicities() {
     let profile = senior_profile(SeniorCategory::Women);
     let request = PlanningSearchRequest {
+        rotation_preference: RotationPreference::AllowMixedDirections,
         profile: profile.id,
         scoring_table: profile.scoring_table,
         required: [
@@ -265,6 +271,7 @@ fn senior_preserves_required_v_spin_euler_and_exact_multiplicities() {
 fn senior_required_regular_spins_cannot_displace_mandatory_choreographic_spin() {
     let profile = senior_profile(SeniorCategory::Women);
     let request = PlanningSearchRequest {
+        rotation_preference: RotationPreference::AllowMixedDirections,
         profile: profile.id,
         scoring_table: profile.scoring_table,
         required: ["CCoSp4", "FCSp4", "FSSp4"]

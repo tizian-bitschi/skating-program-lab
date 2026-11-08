@@ -1,7 +1,7 @@
-# Jump rotation preference: implementation proposal
+# Jump rotation preference
 
-Status: product behavior confirmed 2026-11-08; public API changes proposed,
-not approved or implemented.
+Status: product behavior and public API changes approved by the user on
+2026-11-08; implemented on `codex/rotation-preference`.
 
 The current theoretical search may return compounds requiring opposite-direction
 jumps. Make same-direction compounds the default across supported categories;
@@ -80,7 +80,7 @@ No new "unresolved connection" product state. Incomplete typed plans or explicit
 unmodeled transitions retain their existing unsupported/evidence treatment; they
 must not be mislabeled as mixed-direction connections.
 
-## Proposed public API
+## Public API
 
 Introduce one shared type, available without the optimizer feature:
 
@@ -141,9 +141,11 @@ localized explanations and resolve original IDs without opaque English strings.
   legality independently; these conflicts cannot invalidate an otherwise
   calculable total or create a competition violation.
 - Add `RotationPreferenceConflict(Vec<RotationPreferenceConflict>)` variants to
-  `PlanningSearchError` and `ProgramCompletionError`. Required search elements and
+  `PlanningSearchError`, `ProgramOptimizationError` and `ProgramCompletionError`. Required search elements and
   completion originals are checked before solving, in input order. Do not call
   a preference conflict rule infeasibility or silently remove the requirement.
+  Finite optimization reports a conflict when every alternative in a required
+  group conflicts; otherwise the compatible alternatives remain eligible.
 - Completion retains every original regardless of its `locked` flag: that flag
   does not authorize the solver to rewrite an original. Resolve conflicts by
   changing the request explicitly.
@@ -161,6 +163,19 @@ search and completion must not maintain separate string-based whitelists.
 Preserve input identity and scoring/recognition assumptions during filtering.
 Numerical scoring and rule-only validators do not acquire personal restrictions.
 Fixed historical Bronze examples with no compounds need no new controls.
+`PlanningMaximum.rotation_preference` records which repertoire its proof covers.
+
+### Adult upper bound under the standard preference
+
+All S/F/Lz/A components need an element's first-jump place unless connected by
+Euler or a sequence step/turn. Beyond the first place, an Euler combination adds
+at most one such component. A sequence adds no more than its remaining listed
+places and cannot coexist with a separate Euler combination. Therefore their
+total is bounded by the jump-element limit plus the larger of the Euler budget
+and the sequence's extra listed-place budget. Reserve required components, then
+maximize remaining component value subject to that cap and existing repetition
+and listed-place caps. This is a relaxation: it may retain unpackable choices,
+but cannot exclude a same-direction program. Senior keeps its separate bound.
 
 ## Acceptance cases
 
