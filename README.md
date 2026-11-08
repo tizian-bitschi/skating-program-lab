@@ -7,6 +7,9 @@ An open-source Rust library for planning technical figure skating programs. The 
 For theoretical program construction, use `assess_manual_bv` to calculate
 base value from ordered SOV codes and check composition without supplying
 spin or step feature evidence. See the [assumed-recognition API](docs/specs/assumed-recognition.md).
+`selectable_jump_elements` lists the complete category-permitted atomic jump
+code intentions, including mixed sequences and Euler connections, with no
+1,000-variant cap. See the [planned jump grammar](docs/specs/planned-jump-domain.md).
 The [manual category workflow](docs/manual-category-planning.md) explains selection,
 credited values and the distinction between drafts, violations and unsupported choices.
 Prepare a `GoeScenarioPlan` from the selected codes to run

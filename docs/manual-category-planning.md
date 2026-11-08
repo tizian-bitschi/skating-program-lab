@@ -7,6 +7,8 @@ Use the existing selection and assessment entry points as one workflow:
    and the corresponding registry. Reject unknown serialized versions.
 2. Call `selectable_elements` to show supported individual codes and levels.
    Individual availability does not establish compatibility with other choices.
+   Call `selectable_jump_elements` for complete atomic jump choices, including
+   compound connection intentions and explicit sequence assumptions.
 3. Put selected codes into `ManualBvRequest.elements` using
    `AssumedRecognition::new`, then call `assess_manual_bv`. Supported compound
    codes use this same path. No GOE, duration, movement observations or panel
@@ -33,5 +35,5 @@ transition assumptions and unresolved credit.
 contextual scoring for all six profiles with independent Adult/Rule 612
 composition examples and Communication 2786 values. Existing `manual_bv`,
 `element_selection`, `assumed_recognition` and completion tests cover additional
-negative cases and compatibility. Complete compound domains and maximum search
-belong to the other workstreams of #117.
+negative cases and compatibility. The [jump domain](specs/planned-jump-domain.md)
+defines the complete compound grammar; maximum search belongs to its own #117 workstream.
