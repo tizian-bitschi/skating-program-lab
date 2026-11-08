@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="de">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Drehrichtung · Logikprototyp</title>
+<style>
+:root{--ink:#242424;--muted:#595959;--line:#d8d8d8;--accent:#245a46;--paper:#fff;--ground:#f7f7f5}
+*{box-sizing:border-box}body{margin:0;background:var(--ground);color:var(--ink);font:16px/1.55 system-ui,sans-serif}main{max-width:1000px;margin:auto;padding:32px 24px}h1{font-size:28px;margin:0 0 8px}h2{font-size:20px;margin:0 0 16px}p{margin:8px 0 16px}.muted,small{color:var(--muted)}small{font-size:14px}section{background:var(--paper);border:1px solid var(--line);border-radius:8px;padding:24px;margin:24px 0}.option{display:flex;gap:12px;align-items:flex-start;cursor:pointer}.option input{width:22px;height:22px;margin:3px 0;accent-color:var(--accent)}.option strong{display:block}.option span{display:block}button,select{font:inherit;min-height:44px;border:1px solid var(--line);border-radius:6px;padding:8px 12px;background:white;color:var(--ink)}button{cursor:pointer}button:hover{background:var(--ground)}button:disabled{cursor:default;opacity:.5}button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid var(--accent);outline-offset:3px}.actions{display:flex;flex-wrap:wrap;gap:8px;margin:16px 0}dl{display:grid;grid-template-columns:minmax(130px,220px) 1fr;gap:8px 16px;margin:0}dt{color:var(--muted)}dd{margin:0}table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:10px 8px;border-bottom:1px solid var(--line);vertical-align:top}th{font-weight:600}td:last-child,th:last-child{text-align:right}code{font-size:15px;white-space:nowrap}.table-wrap{overflow:auto}#notice{padding:12px 0;color:var(--accent);font-weight:600}#conflict{border-left:3px solid var(--accent);padding:8px 16px;margin:16px 0}.tabs{display:flex;flex-wrap:wrap;gap:8px}.tabs [aria-selected=true]{border-color:var(--accent);color:var(--accent);font-weight:600}.total{font-size:20px;font-weight:600}.steps{display:flex;flex-wrap:wrap;gap:8px}label[for=required]{display:block;margin-bottom:8px}footer{font-size:14px;color:var(--muted)}@media(max-width:600px){main{padding:20px 16px}section{padding:16px}dl{grid-template-columns:1fr;gap:4px}dd{margin-bottom:10px}th,td{padding:8px 4px}}
+</style>
+<main>
+<h1>Drehrichtung bei Sprungverbindungen</h1>
+<p>Logikprototyp: Was ändert sich, wenn Kombinationen und Sequenzen standardmäßig nur Sprünge in derselben Drehrichtung enthalten?</p>
+<p class="muted">Adult Silver 2026/27 · Wegwerfprototyp · acht ausgewählte Verbindungen, keine vollständige Sprungauswahl und keine laufende Optimierung.</p>
+
+<section aria-labelledby="settings-title">
+<h2 id="settings-title">Persönliche Planung</h2>
+<label class="option"><input id="mixed" type="checkbox" aria-describedby="mixed-help"><span><strong>Unterschiedliche Drehrichtungen innerhalb eines Sprungelements zulassen</strong><span id="mixed-help" class="muted">Standardmäßig aus. Aktivieren, wenn du Sprünge in beiden Drehrichtungen verbinden kannst. Die Option erweitert die Auswahl; sie erzwingt keinen Richtungswechsel.</span></span></label>
+<p class="muted">Die Einstellung gilt für Kombinationen und Sequenzen. Sie legt keine absolute Drehrichtung fest und beschränkt einzelne Solosprünge nicht.</p>
+<label for="required">Eine Verbindung fest vorgeben</label>
+<select id="required"><option value="">Keine Vorgabe</option><option>1Lz+1Lz</option><option>1A+1A+1Lz</option><option>1Lz+1A+1A+SEQ</option><option>1Lz+1T</option></select>
+<div class="actions"><button id="reset">Standard wiederherstellen</button><button id="clear">Vorgabe entfernen</button></div>
+<div id="notice" role="status" aria-live="polite"></div>
+<dl id="state"></dl>
+<div id="conflict" role="status" hidden></div>
+</section>
+
+<section><h2>Auswahl im aktuellen Zustand</h2>
+<p class="muted">„Passt nicht“ bezeichnet hier eine persönliche Einschränkung, keinen Regelverstoß. Der Prototyp ordnet die Beispiele anhand ausdrücklich hinterlegter Ausführungen ein.</p>
+<div class="table-wrap"><table><thead><tr><th>Verbindung</th><th>Beispielausführung</th><th>Auswahl</th></tr></thead><tbody id="choices"></tbody></table></div>
+</section>
+
+<section><h2>Silver: Vergleich zweier Beispielprogramme</h2>
+<p id="program-note"></p>
+<div class="table-wrap"><table><thead><tr><th>Element</th><th>Basiswert</th></tr></thead><tbody id="program"></tbody></table></div>
+<p class="total" id="total"></p>
+<p class="muted">Die Werte werden aus den unten hinterlegten Beispielen addiert. Das ist kein neuer Optimalitätsnachweis. Spins, Choreosequenz, GOE und Zeitboni werden durch den Schalter nicht verändert; GOE und Zeitboni sind hier nicht eingerechnet.</p>
+</section>
+
+<section><h2>Geführte Abläufe</h2>
+<div class="tabs" role="tablist" aria-label="Beispielabläufe"></div>
+<div id="walkthrough" role="tabpanel" tabindex="0"><p id="walk-description"></p><div class="steps" id="steps"></div></div>
+</section>
+<footer>Keine Speicherung. Neuladen setzt die Demo zurück. Die Produktionsbibliothek bleibt unverändert. Fachliche Grundlage: <a href="https://isu-d8g8b4b7ece7aphs.a03.azurefd.net/isudamcontainer/CMS/Corporate-Site/Sports-Rules/Figure-Skating-Rules/Handbooks-Single-%26-Pair-Skating/TP-HandbookSingles-26-27-15-July-2026-1784641784-3364.pdf#page=28">ISU Technical Panel Handbook 2026/27, S. 28–29</a>. Die Einordnung konkreter Fußfolgen ist eine Modellannahme dieses Prototyps.</footer>
+</main>
+<script>
+// Pure, illustrative planning policy. No DOM, storage or production solver.
+const RotationDemo = (() => {
+  const choices = [
+    {code:'1Lz+1T',mixed:false,execution:'Gleiche Drehrichtung; Toe Loop vom Landefuß.'},
+    {code:'1F+1Lo',mixed:false,execution:'Gleiche Drehrichtung; Loop vom Landefuß.'},
+    {code:'1Lz+Eu+1F',mixed:false,execution:'Gleiche Drehrichtung; Euler verbindet zum Flip.'},
+    {code:'1Lz+1A+1A+SEQ',mixed:false,execution:'Gleiche Drehrichtung; direkte Schritte zu beiden Axel.'},
+    {code:'1Lz+1Lz',mixed:true,execution:'Zweiter Lutz in Gegenrichtung vom Landefuß.'},
+    {code:'1A+1A+1Lz',mixed:true,execution:'Axel gegenläufig, verbunden durch Rocker; Lutz in erster Drehrichtung.'},
+    {code:'1F+1Lz',mixed:true,execution:'Lutz in Gegenrichtung vom Landefuß des Flip.'},
+    {code:'1A+1Lz+1A+SEQ',mixed:true,execution:'Lutz gegenläufig zum ersten Axel; direkter Schritt zum letzten Axel.'}
+  ];
+  const initial = () => ({allowMixed:false,required:'',last:'Standard geladen.'});
+  function reduce(state,action){
+    if(action.type==='reset')return initial();
+    if(action.type==='mixed')return {...state,allowMixed:action.value,last:action.value?'Auswahl um Verbindungen mit unterschiedlichen Drehrichtungen erweitert.':'Auswahl auf Verbindungen in derselben Drehrichtung begrenzt.'};
+    if(action.type==='required')return {...state,required:action.value,last:action.value?'Vorgabe gesetzt.':'Vorgabe entfernt.'};
+    return state;
+  }
+  function evaluate(state){
+    const rows=choices.map(c=>({...c,allowed:state.allowMixed||!c.mixed}));
+    const conflict=rows.some(c=>c.code===state.required&&!c.allowed);
+    const jumps=state.allowMixed?[['1A+1A+1Lz',280],['1F',50],['1F+1Lz',110],['1Lo',50]]:[['1Lz+1A+1A+SEQ',280],['1F+1Lo',100],['1Lz',60],['1F',50]];
+    const program=[...jumps,['CCoSp2',300],['CLSp2',290],['ChSq1',350]];
+    return {rows,conflict,program,total:program.reduce((sum,e)=>sum+e[1],0)};
+  }
+  return {initial,reduce,evaluate};
+})();
+</script>
+<script>
+let state=RotationDemo.initial();
+const $=id=>document.getElementById(id);
+const money=n=>(n/100).toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2});
+function dispatch(action){state=RotationDemo.reduce(state,action);render()}
+function render(){
+  const result=RotationDemo.evaluate(state);
+  $('mixed').checked=state.allowMixed;$('required').value=state.required;
+  $('notice').textContent=state.last;
+  const fields=[['Drehrichtungen',state.allowMixed?'Gleich oder unterschiedlich':'Innerhalb jedes Sprungelements gleich'],['Feste Vorgabe',state.required||'Keine'],['Beispielauswahl',`${result.rows.filter(c=>c.allowed).length} von ${result.rows.length} Verbindungen`],['Planung mit Vorgabe',result.conflict?'Konflikt mit persönlicher Einstellung':'Kein Konflikt im gezeigten Filter']];
+  $('state').replaceChildren(...fields.flatMap(([key,value])=>{const dt=document.createElement('dt'),dd=document.createElement('dd');dt.textContent=key;dd.textContent=value;return [dt,dd]}));
+  $('conflict').hidden=!result.conflict;
+  $('conflict').textContent=`Die Vorgabe ${state.required} benötigt in der hinterlegten Ausführung unterschiedliche Drehrichtungen. Aktiviere die Option oder entferne die Vorgabe. Die Demo ändert beides nicht automatisch.`;
+  $('choices').replaceChildren(...result.rows.map(c=>{const tr=document.createElement('tr');for(const text of [c.code,c.execution,c.allowed?'Verfügbar':'Passt nicht zur Einstellung']){const td=document.createElement('td');td.textContent=text;tr.append(td)}return tr}));
+  $('program-note').textContent=result.conflict?'Die Vorgabe steht im Konflikt zur Einstellung. Das folgende allgemeine Beispiel erfüllt diese Vorgabe nicht.':state.required?'Das folgende allgemeine Vergleichsprogramm wird nicht auf die feste Vorgabe angepasst.':'Der Schalter wechselt zwischen dem bisherigen theoretischen Beispiel und einem Beispiel mit gleicher Drehrichtung.';
+  $('program').replaceChildren(...result.program.map(([code,bv])=>{const tr=document.createElement('tr');for(const text of [code,money(bv)]){const td=document.createElement('td');td.textContent=text;tr.append(td)}return tr}));
+  $('total').textContent=`Beispielsumme: ${money(result.total)} Basispunkte`;
+}
+$('mixed').onchange=e=>dispatch({type:'mixed',value:e.target.checked});
+$('required').onchange=e=>dispatch({type:'required',value:e.target.value});
+$('reset').onclick=()=>dispatch({type:'reset'});$('clear').onclick=()=>dispatch({type:'required',value:''});
+const walks=[
+ {name:'Standard und Erweiterung',description:'Beginne mit gleicher Drehrichtung. Erweitere die Auswahl und schalte wieder zurück. Beide Beispielprogramme ergeben 14,30 Punkte.',steps:[['Erweitern',{type:'mixed',value:true}],['Zurück zum Standard',{type:'mixed',value:false}]]},
+ {name:'Konflikt mit Vorgabe',description:'Gib zwei Lutz als Kombination vor. Die Demo meldet den Konflikt zur Standardeinstellung. Erst deine Entscheidung hebt ihn auf.',steps:[['1Lz+1Lz vorgeben',{type:'required',value:'1Lz+1Lz'}],['Unterschiedliche Richtungen zulassen',{type:'mixed',value:true}],['Wieder ausschalten',{type:'mixed',value:false}],['Vorgabe entfernen',{type:'required',value:''}]]},
+ {name:'Axel-Sequenz bleibt verfügbar',description:'Eine direkte Schrittverbindung zum Axel braucht keinen Wechsel der Sprungdrehrichtung. Eine solche Sequenz bleibt auch im Standard verfügbar.',steps:[['Axel-Sequenz vorgeben',{type:'required',value:'1Lz+1A+1A+SEQ'}],['Auswahl erweitern',{type:'mixed',value:true}]]}
+];
+let active=0,step=0;
+function walk(index){active=index;step=0;dispatch({type:'reset'});renderWalk()}
+function renderWalk(){
+  document.querySelectorAll('[role=tab]').forEach((tab,i)=>{tab.setAttribute('aria-selected',String(i===active));tab.tabIndex=i===active?0:-1});
+  $('walkthrough').setAttribute('aria-labelledby',`tab-${active}`);
+  $('walk-description').textContent=walks[active].description;
+  $('steps').replaceChildren(...walks[active].steps.map(([label,action],i)=>{const button=document.createElement('button');button.textContent=`${i+1}. ${label}${i<step?' · erledigt':''}`;button.disabled=i!==step;button.onclick=()=>{dispatch(action);step++;renderWalk();const next=$('steps').querySelector('button:not(:disabled)');(next||$('walkthrough')).focus()};return button}));
+}
+walks.forEach((w,i)=>{const button=document.createElement('button');button.textContent=w.name;button.id=`tab-${i}`;button.setAttribute('role','tab');button.setAttribute('aria-controls','walkthrough');button.onclick=()=>walk(i);button.onkeydown=e=>{if(['ArrowRight','ArrowLeft','Home','End'].includes(e.key)){e.preventDefault();const n=e.key==='Home'?0:e.key==='End'?walks.length-1:(i+(e.key==='ArrowRight'?1:-1)+walks.length)%walks.length;walk(n);$(`tab-${n}`).focus()}};document.querySelector('.tabs').append(button)});
+render();renderWalk();
+</script>
+</html>
