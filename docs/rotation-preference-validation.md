@@ -56,3 +56,15 @@ Passed with locally cached dependencies (`--offline` for Cargo dependency access
 The final focused `rotation_preference` run also passed all seven tests, including
 explicit opt-in on immutable completion originals. No changes to CI, security
 configuration or agent instructions. Release performance comparisons were not run.
+
+## Review correction
+
+The profile jump-optimizer adapter now forwards `self.rotation_preference`
+instead of replacing it with the default. A direct adapter regression exercises
+both settings: it failed on `AllowMixedDirections` before the fix and passed after.
+
+Focused validation passed: four jump-optimizer unit tests, seven public jump-optimizer
+tests, twelve profile tests and seven rotation-preference tests (30 total), plus
+Clippy with warnings denied, formatting and diff checks. Both Standards and Spec
+reviewers cleared the correction. The full suites above were run for the original
+implementation; they were not repeated for this one-line adapter correction.

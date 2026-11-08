@@ -238,7 +238,7 @@ impl ProfileJumpOptimizerRequest {
     fn search_controls(&self, profile: &crate::RuleProfile) -> JumpOptimizerRequest {
         // The internal legacy carrier supplies domain controls only; policy comes from profile.
         JumpOptimizerRequest {
-            rotation_preference: RotationPreference::default(),
+            rotation_preference: self.rotation_preference,
             category: AdultCategory::Bronze,
             ruleset: profile.scoring.recognition_ruleset,
             scoring_table: self.scoring_table,
@@ -335,6 +335,35 @@ pub fn optimize_profile_jumps(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn profile_adapter_preserves_both_rotation_preferences() {
+        let profile = crate::adult_profile(AdultCategory::Silver);
+        for preference in [
+            RotationPreference::SameDirection,
+            RotationPreference::AllowMixedDirections,
+        ] {
+            let request = ProfileJumpOptimizerRequest {
+                rotation_preference: preference,
+                profile: profile.id.clone(),
+                scoring_table: profile.scoring_table,
+                allowed_jumps: vec![],
+                combinations: vec![],
+                exclusions: vec![],
+                excluded_kinds: vec![],
+                max_elements: 4,
+                require_nonempty: false,
+                max_search_nodes: 100,
+                enumerate_equal_optima: false,
+                max_solutions: 1,
+                time_limit: None,
+            };
+            assert_eq!(
+                request.search_controls(&profile).rotation_preference,
+                preference
+            );
+        }
+    }
 
     #[test]
     fn each_small_domain_matches_independent_feasibility_fixtures() {
