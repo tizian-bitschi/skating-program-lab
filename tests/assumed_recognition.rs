@@ -191,7 +191,7 @@ fn senior_levels_and_fixed_codes_are_edition_bound() {
             ScoringTableId::Isu2786June2_2026
         );
     }
-    for code in ["CCoSp5", "CCoSp3V", "ChSp1"] {
+    for code in ["CCoSp5", "CCSp3V", "ChSp1"] {
         assert!(assess_manual_program_with_assumed_recognition(
             &registry,
             &plan,

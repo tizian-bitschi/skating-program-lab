@@ -120,7 +120,7 @@ fn six_profile_source_snapshots() {
                 assert_eq!((option.row.source.page, option.row.source.row), (14, row));
             }
         }
-        for code in ["1LiB", "Eu", "1Tq", "CCoSp3V", "CCoSp5", "ChSp2", "ChSq3"] {
+        for code in ["1LiB", "Eu", "1Tq", "CCoSp5", "ChSp2", "ChSq3"] {
             assert!(get(code).is_none(), "{code}");
         }
         assert!(get("1T").is_some());
@@ -143,7 +143,7 @@ fn direct_selection_and_manual_assessment_keep_the_exact_code() {
             Err(ElementSelectionError::TypeNotSelectable(f)) if f.rule_id == "spin-eligibility"
         ));
     }
-    for code in ["1LiB", "CCoSp3V"] {
+    for code in ["1LiB", "CCSp3V"] {
         assert!(matches!(
             check_selectable_element(&registry, &gold, TABLE, code),
             Err(ElementSelectionError::UnsupportedCode { source }) if source.location.contains(code)
@@ -291,6 +291,9 @@ fn full_selection_matrix_matches_independent_category_and_catalog_fixtures() {
             .collect();
         for stem in spins.split_whitespace() {
             expected.extend(levels.chars().map(|level| format!("{stem}{level}")));
+            if ["CoSp", "CCoSp", "FCoSp", "FCCoSp"].contains(&stem) {
+                expected.extend(levels.chars().map(|level| format!("{stem}{level}V")));
+            }
         }
         let listed = selectable_elements(registry, &profile.id, TABLE).unwrap();
         let actual: BTreeSet<_> = listed
