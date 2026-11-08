@@ -1,6 +1,7 @@
 //! Complete theoretical composition search; performance recognition is outside scope.
 use crate::*;
 mod model;
+mod senior_bound;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RequiredPlanningElement {
@@ -181,26 +182,25 @@ fn domain(
                 .cmp(&b.direct_transitions_assumed),
         )
     });
+    let selection =
+        crate::selection::Selection::new(registry, &request.profile, request.scoring_table)
+            .map_err(PlanningSearchError::Profile)?;
     let mut atoms = Vec::with_capacity(assumptions.len());
     for assumption in assumptions {
         if control.is_cancelled(PlanningSearchPhase::Domain) {
             return Ok(None);
         }
-        let (assessment, program, evidence) = crate::manual_bv::assess_selections(
-            registry,
-            profile,
-            &manual(request, vec![assumption.clone()], SubmissionState::Draft),
-        )
-        .map_err(PlanningSearchError::Profile)?;
-        let value = assessment
-            .total
-            .exact_hundredths
-            .and_then(|v| i32::try_from(v).ok())
-            .ok_or(PlanningSearchError::InconsistentAssessment)?;
-        let element = program
-            .elements
-            .into_iter()
-            .next()
+        let (element, evidence, value, restriction) = crate::manual_bv::resolve_selection(
+            &selection,
+            request.scoring_table,
+            profile.scoring.recognition_ruleset,
+            &assumption,
+        );
+        if restriction.is_some() {
+            return Err(PlanningSearchError::InconsistentAssessment);
+        }
+        let value = value
+            .map(|v| i32::from(v.hundredths))
             .ok_or(PlanningSearchError::InconsistentAssessment)?;
         let (jumps, eulers) = match &element {
             PlannedElement::Jump(JumpElement::Solo(j)) => (vec![j.clone()], 0),
@@ -224,7 +224,7 @@ fn domain(
             ),
             _ => (vec![], 0),
         };
-        let spin = match &evidence[0] {
+        let spin = match &evidence {
             ElementPlanEvidence::Spin { spin, .. } => spin.abbreviation,
             _ => None,
         };
@@ -258,10 +258,13 @@ pub fn search_maximum_bv(
     ]
     .iter()
     .any(|c| adult_profile(*c) == *profile)
+        && ![SeniorCategory::Women, SeniorCategory::Men]
+            .iter()
+            .any(|c| senior_profile(*c) == *profile)
     {
         return Err(PlanningSearchError::UnsupportedCoverage {
             profile: request.profile.clone(),
-            reason: "Complete planning search currently supports built-in Adult profiles.",
+            reason: "Complete planning search supports the built-in Adult and Senior profiles.",
         });
     }
     let policy = crate::profiles::resolve_program_policy(profile, None)

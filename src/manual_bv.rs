@@ -193,7 +193,7 @@ type ResolvedSelection = (
     Option<(ElementSelectionError, Option<usize>)>,
 );
 
-fn resolve_selection(
+pub(crate) fn resolve_selection(
     selection: &Selection<'_>,
     table: ScoringTableId,
     ruleset: RulesetId,

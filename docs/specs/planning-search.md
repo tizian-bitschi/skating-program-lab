@@ -1,6 +1,7 @@
 # Theoretical maximum-BV planning search
 
-Issues #121 and #122 implement the four Adult categories in #117. The public seam is
+Issues #121–#123 implement the four Adult categories and both source-bound Senior
+profiles in #117. The public seam is
 `search_maximum_bv(registry, request, control)`. Required occurrences contain a
 stable caller ID and an exact `AssumedRecognition`; their input order does not
 constrain placement. Exclusions name jump kinds, exact listed jumps and named
@@ -40,13 +41,48 @@ slots. Gold and Masters use the shared role predicates, including their differen
 foot-change restrictions. Masters retains the profile Axel obligation; an exclusion
 removing every Axel produces an explicit diagnostic. Independent subsection
 value bounds strengthen Pumpkin propagation without removing any feasible
-composition. Objective-first, descending-value count branching changes search
+composition. Exact credited-jump and regular-spin subtotal variables link these
+section bounds to the overall objective, so an optimal total propagates section
+limits before whole-element choices are branched. Objective-first, descending-value count branching changes search
 order only. The model checks absolute linear activity before using i32 arithmetic.
 
-The initial model keeps every exact atomic choice. No alias reduction is
-necessary for Adult profiles. Later category work must establish its contextual
-credit and reduction argument separately. Shared profile policies supply the
-bounds and role predicates; the search does not define another category policy.
+The model keeps every exact atomic choice, including all 51,518 Senior jump
+choices per profile. No alias grouping is used. Shared profile policies supply
+bounds and role predicates. Domain construction reuses the manual selection
+resolver and caches individual component checks within one immutable profile/table
+selection context; it still resolves every whole element and keeps its exact identity.
+
+## Senior contextual credit and upper bound
+
+Senior constraints additionally retain jump-kind totals across rotations,
+identical double-or-higher totals, repeated advanced-type totals and repeated
+quad/quint-type totals. Singles can occur three times, subject to the shared
+kind cap. Each advanced type has exact component and solo totals. Boolean integer
+flags identify total==2 for the repetition limits and solo-total==2 for credit.
+The credited objective is raw whole-element BV minus the source-rounded 20% loss
+for each advanced type with two solo occurrences. A compound occurrence prevents
+that type's two-solo loss. The shared scoring helper supplies the rounded value.
+
+This total loss is invariant under whole-element ordering: exactly one of two
+identical advanced solos receives 80% in every reconstruction. The manual assessor
+assigns that per-element credit after deterministic reconstruction. Thus counts
+preserve the exact credited total while internal compound arrangements remain
+separate atomic choices. The public fixture with required 5Lz and two occupied
+compound slots distinguishes the raw winner (another 5Lz) from the credited
+winner (4A): raw maximum50.60, credited maximum49.10.
+
+A private Senior DP folds component vectors for each jump kind. It retains the
+shared kind/identical/repeated-type caps, required component multiplicities,
+Axel presence, listed-component capacity and quint solo capacity. Enumerating
+jump/compound/three-jump budgets reserves the exact structure of required whole
+elements; a required two-jump compound cannot become a three-jump compound.
+Quints cannot occur in compounds, so their repeated-solo loss is unavoidable;
+two required identical advanced solos also force their loss. Other contextual
+losses and compound packing are relaxed. Every legal composition maps to one
+retained state and budget with at least its credited value. The resulting bound
+constrains the credited jump expression, never the raw jump sum. The solver still
+proves the exact objective, and shared full manual assessment checks every
+published alternative.
 
 ## Outcomes and cancellation
 
@@ -63,11 +99,28 @@ a claim that reconstruction has been checked. MaximumProved occurs after a
 returned representative has passed manual assessment. Alternative collection
 has its own Exhausted, LimitReached or Cancelled status. After proving the optimum and validating its first representative, the model
 fixes credited BV to the proved value and enumerates up to five distinct
-whole-element multisets. A nogood excludes the complete atomic count vector,
-including zero counts; auxiliary assignments and required-ID swaps never create
-another composition. Exact compound codes, transition assumptions and repeated
+whole-element multisets. At fixed optimum, a sparse nogood requires at least one selected atomic count
+to decrease. This is equivalent to excluding its complete count vector in the
+positive-value built-in profiles: any strict supermultiset increases credited BV.
+Adult credit is additive; a second identical advanced Senior solo adds its
+positive 80% value, and adding a compound cannot introduce a two-solo loss.
+Illegal third advanced occurrences remain forbidden. Thus no other optimum is
+removed. If a nonpositive atomic value is ever present, collection falls back to
+complete-vector inequalities, including zero counts. Auxiliary assignments and
+required-ID swaps never create another composition. Exact compound codes, transition assumptions and repeated
 occurrences remain part of identity. Count and value branching and reconstruction
 use deterministic repertoire order.
+
+Before another SAT solve, collection traverses order aliases of confirmed whole
+compounds. An alias has the same combination/sequence family, Euler count, raw
+value and exact listed-component multiset, and is already in the permitted domain.
+Replacing one occurrence above its exact required minimum preserves every model
+coefficient and the Senior solo-credit context. Full count vectors suppress
+duplicates, and shared reconstruction/manual assessment confirms each candidate.
+This breadth-first traversal changes collection order only; it does not group or
+prune atoms. If fewer than five are found, every emitted vector is blocked before
+the complete fixed-objective SAT search resumes. Cancellation keeps only already
+validated alternatives.
 
 Fewer than five alternatives carry Exhausted only after the solver proves no
 further vector exists. Five alternatives carry LimitReached even when there
