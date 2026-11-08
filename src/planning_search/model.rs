@@ -8,7 +8,7 @@ use pumpkin_solver::{
         },
         optimisation::{linear_sat_unsat::LinearSatUnsat, OptimisationDirection},
         predicate,
-        results::{OptimisationResult, ProblemSolution, SolutionReference},
+        results::{OptimisationResult, ProblemSolution, SatisfactionResult, SolutionReference},
         termination::TerminationCondition,
         variables::{DomainId, TransformableVariable},
     },
@@ -453,14 +453,99 @@ pub(super) fn search(
         OptimisationResult::Unsatisfiable=>return Ok(PlanningSearchOutcome::Infeasible {diagnostics:vec![PlanningDiagnostic {required_input_indices:(0..request.required.len()).collect(),rule_id:None,message:"No permitted composition satisfies the required occurrences, exclusions and profile roles.".into()}]}),
         _=>return Ok(PlanningSearchOutcome::Cancelled),
     };
-    if control.is_cancelled(PlanningSearchPhase::Reconstruction) {
+    let maximum = solution.get_integer_value(objective) as u32;
+    let mut selected: Vec<_> = counts
+        .iter()
+        .map(|&v| solution.get_integer_value(v))
+        .collect();
+    let Some(first) = reconstruct(
+        registry, request, profile, atoms, &selected, maximum, control,
+    )?
+    else {
         return Ok(PlanningSearchOutcome::Cancelled);
+    };
+    let mut alternatives = vec![first];
+    let mut status = PlanningAlternativeStatus::Cancelled;
+    if !control.is_cancelled(PlanningSearchPhase::MaximumProved) {
+        let tag = solver.new_constraint_tag();
+        solver.add_clause(vec![predicate!(objective == maximum as i32)], tag);
+        loop {
+            if control.is_cancelled(PlanningSearchPhase::Alternatives) {
+                break;
+            }
+            if alternatives.len() == 5 {
+                status = PlanningAlternativeStatus::LimitReached;
+                break;
+            }
+            // Block the whole-element multiset, never auxiliary assignments or IDs.
+            let tag = solver.new_constraint_tag();
+            solver.add_clause(
+                counts
+                    .iter()
+                    .zip(&selected)
+                    .map(|(&v, &n)| predicate!(v != n))
+                    .collect::<Vec<_>>(),
+                tag,
+            );
+            let mut termination = CollectionCancellation(control);
+            let mut resolver = ResolutionResolver::default();
+            let next = match solver.satisfy(&mut brancher, &mut termination, &mut resolver) {
+                SatisfactionResult::Satisfiable(s) => Some(
+                    counts
+                        .iter()
+                        .map(|&v| s.solution().get_integer_value(v))
+                        .collect::<Vec<_>>(),
+                ),
+                SatisfactionResult::Unsatisfiable(..) => {
+                    status = PlanningAlternativeStatus::Exhausted;
+                    None
+                }
+                SatisfactionResult::Unknown(..) => None,
+            };
+            let Some(next) = next else { break };
+            selected = next;
+            let Some(candidate) = reconstruct(
+                registry, request, profile, atoms, &selected, maximum, control,
+            )?
+            else {
+                break;
+            };
+            alternatives.push(candidate);
+        }
+    }
+    Ok(PlanningSearchOutcome::ProvenMaximum(PlanningMaximum {
+        profile: request.profile.clone(),
+        scoring_table: request.scoring_table,
+        maximum_base_hundredths: maximum,
+        alternatives,
+        alternative_status: status,
+    }))
+}
+
+struct CollectionCancellation<'a, C>(&'a C);
+impl<C: PlanningSearchControl> TerminationCondition for CollectionCancellation<'_, C> {
+    fn should_stop(&mut self) -> bool {
+        self.0.is_cancelled(PlanningSearchPhase::Alternatives)
+    }
+}
+
+fn reconstruct(
+    registry: &ProfileRegistry,
+    request: &PlanningSearchRequest,
+    profile: &RuleProfile,
+    atoms: &[Atom],
+    selected: &[i32],
+    maximum: u32,
+    control: &impl PlanningSearchControl,
+) -> Result<Option<PlanningProgram>, PlanningSearchError> {
+    if control.is_cancelled(PlanningSearchPhase::Reconstruction) {
+        return Ok(None);
     }
     let mut elements = Vec::new();
     let mut provenance = Vec::new();
-    for (atom, &count) in atoms.iter().zip(&counts) {
+    for (atom, &n) in atoms.iter().zip(selected) {
         if control.is_cancelled(PlanningSearchPhase::Reconstruction) {
-            return Ok(PlanningSearchOutcome::Cancelled);
+            return Ok(None);
         }
         let required: Vec<_> = request
             .required
@@ -468,11 +553,14 @@ pub(super) fn search(
             .enumerate()
             .filter(|(_, r)| r.element == atom.assumption)
             .collect();
-        let n = solution.get_integer_value(count) as usize;
+        let n = n as usize;
         if n < required.len() {
             return Err(PlanningSearchError::InconsistentAssessment);
         }
         for i in 0..n {
+            if control.is_cancelled(PlanningSearchPhase::Reconstruction) {
+                return Ok(None);
+            }
             elements.push(atom.assumption.clone());
             provenance.push(if let Some((input_index, r)) = required.get(i) {
                 PlanningProvenance::Required {
@@ -490,7 +578,6 @@ pub(super) fn search(
         &manual(request, elements.clone(), SubmissionState::Complete),
     )
     .map_err(PlanningSearchError::Profile)?;
-    let maximum = solution.get_integer_value(objective) as u32;
     if assessment.total.exact_hundredths != Some(i64::from(maximum))
         || !assessment
             .legality
@@ -501,22 +588,13 @@ pub(super) fn search(
     {
         return Err(PlanningSearchError::InconsistentAssessment);
     }
-    let cancelled = control.is_cancelled(PlanningSearchPhase::MaximumProved)
-        || control.is_cancelled(PlanningSearchPhase::Alternatives);
-    Ok(PlanningSearchOutcome::ProvenMaximum(PlanningMaximum {
-        profile: request.profile.clone(),
-        scoring_table: request.scoring_table,
-        maximum_base_hundredths: maximum,
-        alternatives: vec![PlanningProgram {
-            program,
-            elements,
-            provenance,
-            assessment,
-        }],
-        alternative_status: if cancelled {
-            PlanningAlternativeStatus::Cancelled
-        } else {
-            PlanningAlternativeStatus::LimitReached
-        },
+    if control.is_cancelled(PlanningSearchPhase::Reconstruction) {
+        return Ok(None);
+    }
+    Ok(Some(PlanningProgram {
+        program,
+        elements,
+        provenance,
+        assessment,
     }))
 }
