@@ -1210,6 +1210,35 @@ fn assumed_senior_completion_matches_eleven_slot_credited_oracle() {
             .map(|candidate| {
                 assert_eq!(candidate.total_base_hundredths, 4760 + best_delta);
                 assert_eq!(candidate.program.elements.len(), 11);
+                let selections: Vec<_> = candidate.provenance.iter().map(|p| match p {
+                    CompletionProvenance::Original { original_index, .. } => originals[*original_index].clone(),
+                    CompletionProvenance::Inserted { variant_index, .. } => additions[*variant_index].clone(),
+                }).collect();
+                // Rule 612: only the second identical advanced solo gets 80%;
+                // an explicitly supplied compound retains full component credit.
+                let has_compound = selections.iter().any(|s| s.code == "3A+2T");
+                let mut seen = BTreeSet::new();
+                let expected: Vec<_> = selections.iter().map(|s| {
+                    let listed = match s.code.as_str() {
+                        "3A" => 800, "4T" => 950, "4S" => 970, "2T" => 130,
+                        "3A+2T" => 930, "CCoSp4" => 420, "FCSp4" => 380,
+                        "StSq4" => 410, "ChSq1" | "ChSp1" => 350,
+                        _ => unreachable!(),
+                    };
+                    if matches!(s.code.as_str(), "3A" | "4T" | "4S") && !seen.insert(s.code.clone()) && !(s.code == "3A" && has_compound) {
+                        listed / 5 * 4
+                    } else { listed }
+                }).collect();
+                assert_eq!(expected.iter().copied().map(u32::from).sum::<u32>(), 4760 + best_delta);
+                assert_eq!(candidate.per_element.iter().map(|v| v.hundredths).collect::<Vec<_>>(), expected);
+                let manual = assess_manual_bv(&registry, &ManualBvRequest {
+                    profile: q.profile.clone(), scoring_table: q.scoring_table,
+                    submission: SubmissionState::Complete, elements: selections,
+                }).unwrap();
+                assert_eq!(manual.total.exact_hundredths, Some(i64::from(4760 + best_delta)));
+                for (element, expected) in manual.elements.iter().zip(expected) {
+                    assert!(matches!(&element.credited_base, Ok(BaseValueOutcome::Value(v)) if v.hundredths == expected));
+                }
                 candidate
                     .provenance
                     .iter()

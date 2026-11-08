@@ -14,6 +14,9 @@ mod senior;
 #[path = "../../tests/support/workflows.rs"]
 mod workflows;
 
+#[path = "proposal_diagnostics/acceptance.rs"]
+mod acceptance;
+
 #[derive(Debug, Default)]
 struct Diagnostics {
     preflight: Option<Duration>,
