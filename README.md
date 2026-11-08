@@ -4,6 +4,12 @@ An open-source Rust library for planning technical figure skating programs. The 
 
 ## Current capabilities
 
+With the default `optimizer` feature, `search_maximum_bv` proves the best
+theoretical Bronze or Silver composition from complete profile-selected choices,
+exact required occurrences and semantic exclusions. It runs until proof or
+cooperative cancellation. The first slice returns one proved representative;
+alternative collection is marked incomplete. See the [planning-search contract](docs/specs/planning-search.md).
+
 For theoretical program construction, use `assess_manual_bv` to calculate
 base value from ordered SOV codes and check composition without supplying
 spin or step feature evidence. See the [assumed-recognition API](docs/specs/assumed-recognition.md).
