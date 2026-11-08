@@ -60,6 +60,9 @@ printed official credit from timing verification and legacy hypothetical GOE.
 
 ## Documentation
 
+- Complete six-profile theoretical planning acceptance and repeated native Release
+  evidence: [#117/#125 readiness report](docs/milestone-117.md).
+
 - Controlled optimizer integration acceptance: [#104 report](docs/milestone-104.md),
   with identical-request repeated benchmarks, native observations and remaining limits.
 

@@ -6,6 +6,7 @@ Build and run from a clean checkout on Windows with PowerShell 7:
 cargo build --offline --release --example planning_readiness
 $revision = git rev-parse HEAD
 pwsh -NoProfile -File benchmarks/planning-readiness/run.ps1 -ExpectedRevision $revision -OutputDirectory target/planning-readiness -Runs 3 -WatchdogSeconds 120
+python benchmarks/planning-readiness/summarize.py target/planning-readiness
 ```
 
 Run without other compiler, test or benchmark jobs. The runner starts a fresh
@@ -52,3 +53,7 @@ Raw stdout/stderr, compiler/runtime versions, source revision, binary and lockfi
 hashes and host hardware remain alongside the CSV. Host background load and
 thermal state are uncontrolled. These native measurements establish no browser,
 WASM, UI or latency guarantee.
+
+`summarize.py` checks the exact 216-row matrix, every manifest hash, independent
+literal expected values, proof/alternative status and cancellation outcomes before
+writing the summary. Its worked value bounds are recorded in the [readiness report](../../docs/milestone-117.md).
