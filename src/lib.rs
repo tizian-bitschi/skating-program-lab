@@ -25,6 +25,10 @@ mod assessment;
 pub use assessment::*;
 mod manual_bv;
 pub use manual_bv::*;
+#[cfg(feature = "optimizer")]
+mod planning_search;
+#[cfg(feature = "optimizer")]
+pub use planning_search::*;
 mod goe_scenario;
 pub use goe_scenario::*;
 mod program_validation;
