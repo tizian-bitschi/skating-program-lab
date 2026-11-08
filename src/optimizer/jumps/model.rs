@@ -58,17 +58,7 @@ fn universe(
     let mut universe = Vec::new();
     for jump in &request.allowed_jumps {
         let element = JumpElement::Solo(jump.clone());
-        if !request
-            .personal_limits
-            .conflicts(
-                &PlannedElement::Jump(element.clone()),
-                &ElementPlanEvidence::Jump {
-                    direct_transitions_assumed: false,
-                },
-                0,
-            )
-            .is_empty()
-        {
+        if !personal_limits_allow(request, &element) {
             continue;
         }
         jump_code(jump)?;
@@ -78,17 +68,7 @@ fn universe(
         }
     }
     for element in &request.combinations {
-        if !request
-            .personal_limits
-            .conflicts(
-                &PlannedElement::Jump(element.clone()),
-                &ElementPlanEvidence::Jump {
-                    direct_transitions_assumed: false,
-                },
-                0,
-            )
-            .is_empty()
-        {
+        if !personal_limits_allow(request, element) {
             continue;
         }
         if !matches!(element, JumpElement::Combination(_)) {

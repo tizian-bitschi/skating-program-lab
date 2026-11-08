@@ -592,7 +592,7 @@ pub(super) fn optimize_anchored(
     request: &ProgramOptimizationRequest,
     start: Instant,
     anchors: Option<&AnchoredPlacement>,
-    assumed_values: Option<&[BaseValue]>,
+    assumed_values: Option<&[Option<BaseValue>]>,
 ) -> Result<ProgramOptimizationResult, ProgramOptimizationError> {
     use ProgramOptimizationError as E;
     let profile = registry
@@ -660,7 +660,9 @@ pub(super) fn optimize_anchored(
             return Err(E::InvalidRequest("duplicate candidate variants"));
         }
         let value = if let Some(values) = assumed_values {
-            values[i].clone()
+            values[i]
+                .clone()
+                .expect("permitted assumed variant has a resolved value")
         } else {
             variant_base(request, i, ruleset, anchors).map_err(|_| E::UnsupportedVariant(i))?
         };
@@ -995,6 +997,7 @@ pub fn optimize_program_with_assumed_recognition(
         &mut request.variants,
         recognition,
         profile.scoring.recognition_ruleset,
+        &request.personal_limits,
     )?;
     let mut result = optimize_anchored(registry, &request, start, None, Some(&values))?;
     result.assumptions = ASSUMED_SCOPE;
@@ -1009,7 +1012,8 @@ pub(super) fn resolve_variants(
     variants: &mut [ProgramVariant],
     recognition: &[AssumedRecognition],
     ruleset: RulesetId,
-) -> Result<Vec<BaseValue>, ProgramOptimizationError> {
+    personal_limits: &PersonalLimits,
+) -> Result<Vec<Option<BaseValue>>, ProgramOptimizationError> {
     if variants.len() != recognition.len() {
         return Err(ProgramOptimizationError::InvalidRequest(
             "supply one SOV selection per variant",
@@ -1020,12 +1024,57 @@ pub(super) fn resolve_variants(
         .zip(recognition)
         .enumerate()
         .map(|(i, (variant, assumption))| {
+            // Capped jump choices need structural/code validation, not profile scoring.
+            // Keep their original positions so exclusions and required groups retain meaning.
+            if matches!(variant.element, PlannedElement::Jump(_))
+                && !personal_limits
+                    .conflicts(&variant.element, &variant.evidence, i)
+                    .is_empty()
+            {
+                let sequence = matches!(
+                    variant.element,
+                    PlannedElement::Jump(JumpElement::Sequence(_))
+                );
+                let evidence = ElementPlanEvidence::Jump {
+                    direct_transitions_assumed: sequence
+                        && (assumption.direct_transitions_assumed
+                            || matches!(
+                                variant.evidence,
+                                ElementPlanEvidence::Jump {
+                                    direct_transitions_assumed: true
+                                }
+                            )),
+                };
+                let matches =
+                    crate::plan_recognition::intended_details(&variant.element, &evidence)
+                        .is_some_and(|details| {
+                            if matches!(variant.element, PlannedElement::Jump(JumpElement::Solo(_)))
+                            {
+                                details
+                                    .notation()
+                                    .is_some_and(|code| code == assumption.code)
+                                    && catalog_row(table, &assumption.code).is_some()
+                            } else {
+                                crate::scoring::assumed_jump_unit_matches(
+                                    table,
+                                    &details,
+                                    &assumption.code,
+                                )
+                            }
+                        });
+                if !matches || (assumption.direct_transitions_assumed && !sequence) {
+                    return Err(ProgramOptimizationError::UnsupportedVariant(i));
+                }
+                variant.evidence = evidence;
+                variant.recognition_assumed = true;
+                return Ok(None);
+            }
             let (evidence, value) = assumption
                 .resolve(table, &variant.element, ruleset, Some(&variant.evidence))
                 .ok_or(ProgramOptimizationError::UnsupportedVariant(i))?;
             variant.evidence = evidence;
             variant.recognition_assumed = true;
-            Ok(value)
+            Ok(Some(value))
         })
         .collect()
 }
@@ -1230,10 +1279,12 @@ mod tests {
             &mut request.variants,
             &codes,
             profile.scoring.recognition_ruleset,
+            &request.personal_limits,
         )
         .unwrap()
         .into_iter()
         .enumerate()
+        .map(|(i, value)| (i, value.unwrap()))
         .collect();
 
         // Bronze permits each listed jump at most twice. Both singles are 0.40 BV.

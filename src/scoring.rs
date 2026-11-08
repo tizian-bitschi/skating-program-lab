@@ -546,6 +546,21 @@ fn table_row(
     }
 }
 
+// Validate a discarded planned compound without applying a profile's scoring ceiling.
+#[cfg(feature = "optimizer")]
+pub(crate) fn assumed_jump_unit_matches(
+    table: ScoringTableId,
+    details: &crate::RecognitionDetails,
+    code: &str,
+) -> bool {
+    details.notation().is_some_and(|notation| notation == code)
+        && jump_unit_kind(details, true, true).is_ok()
+        && details
+            .components()
+            .iter()
+            .all(|component| crate::catalog_row(table, component.as_str()).is_some())
+}
+
 /// Score an explicitly selected jump unit without constructing a panel outcome.
 pub(crate) fn assumed_jump_unit_value(
     table: ScoringTableId,
