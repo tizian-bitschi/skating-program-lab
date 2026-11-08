@@ -113,6 +113,9 @@ pub(crate) struct Selection<'a> {
     profile: &'a RuleProfile,
     table: ScoringTableId,
     policy: ProgramPolicy,
+    checked: std::cell::RefCell<
+        std::collections::BTreeMap<String, Result<SelectableElement, ElementSelectionError>>,
+    >,
 }
 
 pub(crate) struct ResolvedIndividual {
@@ -159,6 +162,7 @@ impl<'a> Selection<'a> {
             profile,
             table,
             policy: policy.clone(),
+            checked: std::cell::RefCell::default(),
         })
     }
 
@@ -193,7 +197,14 @@ impl<'a> Selection<'a> {
     }
 
     pub(crate) fn check(&self, code: &str) -> Result<SelectableElement, ElementSelectionError> {
-        self.check_row(self.row(code)?)
+        if let Some(result) = self.checked.borrow().get(code) {
+            return result.clone();
+        }
+        let result = self.row(code).and_then(|row| self.check_row(row));
+        self.checked
+            .borrow_mut()
+            .insert(code.into(), result.clone());
+        result
     }
 
     pub(crate) fn row(&self, code: &str) -> Result<&'static CatalogRow, ElementSelectionError> {

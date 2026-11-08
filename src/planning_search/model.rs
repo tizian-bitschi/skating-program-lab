@@ -38,46 +38,54 @@ fn value_upper_bound(
         .iter()
         .filter_map(|r| atoms.iter().find(|a| a.assumption == r.element))
         .collect();
-    let required_jumps: Vec<_> = required.iter().flat_map(|a| a.jumps.iter()).collect();
-    let remaining =
-        profile.jumps.max_jumps - required.iter().filter(|a| !a.jumps.is_empty()).count();
-    let compounds = profile.jumps.max_compounds.min(
-        required
+    let senior = crate::senior::selected(profile, ProfileRule::Repetition);
+    let jump_bound: i32 = if senior {
+        super::senior_bound::jump_upper_bound(atoms, profile, request)
+    } else {
+        let required_jumps: Vec<_> = required.iter().flat_map(|a| a.jumps.iter()).collect();
+        let remaining =
+            profile.jumps.max_jumps - required.iter().filter(|a| !a.jumps.is_empty()).count();
+        let compounds = profile.jumps.max_compounds.min(
+            required
+                .iter()
+                .filter(|a| a.combination() || a.sequence())
+                .count()
+                + remaining,
+        );
+        let required_compounds = required
             .iter()
             .filter(|a| a.combination() || a.sequence())
-            .count()
-            + remaining,
-    );
-    let threes = profile
-        .jumps
-        .max_three_jump_compounds
-        .min(required.iter().filter(|a| a.jumps.len() == 3).count() + remaining);
-    let listed_slots =
-        profile.jumps.max_jumps + compounds + threes * (profile.jumps.max_compound_length - 2);
-    let solos: Vec<_> = atoms
-        .iter()
-        .filter(|a| matches!(a.element, PlannedElement::Jump(JumpElement::Solo(_))))
-        .collect();
-    let mut components: Vec<_> = solos
-        .iter()
-        .flat_map(|a| {
-            std::iter::repeat_n(
-                a.value,
-                profile.jumps.max_repetitions
-                    - required_jumps.iter().filter(|j| ***j == a.jumps[0]).count(),
-            )
-        })
-        .collect();
-    components.sort_unstable_by(|a, b| b.cmp(a));
-    let jump_bound: i32 = required
-        .iter()
-        .filter(|a| !a.jumps.is_empty())
-        .map(|a| a.value)
-        .sum::<i32>()
-        + components
-            .into_iter()
-            .take(listed_slots - required_jumps.len())
-            .sum::<i32>();
+            .count();
+        let threes = profile.jumps.max_three_jump_compounds.min(
+            required.iter().filter(|a| a.jumps.len() == 3).count() + compounds - required_compounds,
+        );
+        let listed_slots =
+            profile.jumps.max_jumps + compounds + threes * (profile.jumps.max_compound_length - 2);
+        let solos: Vec<_> = atoms
+            .iter()
+            .filter(|a| matches!(a.element, PlannedElement::Jump(JumpElement::Solo(_))))
+            .collect();
+        let mut components: Vec<_> = solos
+            .iter()
+            .flat_map(|a| {
+                std::iter::repeat_n(
+                    a.value,
+                    profile.jumps.max_repetitions
+                        - required_jumps.iter().filter(|j| ***j == a.jumps[0]).count(),
+                )
+            })
+            .collect();
+        components.sort_unstable_by(|a, b| b.cmp(a));
+        required
+            .iter()
+            .filter(|a| !a.jumps.is_empty())
+            .map(|a| a.value)
+            .sum::<i32>()
+            + components
+                .into_iter()
+                .take(listed_slots - required_jumps.len())
+                .sum::<i32>()
+    };
     let mut spin_values: Vec<(SpinAbbreviation, i32)> = Vec::new();
     for atom in atoms {
         if let Some(spin) = atom.spin {
@@ -113,6 +121,13 @@ fn value_upper_bound(
         best
     }
     let mut required_spins: Vec<_> = required.iter().filter_map(|a| a.spin).collect();
+    let required_choreographic_spins = required
+        .iter()
+        .filter(|a| a.family() == ProfileElementFamily::ChoreographicSpin)
+        .count();
+    // Choreographic spins consume the same overall spin allowance.
+    let choreographic_slots =
+        required_choreographic_spins.max(usize::from(policy.require_choreographic_spin));
     spin_values.retain(|(s, _)| !required_spins.contains(s));
     let spin_bound = required
         .iter()
@@ -123,17 +138,21 @@ fn value_upper_bound(
             &spin_values,
             &policy.spins,
             &mut required_spins,
-            policy.spins.max_spins - required.iter().filter(|a| a.spin.is_some()).count(),
+            policy.spins.max_spins
+                - required.iter().filter(|a| a.spin.is_some()).count()
+                - choreographic_slots,
         )
         .max(0);
     let family_bound = |family, cap: usize| {
-        atoms
-            .iter()
-            .filter(|a| a.family() == family)
-            .map(|a| a.value)
-            .max()
-            .unwrap_or(0)
-            * cap as i32
+        let reserved: Vec<_> = required.iter().filter(|a| a.family() == family).collect();
+        reserved.iter().map(|a| a.value).sum::<i32>()
+            + atoms
+                .iter()
+                .filter(|a| a.family() == family)
+                .map(|a| a.value)
+                .max()
+                .unwrap_or(0)
+                * (cap - reserved.len()) as i32
     };
     let total = jump_bound
         + spin_bound
@@ -149,6 +168,77 @@ fn value_upper_bound(
     (jump_bound, spin_bound, total)
 }
 
+fn atom_upper(atom: &Atom, profile: &RuleProfile, required: &[&Atom]) -> usize {
+    let senior = crate::senior::selected(profile, ProfileRule::Repetition);
+    let mut upper = if atom.spin.is_some() {
+        1
+    } else if !atom.jumps.is_empty() {
+        profile.jumps.max_jumps
+    } else {
+        1
+    };
+    if atom.combination() {
+        upper = upper
+            .min(profile.jumps.max_combinations)
+            .min(profile.jumps.max_compounds);
+    }
+    if atom.sequence() {
+        upper = upper
+            .min(profile.jumps.max_sequences)
+            .min(profile.jumps.max_compounds);
+    }
+    if let Some(limit) = profile.jumps.max_eulers.checked_div(atom.eulers) {
+        upper = upper.min(limit);
+    }
+    for jump in &atom.jumps {
+        upper = upper.min(
+            if senior && jump.rotations == Some(1) {
+                crate::senior::DEFINITION.max_kind_occurrences
+            } else {
+                profile.jumps.max_repetitions
+            } / atom.jumps.iter().filter(|j| *j == jump).count(),
+        );
+    }
+    if senior {
+        for jump in &atom.jumps {
+            let same_kind = atom.jumps.iter().filter(|j| j.kind == jump.kind).count();
+            upper = upper.min(crate::senior::DEFINITION.max_kind_occurrences / same_kind);
+        }
+    }
+    if !atom.jumps.is_empty() {
+        let reserved = required.iter().filter(|a| !a.jumps.is_empty()).count();
+        let own = required
+            .iter()
+            .filter(|a| a.assumption == atom.assumption)
+            .count();
+        upper = upper.min(profile.jumps.max_jumps - reserved + own);
+    }
+    for (select, cap) in [
+        (
+            Atom::combination as fn(&Atom) -> bool,
+            profile.jumps.max_combinations,
+        ),
+        (
+            Atom::sequence as fn(&Atom) -> bool,
+            profile.jumps.max_sequences,
+        ),
+        (
+            (|a: &Atom| a.combination() || a.sequence()) as fn(&Atom) -> bool,
+            profile.jumps.max_compounds,
+        ),
+    ] {
+        if select(atom) {
+            let reserved = required.iter().filter(|a| select(a)).count();
+            let own = required
+                .iter()
+                .filter(|a| a.assumption == atom.assumption)
+                .count();
+            upper = upper.min(cap - reserved + own);
+        }
+    }
+    upper
+}
+
 pub(super) fn search(
     registry: &ProfileRegistry,
     request: &PlanningSearchRequest,
@@ -157,6 +247,12 @@ pub(super) fn search(
     atoms: &[Atom],
     control: &impl PlanningSearchControl,
 ) -> Result<PlanningSearchOutcome, PlanningSearchError> {
+    let senior = crate::senior::selected(profile, ProfileRule::Repetition);
+    let required: Vec<_> = request
+        .required
+        .iter()
+        .filter_map(|r| atoms.iter().find(|a| a.assumption == r.element))
+        .collect();
     let mut solver = Solver::default();
     let (jump_bound, spin_bound, upper) = value_upper_bound(atoms, profile, policy, request);
     let max_elements = profile.jumps.max_jumps
@@ -167,9 +263,25 @@ pub(super) fn search(
     // all independently bounded variables rather than only a feasible solution.
     let activity = atoms
         .iter()
-        .map(|a| i64::from(a.value) * max_elements as i64)
+        .map(|a| i64::from(a.value) * atom_upper(a, profile, &required) as i64)
         .sum::<i64>()
-        + i64::from(upper);
+        + i64::from(upper)
+        + if senior {
+            atoms
+                .iter()
+                .filter(|a| {
+                    matches!(a.element, PlannedElement::Jump(JumpElement::Solo(_)))
+                        && a.jumps[0].rotations.is_some_and(|r| r >= 3)
+                })
+                .map(|a| {
+                    i64::from(
+                        a.value - i32::from(crate::scoring::repetition_hundredths(a.value as u16)),
+                    )
+                })
+                .sum::<i64>()
+        } else {
+            0
+        };
     if activity > i64::from(i32::MAX) {
         return Err(PlanningSearchError::UnsupportedCoverage {
             profile: request.profile.clone(),
@@ -181,31 +293,7 @@ pub(super) fn search(
         if control.is_cancelled(PlanningSearchPhase::Model) {
             return Ok(PlanningSearchOutcome::Cancelled);
         }
-        let mut upper = if atom.spin.is_some() {
-            1
-        } else if !atom.jumps.is_empty() {
-            profile.jumps.max_jumps
-        } else {
-            1
-        };
-        if atom.combination() {
-            upper = upper
-                .min(profile.jumps.max_combinations)
-                .min(profile.jumps.max_compounds);
-        }
-        if atom.sequence() {
-            upper = upper
-                .min(profile.jumps.max_sequences)
-                .min(profile.jumps.max_compounds);
-        }
-        if let Some(limit) = profile.jumps.max_eulers.checked_div(atom.eulers) {
-            upper = upper.min(limit);
-        }
-        for jump in &atom.jumps {
-            upper = upper.min(
-                profile.jumps.max_repetitions / atom.jumps.iter().filter(|j| *j == jump).count(),
-            );
-        }
+        let upper = atom_upper(atom, profile, &required);
         counts.push(solver.new_bounded_integer(0, upper as i32));
     }
     // Allocate variables before posting: Pumpkin forbids creating a variable
@@ -213,6 +301,29 @@ pub(super) fn search(
     let sequence_count = solver.new_bounded_integer(0, profile.jumps.max_sequences as i32);
     let euler_combination_count = solver.new_bounded_integer(0, profile.jumps.max_compounds as i32);
     let objective = solver.new_bounded_integer(0, upper);
+    let advanced: Vec<_> = if senior {
+        atoms
+            .iter()
+            .filter(|a| {
+                a.jumps.len() == 1
+                    && !a.combination()
+                    && !a.sequence()
+                    && a.jumps[0].rotations.is_some_and(|r| r >= 3)
+            })
+            .map(|a| {
+                (
+                    a.jumps[0].clone(),
+                    a.value - i32::from(crate::scoring::repetition_hundredths(a.value as u16)),
+                    solver.new_bounded_integer(0, 2),
+                    solver.new_bounded_integer(0, 2),
+                    solver.new_bounded_integer(0, 1),
+                    solver.new_bounded_integer(0, 1),
+                )
+            })
+            .collect()
+    } else {
+        vec![]
+    };
     for (atom, &count) in atoms.iter().zip(&counts) {
         let minimum = request
             .required
@@ -280,7 +391,19 @@ pub(super) fn search(
     );
     constrain(&|a| a.eulers as i32, 0, profile.jumps.max_eulers as i32);
     for permission in &profile.jumps.allowed {
-        for rotations in permission.min_rotations..=permission.max_rotations {
+        if senior {
+            constrain(
+                &|a| {
+                    a.jumps
+                        .iter()
+                        .filter(|j| j.kind == Some(permission.kind))
+                        .count() as i32
+                },
+                0,
+                crate::senior::DEFINITION.max_kind_occurrences as i32,
+            );
+        }
+        for rotations in permission.min_rotations..=permission.max_rotations.min(5) {
             constrain(
                 &|a| {
                     a.jumps
@@ -291,7 +414,11 @@ pub(super) fn search(
                         .count() as i32
                 },
                 0,
-                profile.jumps.max_repetitions as i32,
+                if senior && rotations == 1 {
+                    crate::senior::DEFINITION.max_kind_occurrences as i32
+                } else {
+                    profile.jumps.max_repetitions as i32
+                },
             );
         }
     }
@@ -357,11 +484,13 @@ pub(super) fn search(
             max_elements as i32,
         );
     }
-    constrain(
-        &|a| if a.jumps.is_empty() { 0 } else { a.value },
-        0,
-        jump_bound,
-    );
+    if !senior {
+        constrain(
+            &|a| if a.jumps.is_empty() { 0 } else { a.value },
+            0,
+            jump_bound,
+        );
+    }
     constrain(
         &|a| if a.spin.is_some() { a.value } else { 0 },
         0,
@@ -397,12 +526,77 @@ pub(super) fn search(
         ],
         tag,
     );
+    for (jump, _, total, solos, repeated, reduced) in &advanced {
+        for (aggregate, solo_only) in [(*total, false), (*solos, true)] {
+            let mut terms: Vec<_> = atoms
+                .iter()
+                .zip(&counts)
+                .filter_map(|(a, v)| {
+                    let n = if solo_only && (a.combination() || a.sequence()) {
+                        0
+                    } else {
+                        a.jumps.iter().filter(|j| *j == jump).count() as i32
+                    };
+                    (n != 0).then(|| v.scaled(n))
+                })
+                .collect();
+            terms.push(aggregate.scaled(-1));
+            let tag = solver.new_constraint_tag();
+            solver
+                .add_constraint(pumpkin_solver::equals(terms, 0, tag))
+                .post();
+        }
+        for (aggregate, flag) in [(*total, *repeated), (*solos, *reduced)] {
+            let tag = solver.new_constraint_tag();
+            solver.add_clause(vec![predicate!(aggregate <= 1), predicate!(flag == 1)], tag);
+            let tag = solver.new_constraint_tag();
+            solver.add_clause(vec![predicate!(aggregate >= 2), predicate!(flag == 0)], tag);
+        }
+    }
+    if senior {
+        let mut terms: Vec<_> = atoms
+            .iter()
+            .zip(&counts)
+            .filter(|(a, _)| !a.jumps.is_empty())
+            .map(|(a, v)| v.scaled(a.value))
+            .collect();
+        terms.extend(
+            advanced
+                .iter()
+                .map(|(_, loss, _, _, _, reduced)| reduced.scaled(-loss)),
+        );
+        let tag = solver.new_constraint_tag();
+        solver
+            .add_constraint(pumpkin_solver::less_than_or_equals(terms, jump_bound, tag))
+            .post();
+    }
+    for (high_only, cap) in [
+        (false, crate::senior::DEFINITION.max_repeated_advanced),
+        (true, crate::senior::DEFINITION.max_repeated_quad_or_quint),
+    ] {
+        let terms: Vec<_> = advanced
+            .iter()
+            .filter(|(j, ..)| !high_only || j.rotations.is_some_and(|r| r >= 4))
+            .map(|(_, _, _, _, flag, _)| flag.scaled(1))
+            .collect();
+        if !terms.is_empty() {
+            let tag = solver.new_constraint_tag();
+            solver
+                .add_constraint(pumpkin_solver::less_than_or_equals(terms, cap as i32, tag))
+                .post();
+        }
+    }
     // Exact catalog values; absolute activity was checked before construction.
     let mut terms: Vec<_> = atoms
         .iter()
         .zip(&counts)
         .map(|(a, v)| v.scaled(a.value))
         .collect();
+    terms.extend(
+        advanced
+            .iter()
+            .map(|(_, loss, _, _, _, reduced)| reduced.scaled(-loss)),
+    );
     terms.push(objective.scaled(-1));
     let tag = solver.new_constraint_tag();
     solver
@@ -420,6 +614,13 @@ pub(super) fn search(
     let mut variables = vec![objective];
     variables.extend(ordered.into_iter().map(|(_, v)| *v));
     variables.extend([sequence_count, euler_combination_count]);
+    variables.extend(
+        advanced
+            .iter()
+            .flat_map(|(_, _, total, solos, repeated, reduced)| {
+                [*total, *solos, *repeated, *reduced]
+            }),
+    );
     let mut brancher = CountBrancher::new(InputOrder::new(&variables), InDomainMax);
     let outcome = solver.optimise(
         &mut brancher,
