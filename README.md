@@ -10,6 +10,8 @@ spin or step feature evidence. See the [assumed-recognition API](docs/specs/assu
 `selectable_jump_elements` lists the complete category-permitted atomic jump
 code intentions, including mixed sequences and Euler connections, with no
 1,000-variant cap. See the [planned jump grammar](docs/specs/planned-jump-domain.md).
+The [manual category workflow](docs/manual-category-planning.md) explains selection,
+credited values and the distinction between drafts, violations and unsupported choices.
 Prepare a `GoeScenarioPlan` from the selected codes to run
 `preview_goe_scenario` with a uniform final GOE and individual overrides.
 The [BV-first acceptance matrix](docs/milestone-89.md) covers Adult and Senior
