@@ -11,8 +11,10 @@ if ($LASTEXITCODE -ne 0 -or $revision -ne $ExpectedRevision) { throw 'Expected r
 if (& git.exe -C $root status --porcelain --untracked-files=normal) { throw 'Requires a clean source checkout' }
 $exe = Join-Path $root 'target/release/examples/planning_readiness.exe'
 if (!(Test-Path -LiteralPath $exe)) { throw 'Build Release example first: cargo build --offline --release --example planning_readiness' }
+if ((Test-Path -LiteralPath $OutputDirectory) -and (Get-ChildItem -LiteralPath $OutputDirectory -Force)) { throw 'Output directory must be empty' }
 New-Item -ItemType Directory -Force -Path $OutputDirectory | Out-Null
 $output = (Resolve-Path -LiteralPath $OutputDirectory).Path
+Copy-Item -LiteralPath (Join-Path $root 'Cargo.lock') -Destination (Join-Path $output 'Cargo.lock')
 $cpu = Get-CimInstance Win32_Processor
 $os = Get-CimInstance Win32_OperatingSystem
 @("revision=$revision", "runs=$Runs", "external_watchdog_seconds=$WatchdogSeconds", 'No API time/node budget; no repertoire reduction; serial fresh process per run; no excluded warmup.',
@@ -28,11 +30,11 @@ $os = Get-CimInstance Win32_OperatingSystem
 $header = 'profile,scenario,cancel_phase,outcome,maximum_hundredths,alternatives,alternative_status,domain_us,model_us,first_valid_us,proof_us,alternatives_us,total_us,cancel_response_us,passed,run,peak_working_set_bytes,request_sha256,exit_code'
 $header | Set-Content -LiteralPath (Join-Path $output 'observations.csv')
 $failures = 0
-function Measure-Request([string]$Profile, [string]$Scenario, [string]$Cancel, [int]$Run) {
-    $label = "$Profile-$Scenario-$(if ($Cancel) { $Cancel } else { 'continue' })-$Run"
+function Measure-Request([string]$ProfileName, [string]$Scenario, [string]$Cancel, [int]$Run) {
+    $label = "$ProfileName-$Scenario-$(if ($Cancel) { $Cancel } else { 'continue' })-$Run"
     $info = [Diagnostics.ProcessStartInfo]::new()
     $info.FileName = $exe
-    foreach ($arg in @($Profile, $Scenario)) { $info.ArgumentList.Add($arg) }
+    foreach ($arg in @($ProfileName, $Scenario)) { $info.ArgumentList.Add($arg) }
     if ($Cancel) { $info.ArgumentList.Add($Cancel) }
     $info.UseShellExecute = $false
     $info.CreateNoWindow = $true
@@ -70,7 +72,7 @@ function Measure-Request([string]$Profile, [string]$Scenario, [string]$Cancel, [
     [IO.File]::WriteAllText((Join-Path $output "$label.stderr.txt"), $errorText)
     $hash = ''
     if ($request) {
-        $manifest = Join-Path $output "$Profile-$Scenario.request.txt"
+        $manifest = Join-Path $output "$ProfileName-$Scenario.request.txt"
         if (Test-Path -LiteralPath $manifest) {
             if ([IO.File]::ReadAllText($manifest) -cne $request) { throw "Request changed: $label" }
         } else { [IO.File]::WriteAllText($manifest, $request, [Text.UTF8Encoding]::new($false)) }
@@ -78,23 +80,24 @@ function Measure-Request([string]$Profile, [string]$Scenario, [string]$Cancel, [
     }
     if (!$metric) {
         $outcome = if ($timedOut) { 'WatchdogFailure' } else { 'ProcessFailure' }
-        $metric = "$Profile,$Scenario,$Cancel,$outcome,,0,,,,,,,,,false"
+        $metric = "$ProfileName,$Scenario,$Cancel,$outcome,,0,,,,,,,,,false"
     }
+    if ($metric.Split(',').Count -ne 15) { throw "Malformed metric row: $label" }
     "$metric,$Run,$peak,$hash,$($process.ExitCode)" | Add-Content -LiteralPath (Join-Path $output 'observations.csv')
     $passed = ($metric.Split(',')[14] -eq 'true') -and $process.ExitCode -eq 0
     $process.Dispose()
     if (!$passed) { $script:failures++; Write-Warning "Readiness failure retained: $label" }
 }
-foreach ($profile in @('Bronze', 'Silver', 'Gold', 'Masters', 'Women', 'Men')) {
+foreach ($profileName in @('Bronze', 'Silver', 'Gold', 'Masters', 'Women', 'Men')) {
     for ($run = 1; $run -le $Runs; $run++) {
         foreach ($scenario in @('empty', 'required', 'excluded', 'impossible')) {
-            Measure-Request $profile $scenario '' $run
+            Measure-Request $profileName $scenario '' $run
         }
         foreach ($phase in @('Domain', 'Model', 'Solve', 'IncumbentFound', 'Reconstruction', 'MaximumProved', 'Alternatives', 'PostproofReconstruction')) {
-            Measure-Request $profile 'empty' $phase $run
+            Measure-Request $profileName 'empty' $phase $run
         }
     }
-    Write-Output "Completed $profile; cumulative failures=$failures"
+    Write-Output "Completed $profileName; cumulative failures=$failures"
 }
 if ($failures) { throw "$failures readiness failures; see retained observations in $output" }
 Write-Output "All requests passed; observations: $output"
