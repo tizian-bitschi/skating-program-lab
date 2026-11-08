@@ -156,6 +156,7 @@ fn sit() -> ProgramVariant {
 fn request() -> ProgramCompletionRequest {
     let p = adult_profile(AdultCategory::Silver);
     ProgramCompletionRequest {
+        personal_limits: PersonalLimits::default(),
         rotation_preference: RotationPreference::default(),
         season: p.season,
         profile: p.id,
@@ -532,6 +533,7 @@ fn different_original_recognition_evidence_remains_distinct_in_visible_ties() {
 fn generated_domain_audit_is_preserved_and_bound_to_supplied_variants() {
     let mut req = request();
     let generator = CandidateGenerationRequest {
+        personal_limits: PersonalLimits::default(),
         rotation_preference: RotationPreference::default(),
         season: req.season,
         profile: req.profile.clone(),
@@ -819,6 +821,7 @@ fn gold_code_domain_completion_matches_manual_bv_and_order_oracle() {
         let manual = assess_manual_bv(
             &registry,
             &ManualBvRequest {
+                personal_limits: PersonalLimits::default(),
                 rotation_preference: RotationPreference::default(),
                 profile: q.profile.clone(),
                 scoring_table: q.scoring_table,
@@ -971,6 +974,7 @@ fn assumed_senior_completion_keeps_distinct_equal_bv_choices() {
         let manual = assess_manual_bv(
             &registry,
             &ManualBvRequest {
+                personal_limits: PersonalLimits::default(),
                 rotation_preference: RotationPreference::default(),
                 profile: q.profile.clone(),
                 scoring_table: q.scoring_table,
@@ -1098,6 +1102,7 @@ fn assumed_senior_completion_credits_the_second_axel_in_each_allowed_gap() {
         let manual = assess_manual_bv(
             &registry,
             &ManualBvRequest {
+                personal_limits: PersonalLimits::default(),
                 rotation_preference: RotationPreference::default(),
                 profile: q.profile.clone(),
                 scoring_table: q.scoring_table,
@@ -1237,6 +1242,7 @@ fn assumed_senior_completion_matches_eleven_slot_credited_oracle() {
                 assert_eq!(expected.iter().copied().map(u32::from).sum::<u32>(), 4760 + best_delta);
                 assert_eq!(candidate.per_element.iter().map(|v| v.hundredths).collect::<Vec<_>>(), expected);
                 let manual = assess_manual_bv(&registry, &ManualBvRequest {
+personal_limits: PersonalLimits::default(),
 rotation_preference: RotationPreference::default(),
                     profile: q.profile.clone(), scoring_table: q.scoring_table,
                     submission: SubmissionState::Complete, elements: selections,
@@ -1261,4 +1267,144 @@ rotation_preference: RotationPreference::default(),
             .collect::<BTreeSet<_>>();
         assert_eq!(actual, expected);
     }
+}
+
+#[test]
+fn immutable_personal_conflict_preserves_original_and_manual_assessment() {
+    let mut q = request();
+    let original = q.original.clone();
+    q.personal_limits.spin_levels.push(SpinLevelLimit {
+        abbreviation: SpinAbbreviation {
+            kind: RegularSpinKind::Sit,
+            entry: SpinEntry::NonFlying,
+            change_foot: false,
+        },
+        maximum: Level::Basic,
+    });
+    let Err(ProgramCompletionError::PersonalLimitConflict(conflicts)) =
+        complete_program(&ProfileRegistry::adult(), &q)
+    else {
+        panic!("immutable personal conflict");
+    };
+    assert_eq!(q.original, original);
+    assert_eq!(conflicts.len(), 1);
+    assert_eq!(conflicts[0].element_index, 1);
+    assert_eq!(
+        conflicts[0].kind,
+        PersonalLimitConflictKind::SpinLevel {
+            abbreviation: q.personal_limits.spin_levels[0].abbreviation,
+            requested: Level::One,
+            maximum: Level::Basic
+        }
+    );
+}
+
+#[test]
+fn completion_rejects_domain_generated_under_different_personal_limits() {
+    let registry = ProfileRegistry::adult();
+    let mut q = request();
+    let mut generation = generation_defaults::request(adult_profile(AdultCategory::Silver));
+    generation.jump_kinds = vec![JumpKind::ToeLoop, JumpKind::Salchow];
+    generation.rotations = vec![1];
+    generation.solo_jumps = true;
+    let generated = generate_program_candidates(&registry, &generation).unwrap();
+    q.variants = generated.variants.clone();
+    q.generated_domain = Some(generated);
+    q.personal_limits.jump_rotations.push(JumpRotationLimit {
+        kind: JumpKind::Lutz,
+        maximum: JumpRotationClass::Double,
+    });
+    assert!(matches!(
+        complete_program(&registry, &q),
+        Err(ProgramCompletionError::InvalidRequest(
+            "generated domain does not match request"
+        ))
+    ));
+}
+
+#[test]
+fn completion_filters_additions_under_personal_caps_and_preserves_all_originals() {
+    let mut q = request();
+    let originals = q.original.clone();
+    let mut double = jump(JumpKind::ToeLoop);
+    if let PlannedElement::Jump(JumpElement::Solo(j)) = &mut double.element {
+        j.rotations = Some(2);
+    }
+    q.variants.push(double);
+    q.personal_limits.jump_rotations.push(JumpRotationLimit {
+        kind: JumpKind::ToeLoop,
+        maximum: JumpRotationClass::Single,
+    });
+    let result = result(&q);
+    assert_eq!(result.status, OptimizerStatus::OptimalProven);
+    for candidate in &result.candidates {
+        assert!(candidate.assessment.personal_conflicts.is_empty());
+        for (original_index, original) in originals.iter().enumerate() {
+            let index = candidate.provenance.iter().position(|p| matches!(p, CompletionProvenance::Original { original_index: i, .. } if *i == original_index)).unwrap();
+            assert_eq!(candidate.program.elements[index], original.entry.planned);
+        }
+        assert!(!candidate.provenance.iter().any(|p| matches!(
+            p,
+            CompletionProvenance::Inserted {
+                variant_index: 2,
+                ..
+            }
+        )));
+    }
+}
+
+#[test]
+fn fixed_triple_lutz_reports_the_original_conflict_before_completion() {
+    let registry = ProfileRegistry::senior();
+    let p = senior_profile(SeniorCategory::Women);
+    let mut q = request();
+    q.profile = p.id;
+    q.policy = senior_program_policy(SeniorCategory::Women);
+    q.original = vec![CompletionEntry {
+        id: "lutz".into(),
+        locked: true,
+        entry: ManualProgramEntry {
+            planned: PlannedElement::Jump(JumpElement::Solo(ListedJump {
+                kind: Some(JumpKind::Lutz),
+                rotations: Some(3),
+            })),
+            evidence: ElementPlanEvidence::Jump {
+                direct_transitions_assumed: false,
+            },
+            intended_recognition: None,
+            scenario: None,
+        },
+    }];
+    q.variants.clear();
+    q.insertion.boundaries = vec![0, 1];
+    q.min_additions = 0;
+    q.max_additions = 0;
+    q.personal_limits.jump_rotations.push(JumpRotationLimit {
+        kind: JumpKind::Lutz,
+        maximum: JumpRotationClass::Double,
+    });
+    let original = q.original.clone();
+    let Err(ProgramCompletionError::PersonalLimitConflict(conflicts)) =
+        complete_program_with_assumed_recognition(
+            &registry,
+            &q,
+            &[AssumedRecognition::new("3Lz")],
+            &[],
+        )
+    else {
+        panic!("fixed 3Lz conflict");
+    };
+    assert_eq!(q.original, original);
+    assert_eq!(
+        conflicts,
+        [PersonalLimitConflict {
+            element_index: 0,
+            component_index: None,
+            kind: PersonalLimitConflictKind::JumpRotation {
+                kind: JumpKind::Lutz,
+                requested: 3,
+                maximum: JumpRotationClass::Double
+            }
+        }]
+    );
 }

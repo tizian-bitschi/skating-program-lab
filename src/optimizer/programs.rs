@@ -44,6 +44,7 @@ pub enum PersonalExclusion {
 
 #[derive(Debug, Clone)]
 pub struct ProgramOptimizationRequest {
+    pub personal_limits: PersonalLimits,
     pub rotation_preference: RotationPreference,
     pub season: Season,
     pub profile: ProfileId,
@@ -113,6 +114,7 @@ pub struct ProgramOptimizationResult {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ProgramOptimizationError {
+    PersonalLimitConflict(Vec<PersonalLimitConflict>),
     RotationPreferenceConflict(Vec<RotationPreferenceConflict>),
     InvalidRequest(&'static str),
     Profile(ProfileSelectionError),
@@ -641,8 +643,16 @@ pub(super) fn optimize_anchored(
         EvaluationScope::EvidenceBased
     };
     let mut sources = profile.sources.clone();
-    // Verify all requested variants before exclusions; unsupported inputs are never hidden.
+    // Personal maxima remove optional choices before scoring; other unsupported inputs stay explicit.
     for (i, variant) in request.variants.iter().enumerate() {
+        if !request
+            .personal_limits
+            .conflicts(&variant.element, &variant.evidence, i)
+            .is_empty()
+        {
+            excluded_variants.push(i);
+            continue;
+        }
         if assumed_values.is_none()
             && request.variants[..i].contains(variant)
             && !anchors.is_some_and(|a| i >= a.first_anchor)
@@ -696,6 +706,21 @@ pub(super) fn optimize_anchored(
     }
     for group in &request.must_have {
         if !group.is_empty() {
+            if !group.iter().any(|i| universe.contains(i)) {
+                let personal: Vec<_> = group
+                    .iter()
+                    .flat_map(|&i| {
+                        request.personal_limits.conflicts(
+                            &request.variants[i].element,
+                            &request.variants[i].evidence,
+                            i,
+                        )
+                    })
+                    .collect();
+                if !personal.is_empty() {
+                    return Err(E::PersonalLimitConflict(personal));
+                }
+            }
             let conflicts: Vec<_> = group
                 .iter()
                 .filter_map(|&i| {
@@ -1123,6 +1148,7 @@ mod tests {
     pub(super) fn bronze_solos() -> ProgramOptimizationRequest {
         let profile = adult_profile(AdultCategory::Bronze);
         ProgramOptimizationRequest {
+            personal_limits: PersonalLimits::default(),
             rotation_preference: RotationPreference::default(),
             season: profile.season,
             profile: profile.id,

@@ -15,6 +15,7 @@ The core is intended for native and eventual WebAssembly use. Correctness and tr
 | `src/lib.rs` | Public re-exports, ruleset and table identities, source references. |
 | `src/planning_search.rs`, `src/planning_search/model.rs` | Complete theoretical Adult and Senior repertoires, exact required occurrences, semantic exclusions and bounded atomic-count Pumpkin proof, followed by shared manual-BV reconstruction. |
 | `src/plan.rs` | Ordered `Program` and intended elements; incomplete plans are representable. |
+| `src/personal_limits.rs` | Shared typed repertoire maxima and indexed personal conflicts, independent of solver, scoring and competition policies. |
 | `src/assessment.rs` | Additive manual-program entry point; combines existing validation and scoring while preserving intended and supplied-recognition stages, optional GOE and incomplete aggregates. |
 | `src/legality.rs` | Additive stage-aware coverage report built from shared plan validation, explicit profile policies and unevaluated-rule inventory. |
 | `src/execution.rs` | Observations and supplied panel recognition, calls and notation. |

@@ -67,8 +67,15 @@ pub fn selectable_jump_elements(
     table: ScoringTableId,
     rotation_preference: RotationPreference,
 ) -> Result<Vec<AssumedRecognition>, ProfileSelectionError> {
-    planned_jump_elements(registry, profile, table, rotation_preference, &mut || false)
-        .map(|choices| choices.expect("noncancellable listing"))
+    planned_jump_elements(
+        registry,
+        profile,
+        table,
+        rotation_preference,
+        &PersonalLimits::default(),
+        &mut || false,
+    )
+    .map(|choices| choices.expect("noncancellable listing"))
 }
 
 /// List choices for a registered profile with an explicit, profile-bound policy.
@@ -334,6 +341,7 @@ pub(crate) fn planned_jump_elements(
     profile: &ProfileId,
     table: ScoringTableId,
     rotation_preference: RotationPreference,
+    limits: &PersonalLimits,
     cancelled: &mut impl FnMut() -> bool,
 ) -> Result<Option<Vec<AssumedRecognition>>, ProfileSelectionError> {
     let selected = Selection::new(registry, profile, table)?;
@@ -354,6 +362,13 @@ pub(crate) fn planned_jump_elements(
             ..
         } = option
         {
+            let (_, element) = selection_shape(row).expect("selected solo jump");
+            let evidence = ElementPlanEvidence::Jump {
+                direct_transitions_assumed: false,
+            };
+            if !limits.conflicts(&element, &evidence, 0).is_empty() {
+                continue;
+            }
             choices.push(AssumedRecognition::new(row.notation));
             if rotations <= 4 || !crate::senior::selected(selected.profile, ProfileRule::Structure)
             {
@@ -440,6 +455,48 @@ pub(crate) fn planned_jump_elements(
     Ok(Some(filtered))
 }
 
+/// Profile-permitted choices intersected with personal repertoire maxima.
+pub fn selectable_elements_with_limits(
+    registry: &ProfileRegistry,
+    profile: &ProfileId,
+    table: ScoringTableId,
+    limits: &PersonalLimits,
+) -> Result<Vec<SelectableElement>, ProfileSelectionError> {
+    Ok(selectable_elements(registry, profile, table)?
+        .into_iter()
+        .filter(|s| {
+            let Some((_, element)) = selection_shape(s.row) else {
+                return false;
+            };
+            let Some((evidence, _)) =
+                crate::assumed_recognition::resolve_individual_row(s.row, &element, None)
+            else {
+                return false;
+            };
+            limits.conflicts(&element, &evidence, 0).is_empty()
+        })
+        .collect())
+}
+
+/// Complete atomic jump choices intersected with personal listed rotation maxima.
+pub fn selectable_jump_elements_with_limits(
+    registry: &ProfileRegistry,
+    profile: &ProfileId,
+    table: ScoringTableId,
+    rotation_preference: RotationPreference,
+    limits: &PersonalLimits,
+) -> Result<Vec<AssumedRecognition>, ProfileSelectionError> {
+    planned_jump_elements(
+        registry,
+        profile,
+        table,
+        rotation_preference,
+        limits,
+        &mut || false,
+    )
+    .map(|choices| choices.expect("noncancellable listing"))
+}
+
 #[cfg(test)]
 mod planning_tests {
     use super::*;
@@ -500,6 +557,7 @@ mod planning_tests {
                 &profile.id,
                 profile.scoring_table,
                 RotationPreference::AllowMixedDirections,
+                &PersonalLimits::default(),
                 &mut || false,
             )
             .unwrap()
@@ -511,6 +569,7 @@ mod planning_tests {
             let assessment = assess_manual_bv(
                 registry,
                 &ManualBvRequest {
+                    personal_limits: PersonalLimits::default(),
                     rotation_preference: RotationPreference::default(),
                     profile: profile.id,
                     scoring_table: profile.scoring_table,
@@ -542,6 +601,7 @@ mod planning_tests {
             &senior_profile(SeniorCategory::Women).id,
             ScoringTableId::Isu2786June2_2026,
             RotationPreference::default(),
+            &PersonalLimits::default(),
             &mut || {
                 polls += 1;
                 polls == 200
@@ -562,6 +622,7 @@ mod planning_tests {
             &p.id,
             p.scoring_table,
             RotationPreference::AllowMixedDirections,
+            &PersonalLimits::default(),
             &mut || {
                 expansion_polls += 1;
                 false
@@ -575,6 +636,7 @@ mod planning_tests {
             &p.id,
             p.scoring_table,
             RotationPreference::SameDirection,
+            &PersonalLimits::default(),
             &mut || {
                 polls += 1;
                 polls > expansion_polls

@@ -20,6 +20,7 @@ pub struct CompletionInsertionPolicy {
 
 #[derive(Debug, Clone)]
 pub struct ProgramCompletionRequest {
+    pub personal_limits: PersonalLimits,
     pub rotation_preference: RotationPreference,
     pub season: Season,
     pub profile: ProfileId,
@@ -95,6 +96,7 @@ pub struct ProgramCompletionResult {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ProgramCompletionError {
+    PersonalLimitConflict(Vec<PersonalLimitConflict>),
     RotationPreferenceConflict(Vec<RotationPreferenceConflict>),
     InvalidRequest(&'static str),
     Profile(ProfileSelectionError),
@@ -111,6 +113,7 @@ fn manual(
     submission: SubmissionState,
 ) -> ManualProgramRequest {
     ManualProgramRequest {
+        personal_limits: request.personal_limits.clone(),
         rotation_preference: request.rotation_preference,
         profile: request.profile.clone(),
         scoring_table: request.scoring_table,
@@ -200,6 +203,7 @@ fn validate_request(
             || domain.audit.profile != request.profile
             || domain.audit.scoring_table != request.scoring_table
             || domain.audit.rotation_preference != request.rotation_preference
+            || domain.audit.personal_limits != request.personal_limits
         {
             return Err(E::InvalidRequest("generated domain does not match request"));
         }
@@ -229,6 +233,19 @@ fn check_global_conflicts(
     assumed: bool,
 ) -> Result<(), ProgramCompletionError> {
     use ProgramCompletionError as E;
+    let personal_conflicts: Vec<_> = request
+        .original
+        .iter()
+        .enumerate()
+        .flat_map(|(i, e)| {
+            request
+                .personal_limits
+                .conflicts(&e.entry.planned, &e.entry.evidence, i)
+        })
+        .collect();
+    if !personal_conflicts.is_empty() {
+        return Err(E::PersonalLimitConflict(personal_conflicts));
+    }
     let rotation_conflicts = crate::rotation::conflicts(
         request.original.iter().map(|e| &e.entry.planned),
         request.rotation_preference,
@@ -323,6 +340,7 @@ fn prepare_search(
     });
     variants.extend(request.original.iter().map(|e| variant(&e.entry)));
     let search_request = ProgramOptimizationRequest {
+        personal_limits: request.personal_limits.clone(),
         rotation_preference: request.rotation_preference,
         season: request.season,
         profile: request.profile.clone(),

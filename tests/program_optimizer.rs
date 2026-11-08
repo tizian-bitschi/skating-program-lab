@@ -97,6 +97,7 @@ fn request(
 ) -> ProgramOptimizationRequest {
     let profile = adult_profile(category);
     ProgramOptimizationRequest {
+        personal_limits: PersonalLimits::default(),
         rotation_preference: RotationPreference::default(),
         season: profile.season,
         profile: profile.id,
@@ -825,6 +826,7 @@ fn optimize_gold_sov_selections_without_spin_or_step_proof() {
         let manual = assess_manual_bv(
             &registry,
             &ManualBvRequest {
+                personal_limits: PersonalLimits::default(),
                 rotation_preference: RotationPreference::default(),
                 profile: q.profile.clone(),
                 scoring_table: q.scoring_table,
@@ -870,6 +872,7 @@ fn assumed_senior_full_program_matches_manual_bv() {
     let manual = assess_manual_bv(
         &registry,
         &ManualBvRequest {
+            personal_limits: PersonalLimits::default(),
             rotation_preference: RotationPreference::default(),
             profile: q.profile,
             scoring_table: q.scoring_table,
@@ -993,4 +996,72 @@ fn assumed_senior_credited_optima_match_literal_ordered_oracle() {
             assert_eq!(axels, if excluded { vec![800, 640] } else { vec![800] });
         }
     }
+}
+
+#[test]
+fn personal_maxima_filter_optional_variants_and_required_alternatives() {
+    let registry = ProfileRegistry::adult();
+    let basic = spin(
+        RegularSpinKind::Camel,
+        SpinEntry::NonFlying,
+        false,
+        Level::Basic,
+        vec![],
+    );
+    let one = spin(
+        RegularSpinKind::Camel,
+        SpinEntry::NonFlying,
+        false,
+        Level::One,
+        vec![feature(
+            SpinFeature::EightRevolutions,
+            FeatureAttemptOutcome::Successful,
+        )],
+    );
+    let mut q = request(AdultCategory::Bronze, vec![one, basic], 1);
+    q.personal_limits.spin_levels.push(SpinLevelLimit {
+        abbreviation: SpinAbbreviation {
+            kind: RegularSpinKind::Camel,
+            entry: SpinEntry::NonFlying,
+            change_foot: false,
+        },
+        maximum: Level::Basic,
+    });
+    q.must_have = vec![vec![0, 1]];
+    let result = optimize_program(&registry, &q).unwrap();
+    assert_eq!(result.status, OptimizerStatus::OptimalProven);
+    assert!(result.candidates.iter().all(|c| c.variant_indices == [1]));
+    assert_eq!(result.excluded_variants, [0]);
+    q.must_have = vec![vec![0]];
+    let Err(ProgramOptimizationError::PersonalLimitConflict(conflicts)) =
+        optimize_program(&registry, &q)
+    else {
+        panic!("required conflict");
+    };
+    assert_eq!(conflicts[0].element_index, 0);
+}
+
+#[test]
+fn personal_limits_remove_unneeded_unsupported_optional_variants_before_scoring() {
+    let mut unsupported = jump(JumpKind::Lutz);
+    if let PlannedElement::Jump(JumpElement::Solo(j)) = &mut unsupported.element {
+        j.rotations = Some(3);
+    }
+    let mut q = request(
+        AdultCategory::Bronze,
+        vec![unsupported, jump(JumpKind::ToeLoop)],
+        1,
+    );
+    q.personal_limits.jump_rotations.push(JumpRotationLimit {
+        kind: JumpKind::Lutz,
+        maximum: JumpRotationClass::Double,
+    });
+    let r = result(&q);
+    assert_eq!(r.status, OptimizerStatus::OptimalProven);
+    assert_eq!(r.universe, [1]);
+    q.personal_limits = PersonalLimits::default();
+    assert!(matches!(
+        optimize_program(&ProfileRegistry::adult(), &q),
+        Err(ProgramOptimizationError::UnsupportedVariant(0))
+    ));
 }

@@ -72,6 +72,7 @@ pub struct ManualElementScenario {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ManualProgramRequest {
+    pub personal_limits: PersonalLimits,
     pub rotation_preference: RotationPreference,
     pub profile: ProfileId,
     pub scoring_table: ScoringTableId,
@@ -111,6 +112,7 @@ pub struct ManualElementAssessment {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ManualProgramAssessment {
+    pub personal_conflicts: Vec<PersonalLimitConflict>,
     pub rotation_conflicts: Vec<RotationPreferenceConflict>,
     /// Preserves plans, assumptions, calls and observations separately.
     pub request: ManualProgramRequest,
@@ -461,6 +463,16 @@ pub(crate) fn assess_manual_scope(
         }))
     });
     Ok(ManualProgramAssessment {
+        personal_conflicts: request
+            .entries
+            .iter()
+            .enumerate()
+            .flat_map(|(i, e)| {
+                request
+                    .personal_limits
+                    .conflicts(&e.planned, &e.evidence, i)
+            })
+            .collect(),
         rotation_conflicts: crate::rotation::conflicts(
             request.entries.iter().map(|e| &e.planned),
             request.rotation_preference,

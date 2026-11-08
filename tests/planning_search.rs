@@ -3,6 +3,7 @@ use skating_program_lab::*;
 
 fn request(category: AdultCategory) -> PlanningSearchRequest {
     PlanningSearchRequest {
+        personal_limits: PersonalLimits::default(),
         rotation_preference: RotationPreference::default(),
         profile: adult_profile(category).id,
         scoring_table: ScoringTableId::Isu2786June2_2026,
@@ -348,6 +349,7 @@ fn complete_public_repertoire_matches_an_independent_small_exhaustive_oracle() {
         let reassessed = assess_manual_bv(
             &ProfileRegistry::adult(),
             &ManualBvRequest {
+                personal_limits: PersonalLimits::default(),
                 rotation_preference: preference,
                 profile: r.profile,
                 scoring_table: r.scoring_table,

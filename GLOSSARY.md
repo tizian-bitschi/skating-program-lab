@@ -17,3 +17,12 @@ _Avoid_: Illegal connection
 **Planning preference**:
 A personal restriction on proposed program content, separate from competition-rule eligibility.
 _Avoid_: Competition rule
+
+**Personal maximum**:
+An upper bound on one exact regular-spin abbreviation's planned level, or one
+jump kind's listed rotation class. It intersects other planning preferences and
+competition eligibility without changing scoring or competition rules.
+
+**Listed rotation class**:
+The notation class Single through Quintuple. Single Axel means 1A; it does not
+mean a literal count of physical turns.
