@@ -1,0 +1,23 @@
+revision=5279ff11bc4beba261875aa61a1a54b64d38cca5
+runs=3
+external_watchdog_seconds=120
+No API time/node budget; no repertoire reduction; serial fresh process per run; no excluded warmup.
+os=Microsoft Windows 11 Pro 10.0.26200 64-Bit
+cpu=13th Gen Intel(R) Core(TM) i9-13900K
+cores=24; logical=32
+ram_bytes=68414652416
+rustc 1.99.1 (58cf8f9c3 2026-10-13)
+binary: rustc
+commit-hash: 58cf8f9c35b355199727627d07ae34a4e2846d67
+commit-date: 2026-10-13
+host: x86_64-pc-windows-msvc
+release: 1.99.1
+LLVM version: 23.1.1
+cargo 1.99.1 (5f94df478 2026-08-27)
+binary_sha256=B5A7E6906EC6EF49E4E3AE5548A1BEB83AAFEC58E5AE7E56836E7FF1D2691952
+cargo_lock_sha256=4687DFF3C4302E35738ED1B09FDC9DD9DF47C6B076A3B42AB573099B5570F9E8
+Pumpkin=0.5.0; native Release; compilation excluded; host thermal/background load uncontrolled.
+Memory=Windows Process.PeakWorkingSet64 sampled after API return while child waits for stdin ACK; includes process/runtime/domain/model. ACK is outside total_us.
+Phases=first public control poll. domain_us=start->Model; model_us=Model->Solve; first_valid_us=start->validated IncumbentFound; proof_us=start->MaximumProved (includes validation); alternatives_us=proof->return.
+Missing phase=empty CSV field. Cancellation response=first true cancellation poll->API return. PostproofReconstruction cancels reconstruction of a later alternative.
+Manifest=one-line Rust Debug serialization of every PlanningSearchRequest field, UTF8 without BOM, final LF; compared byte-for-byte on every repetition.

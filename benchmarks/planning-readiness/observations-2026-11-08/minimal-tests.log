@@ -1,0 +1,478 @@
+   Compiling skating-program-lab v0.1.0 (C:\Users\tizia\Documents\ChatGPT\skating-program-lab\issue-125-worktree)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 6.82s
+     Running unittests src\lib.rs (target\debug\deps\skating_program_lab-e27a2861b340fef0.exe)
+
+running 6 tests
+test optimizer::tests::scoring_rejects_elements_outside_the_domain ... ok
+test scoring::program_tests::factored_base_rounds_each_value_to_hundredths ... ok
+test scoring::program_tests::mismatched_recognition_ruleset_prevents_exact_tes ... ok
+test catalog::tests::embedded_rows_have_no_extra_or_duplicate_codes ... ok
+test selection::planning_tests::cancellation_never_returns_a_partial_repertoire ... ok
+test selection::planning_tests::source_grammar_for_six_profiles_uses_the_real_manual_path ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.17s
+
+     Running tests\assessment.rs (target\debug\deps\assessment-cf613cab324bcfb7.exe)
+
+running 16 tests
+test invalid_feature_evidence_does_not_consume_later_valid_credit ... ok
+test draft_missing_roles_are_completion_diagnostics ... ok
+test unknown_rotations_and_missing_spin_credit_remain_unresolved_and_ordered ... ok
+test invalid_identity_boundary_target_and_plan_association ... ok
+test bronze_and_silver_source_checked_bv_and_missing_goe ... ok
+test explicit_recognition_does_not_fill_missing_plan_qualification ... ok
+test boundary_is_explicit_and_requires_complete_goe ... ok
+test shared_spin_feature_consumption_uses_current_order ... ok
+test unknown_calls_and_unsupported_combinations_prevent_exact_scenarios ... ok
+test observation_references_are_rejected_in_every_recognition_stage ... ok
+test invalid_feature_targets_cannot_qualify_exact_planned_levels ... ok
+test silver_role_and_jump_eligibility_are_checked_independently_of_bv ... ok
+test absent_zero_and_mixed_goe_are_distinct ... ok
+test supplied_plan_indices_must_follow_reordering_in_both_stages ... ok
+test independent_spin_panel_findings_do_not_change_intended_bv ... ok
+test supplied_calls_falls_and_unsupported_outcomes_stay_separate ... ok
+
+test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\assumed_recognition.rs (target\debug\deps\assumed_recognition-492117a31aa6cdfe.exe)
+
+running 7 tests
+test structural_violations_remain_under_assumed_recognition ... ok
+test assumed_mode_skips_variation_qualification_and_keeps_the_shared_level_cap ... ok
+test assumed_choreography_reports_unknown_plan_vocabulary ... ok
+test assumed_sequence_requires_an_explicit_direct_transition ... ok
+test senior_manual_total_uses_eighty_percent_for_second_advanced_solo ... ok
+test gold_selects_published_levels_without_technical_evidence ... ok
+test senior_levels_and_fixed_codes_are_edition_bound ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests\candidate_generation.rs (target\debug\deps\candidate_generation-eccd16c634355e5d.exe)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\catalog.rs (target\debug\deps\catalog-9257ba0c2312c24f.exe)
+
+running 6 tests
+test exact_lookup_rejects_absent_codes_and_editions_without_fallback ... ok
+test known_catalog_rows_do_not_expand_recognition_or_scoring_support ... ok
+test independent_numerical_fixtures_cover_every_family_and_all_goe_columns ... ok
+test numerical_audit_rejects_missing_columns_wrong_values_and_editions ... ok
+test every_manifest_row_has_exact_catalog_metadata ... ok
+test all_published_numeric_cells_match_the_independent_source_extraction ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\catalog_manifest.rs (target\debug\deps\catalog_manifest-08883c472adfc2ed.exe)
+
+running 3 tests
+test catalog_provenance_resolves_only_the_preserved_june_edition ... ok
+test source_inventory_accounts_for_every_printed_value_row ... ok
+test inventory_validation_rejects_source_and_metadata_corruption ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests\domain.rs (target\debug\deps\domain-46ff95b422a0e461.exe)
+
+running 3 tests
+test scoring_sources_resolve_exact_official_versions ... ok
+test supported_example_retains_all_fields ... ok
+test unknown_versions_are_rejected_without_fallback ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\element_selection.rs (target\debug\deps\element_selection-80ad5a1a5c21d77f.exe)
+
+running 6 tests
+test selection_does_not_fall_back_to_a_builtin_profile ... ok
+test direct_selection_and_manual_assessment_keep_the_exact_code ... ok
+test manual_base_at_each_level_boundary_uses_the_exact_selection_source ... ok
+test explicit_policy_supports_registered_profiles_without_overriding_builtins ... ok
+test six_profile_source_snapshots ... ok
+test full_selection_matrix_matches_independent_category_and_catalog_fixtures ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.53s
+
+     Running tests\execution.rs (target\debug\deps\execution-498434b5e869abd9.exe)
+
+running 8 tests
+test ignored_and_recognized_zero_value_remain_distinct ... ok
+test level_and_scoring_annotation_are_distinct ... ok
+test notation_orders_marks_independently_of_input_order_and_single_element_alias ... ok
+test notation_preserves_spin_levels_combination_and_unknown_calls ... ok
+test observed_fall_and_supplied_calls_do_not_change_the_plan ... ok
+test recognition_rejects_conflicting_or_unrepresentable_input ... ok
+test recognition_retains_source_and_all_component_marks ... ok
+test structure_markers_have_one_valid_position_and_kind ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\execution_scoring.rs (target\debug\deps\execution_scoring-56d4af07c0f8009a.exe)
+
+running 11 tests
+test execution_evidence_preserves_zero_no_value_ignored_and_unknown_outcomes ... ok
+test execution_program_and_planning_keep_credit_and_deductions_separate ... ok
+test execution_alignment_and_partial_errors_do_not_produce_exact_totals ... ok
+test full_revolutions_and_euler_step_over_use_verified_distinct_rules ... ok
+test fall_location_and_deleted_calls_have_cumulative_consequences ... ok
+test legacy_element_scores_match_frozen_pre_evidence_source_contracts ... ok
+test invalid_or_unsupported_evidence_is_rejected_without_inference ... ok
+test step_out_evidence_enables_interrupted_score_without_changing_legacy_contract ... ok
+test nonterminal_sequence_before_deleted_axel_and_rep_needs_explicit_cause ... ok
+test more_than_one_full_revolution_never_reuses_the_one_turn_numeric_rule ... ok
+test unknown_execution_is_compatible_and_explicit_no_errors_resolves_unknown_fall ... ok
+
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\goe_scenario.rs (target\debug\deps\goe_scenario-16bfb58407e9eea4.exe)
+
+running 6 tests
+test ungraded_jumps_still_occupy_assumed_second_half_slots ... ok
+test known_zero_outcomes_and_unavailable_selections_stay_distinct ... ok
+test call_and_fall_constraints_keep_independent_elements_exact ... ok
+test gold_spin_preview_uses_published_columns_without_changing_the_plan ... ok
+test senior_preview_preserves_repeat_credit_and_assumes_second_half_explicitly ... ok
+test unscored_senior_spin_does_not_obscure_jump_repetition_credit ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests\grand_prix_fixtures.rs (target\debug\deps\grand_prix_fixtures-d341e1db56563fde.exe)
+
+running 10 tests
+test exact_decimal_contract_rejects_lossy_or_missing_values ... ok
+test official_source_editions_and_selected_programs_are_pinned ... ok
+test pcs_rejects_rounding_only_after_summing_components - should panic ... ok
+test factored_pcs_matches_every_program_with_component_rounding ... ok
+test parity_detects_grade_column_corruption_with_location - should panic ... ok
+test every_support_label_matches_the_reviewed_coverage_matrix ... ok
+test every_printed_field_matches_separately_reviewed_source_manifest ... ok
+test schema_rejects_swapped_columns_in_every_fixture_file ... ok
+test arithmetic_inventory_and_missing_grades_are_explicit ... ok
+test coverage_rejects_mislabeled_triples_quads_marked_compounds_and_spins ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\jump_optimizer.rs (target\debug\deps\jump_optimizer-c2b974df2280cb89.exe)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\legality.rs (target\debug\deps\legality-b0526c3d08bc8263.exe)
+
+running 18 tests
+test compatible_spin_obligations_can_share_one_insertion ... ok
+test coverage_retains_violation_and_unknown_for_the_same_rule_instance ... ok
+test full_bronze_plan_has_no_covered_violation_and_retains_open_rules ... ok
+test custom_profile_uses_explicit_override_and_never_inherits_adult_audit ... ok
+test missing_local_qualification_preserves_earlier_possible_eight_revolution_success ... ok
+test saturated_draft_does_not_label_missing_axel_as_insertable ... ok
+test plain_upright_does_not_supply_a_difficult_variation_prerequisite ... ok
+test unqualified_spin_is_missing_evidence_in_both_stages ... ok
+test sequence_without_direct_step_assumption_and_repeated_components_stay_visible ... ok
+test gold_prohibition_survives_missing_content_and_draft_omissions_are_indexed ... ok
+test unevaluated_transition_retains_selected_event_replacement ... ok
+test unknown_first_success_blocks_later_credit_and_insufficient_hold_does_not_consume_it ... ok
+test successful_position_prerequisites_are_traced_and_combination_type_is_not_applicable ... ok
+test competing_required_jump_families_are_not_jointly_insertable_in_one_slot ... ok
+test all_four_profiles_keep_distinct_obligations ... ok
+test first_success_is_spin_scoped_and_can_use_the_second_foot ... ok
+test missing_basic_position_is_unknown_and_known_unmodeled_position_is_unsupported ... ok
+test unknown_feature_lists_and_uncheckable_targets_differ_from_explicitly_empty_lists ... ok
+
+test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests\manual_bv.rs (target\debug\deps\manual_bv-858d3679eb522882.exe)
+
+running 12 tests
+test gold_spin_draft_has_base_value_before_a_goe_request ... ok
+test missing_role_and_sequence_assumption_are_reported_independently_of_table_value ... ok
+test unavailable_selections_keep_indices_values_and_known_violations ... ok
+test manual_entry_points_agree_on_clean_senior_repetition ... ok
+test euler_sequence_requires_a_separate_qualifying_step ... ok
+test planned_euler_does_not_bypass_category_or_program_limits ... ok
+test planned_euler_transitions_need_no_performance_observations ... ok
+test senior_excess_jump_and_compound_slots_do_not_have_exact_credit ... ok
+test senior_quint_compounds_keep_the_table_sum_and_block_credit ... ok
+test senior_unknown_components_only_remove_supported_credit_where_context_is_uncertain ... ok
+test senior_uses_the_protocol_scorer_repetition_value_and_keeps_unknown_context_explicit ... ok
+test source_values_for_complete_adult_selections ... ok
+
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests\official_replay.rs (target\debug\deps\official_replay-a88e2211f3dcc56f.exe)
+
+running 6 tests
+test manual_replay::complete_source_linked_manual_envelope_keeps_movement_evidence_missing ... ok
+test missing_and_invalid_judge_marks_preserve_independent_base_values ... ok
+test unchanged_trimmed_goe_still_fails_source_verification ... ok
+test absent_reference_and_unknown_positions_keep_verified_subtotals ... ok
+test mutations_cannot_keep_an_exact_total_even_if_arithmetic_is_unchanged ... ok
+test all_twelve_official_programs_have_independently_verified_exact_tes ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.23s
+
+     Running tests\optimizer.rs (target\debug\deps\optimizer-017a63cc58fb51f7.exe)
+
+running 1 test
+test reference_has_one_distinct_unfactored_optimum ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\panel_scoring.rs (target\debug\deps\panel_scoring-7e11d5b333aedd31.exe)
+
+running 8 tests
+test missing_and_invalid_grades_never_become_zero_or_a_reduced_panel ... ok
+test numerical_mapping_precedes_mean_and_extremes_are_removed_once ... ok
+test reduced_and_original_references_and_call_applicability_are_catalog_backed ... ok
+test supplied_credit_is_separate_from_table_base_and_from_timing_verification ... ok
+test senior_solo_rep_rejects_single_double_credit_but_preserves_legacy_and_special_compounds ... ok
+test component_stars_use_only_retained_catalog_rows_for_bv_and_panel_reference ... ok
+test marked_second_solo_uses_context_and_original_goe_reference ... ok
+test printed_credit_is_validated_for_every_outcome_and_aliases_apply_once ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\plan.rs (target\debug\deps\plan-27b2ae90ed0cbed3.exe)
+
+running 2 tests
+test bronze_plan_preserves_order_and_details ... ok
+test transitions_and_unspecified_details_remain_distinct ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\planned_jump_domain.rs (target\debug\deps\planned_jump_domain-9b1e38ae46dad173.exe)
+
+running 1 test
+test public_jump_listing_matches_independent_six_profile_grammar ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.35s
+
+     Running tests\planned_v_spins.rs (target\debug\deps\planned_v_spins-01637cabcc8b03ff.exe)
+
+running 4 tests
+test v_choices_report_the_same_type_and_level_restrictions ... ok
+test planned_v_spins_keep_published_values_and_spin_roles ... ok
+test full_and_v_cannot_disguise_a_repeated_spin_abbreviation ... ok
+test all_planned_combination_v_levels_have_the_published_value_and_named_type ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running tests\planning_alternatives.rs (target\debug\deps\planning_alternatives-ede60a6b4f828215.exe)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\planning_readiness.rs (target\debug\deps\planning_readiness-fba95ff14a2ce9c2.exe)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\planning_search.rs (target\debug\deps\planning_search-f51d6ba012f06d3c.exe)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\planning_search_senior.rs (target\debug\deps\planning_search_senior-6645f2af85ec5cd7.exe)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\profiles.rs (target\debug\deps\profiles-b57a6d93708c82f1.exe)
+
+running 11 tests
+test unsupported_mechanisms_and_pair_scope_never_evaluate_as_allowed ... ok
+test selected_sov_edition_requires_its_exact_source_in_the_profile_inventory ... ok
+test scoring_binding_override_is_explicitly_rejected_instead_of_ignored ... ok
+test configured_synthetic_profile_changes_count_and_eligibility_with_its_own_sources ... ok
+test contradictory_requirements_are_invalid_before_selection ... ok
+test incomplete_sources_invalid_bounds_and_duplicate_bindings_are_rejected ... ok
+test typed_family_variants_and_repetitions_are_shared_policy ... ok
+test overrides_are_order_independent_and_conflicts_are_rejected ... ok
+test scoring_preserves_catalog_values_and_uses_explicit_profile_duration_and_deductions ... ok
+test adult_source_backed_eligibility_and_caps_survive_profile_selection ... ok
+test identity_errors_retain_requested_version_and_registry_never_overwrites ... ok
+
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\program_completion.rs (target\debug\deps\program_completion-ad031e5012d87a80.exe)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\program_optimizer.rs (target\debug\deps\program_optimizer-272e3bf4056b0585.exe)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\program_validation.rs (target\debug\deps\program_validation-acd1677dbab6b32a.exe)
+
+running 9 tests
+test missing_qualification_or_unmodeled_variations_never_prove_level_credit ... ok
+test feature_evaluation_scope_preserves_local_checks_and_legacy_limits ... ok
+test sequence_assumptions_resolve_only_the_supported_direct_step_uncertainty ... ok
+test successful_step_checks_retain_family_specific_sources_and_indices ... ok
+test first_attempt_consumes_feature_even_when_unsuccessful ... ok
+test typed_choreography_evidence_supplements_but_cannot_contradict_the_plan ... ok
+test gold_steps_require_movement_and_ignore_features_three_to_five ... ok
+test eight_revolution_feature_waits_for_first_success_but_missing_outcome_stays_unknown ... ok
+test choreographic_families_have_distinct_counts_and_same_foot_recognition ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\scoring.rs (target\debug\deps\scoring-09f9b37b6aa2fd07.exe)
+
+running 47 tests
+test downgraded_zero_rows_require_consistent_goe ... ok
+test all_deleted_components_are_no_value_rather_than_recognized_zero ... ok
+test change_foot_layback_variants_have_explicit_source_fixtures ... ok
+test non_jump_marks_and_missing_levels_do_not_fabricate_values ... ok
+test bronze_boundary_fixture_uses_required_duration_and_unfactored_goe ... ok
+test annotations_and_unresolved_nonjumps_are_isolated ... ok
+test planning_preserves_zero_outcomes_and_annotation_semantics ... ok
+test euler_component_calls_and_sequence_q_keep_their_numeric_rules ... ok
+test deleted_component_changes_bv_and_reference_but_keeps_its_execution_calls ... ok
+test call_and_fall_limits_are_enforced ... ok
+test interrupted_unit_bv_is_known_but_execution_context_is_not_fabricated ... ok
+test clean_jump_columns_match_june_table ... ok
+test euler_zero_and_sequence_second_half_remain_distinct_from_no_value ... ok
+test marked_rows_and_call_boundaries ... ok
+test invalid_timing_and_falls_remain_unresolved ... ok
+test missing_or_unsupported_unit_structure_does_not_get_a_default_score ... ok
+test no_value_is_zero_but_invalid_or_unknown_outcomes_are_not ... ok
+test no_value_jump_does_not_claim_a_bonus_when_eligibility_is_unknown ... ok
+test planning_boundary_is_optional_and_never_timing_evidence ... ok
+test planning_boundary_and_uncertain_selection_are_local_to_affected_jumps ... ok
+test downgrade_and_fall_require_minimum_final_goe ... ok
+test no_value_before_half_or_known_nonjump_does_not_block_bonus ... ok
+test program_totals_keep_deductions_separate ... ok
+test recognized_pair_sums_base_and_uses_one_reference_goe ... ok
+test repeated_program_scores_and_sources_match ... ok
+test score_preserves_outcomes_and_rejects_unknowns_and_combinations ... ok
+test scoring_rejects_incomplete_or_inconsistent_inputs ... ok
+test resolved_zero_and_ignored_elements_do_not_make_tes_incomplete ... ok
+test expanded_families_integrate_without_second_half_spin_credit ... ok
+test jump_value_does_not_depend_on_adult_category ... ok
+test multiple_component_calls_use_one_goe_and_special_multiple_q_reduction ... ok
+test single_q_starts_at_three_for_solo_combination_and_repetition ... ok
+test second_component_can_set_combination_goe_reference ... ok
+test second_half_uses_required_duration_last_three_and_unfactored_goe ... ok
+test single_judge_scores_follow_source_rows ... ok
+test source_table_fixtures ... ok
+test supplied_euler_and_sequence_units_use_full_source_values_and_one_goe ... ok
+test three_jump_combination_sums_components_and_uses_only_one_reference_goe ... ok
+test supplied_repetition_reduces_only_base_and_preserves_call_goe_reference ... ok
+test supplied_contextual_repetition_retains_one_jump_with_original_goe ... ok
+test timestamps_follow_program_order_across_element_types ... ok
+test supplied_starred_whole_element_is_no_value_not_recognized_zero ... ok
+test unknown_and_unsupported_do_not_become_zero ... ok
+test timing_rule_502_prevents_false_exact_scores ... ok
+test unresolved_inputs_do_not_yield_exact_tes ... ok
+test combined_edge_rotation_calls_follow_source_columns_and_cumulative_limits ... ok
+test single_non_jump_scores_match_independent_source_extraction ... ok
+
+test result: ok. 47 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running tests\senior_benchmarks.rs (target\debug\deps\senior_benchmarks-33ce36fc9381507d.exe)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\senior_profiles.rs (target\debug\deps\senior_profiles-affbd4b162b1d9d0.exe)
+
+running 12 tests
+test senior_recognition_and_deduction_uncertainty_never_use_adult_defaults ... ok
+test exact_identities_and_shared_technical_definition ... ok
+test known_zero_spins_preserve_repetition_credit_and_unrelated_values ... ok
+test second_advanced_solo_receives_eighty_percent_but_compound_occurrence_does_not ... ok
+test custom_profiles_and_event_bindings_do_not_fall_back_to_adult ... ok
+test manual_assessment_uses_context_without_rewriting_supplied_recognition ... ok
+test six_jump_and_eleven_slot_maxima_do_not_require_exact_counts ... ok
+test official_spin_policy_integrity_is_identical_at_both_public_boundaries ... ok
+test repetition_counts_kinds_doubles_and_advanced_types_separately ... ok
+test missing_evidence_and_spin_caps_remain_visible ... ok
+test senior_compounds_and_euler_have_independent_boundaries ... ok
+test complete_skeleton_roles_levels_and_draft_obligations ... ok
+
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests\spin_validation.rs (target\debug\deps\spin_validation-7b12910b86b89f19.exe)
+
+running 17 tests
+test legacy_jump_findings_are_preserved_and_coverage_cites_unsupported_slices ... ok
+test layback_needs_specific_posture_even_with_the_same_upright_base_position ... ok
+test one_position_foot_checks_require_the_intended_position_and_panel_never_fills_gaps ... ok
+test synthetic_profile_uses_same_policy_mechanisms_without_adult_fallback ... ok
+test three_duplicate_evidence_entries_never_select_an_arbitrary_value ... ok
+test per_foot_findings_identify_each_affected_step_and_local_uncertainty ... ok
+test empty_missing_and_multiple_change_plans_preserve_uncertainty ... ok
+test invalid_evidence_targets_duplicates_order_entry_and_foot_change_are_rejected ... ok
+test explicit_empty_unknown_and_legacy_text_features_are_not_conflated ... ok
+test one_position_combination_no_value_is_distinct_from_unknown_and_short_movement ... ok
+test combination_two_positions_v_three_full_value_and_missing_unknown ... ok
+test synthetic_position_and_foot_rules_require_explicit_sources_and_thresholds ... ok
+test basic_positions_per_foot_and_no_value_are_conditional_and_distinct_from_prohibition ... ok
+test counts_abbreviation_duplicates_and_required_roles_use_ordered_program ... ok
+test additional_basic_positions_and_explicit_feature_free_final_wind_up ... ok
+test independently_transcribed_adult_revolution_and_level_boundaries ... ok
+test all_twenty_spin_abbreviations_use_profile_roles ... ok
+
+test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests\theoretical_manual_planning.rs (target\debug\deps\theoretical_manual_planning-72ef8e76c9e2a67a.exe)
+
+running 3 tests
+test unknown_profile_and_table_versions_never_enter_the_planning_workflow ... ok
+test draft_omissions_prohibitions_and_unsupported_choices_remain_separate ... ok
+test selected_codes_form_category_programs_without_performance_evidence ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.09s
+
+     Running tests\validation.rs (target\debug\deps\validation-5c667f20cb34bb86.exe)
+
+running 21 tests
+test bronze_combination_and_repetition_boundaries ... ok
+test bronze_jump_boundaries_and_source ... ok
+test incomplete_axel_and_components_have_distinct_explainable_findings ... ok
+test euler_with_unknown_intervening_transition_is_not_a_proven_violation ... ok
+test bronze_counts_jump_elements_independently_of_local_findings ... ok
+test five_eligible_jumps_produce_one_count_finding ... ok
+test compound_limits_repetitions_and_uncertainty ... ok
+test incomplete_structures_and_repetitions_are_unknown_and_sequences_reported ... ok
+test incomplete_jump_does_not_make_known_combination_length_unknown ... ok
+test explicit_transitions_are_unknown_with_sports_rule_source_in_all_categories ... ok
+test unspecified_elements_only_make_counts_unknown_when_limit_can_be_crossed ... ok
+test invalid_axel_does_not_meet_masters_requirement ... ok
+test compound_and_euler_count_boundaries_are_source_linked ... ok
+test masters_axel_requirement_distinguishes_missing_type_from_rotation ... ok
+test category_jump_types_and_element_boundaries ... ok
+test missing_fields_and_multiple_combination_findings_are_preserved ... ok
+test sequence_occupies_one_jump_element_slot ... ok
+test unsupported_category_and_season_are_explicit ... ok
+test each_excess_repetition_has_a_location_for_each_jump_type ... ok
+test missing_and_invalid_rotations_and_unspecified_element_limits_are_distinct ... ok
+test combination_rules_have_independent_boundaries ... ok
+
+test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\workflow_acceptance.rs (target\debug\deps\workflow_acceptance-8da8a5f12cbb8c59.exe)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests skating_program_lab
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

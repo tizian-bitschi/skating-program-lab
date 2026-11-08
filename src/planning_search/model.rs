@@ -621,6 +621,8 @@ pub(super) fn search(
             }),
     );
     let mut brancher = CountBrancher::new(InputOrder::new(&variables), InDomainMax);
+    let mut incumbent_error = None;
+    let mut incumbent_cancelled = false;
     let outcome = solver.optimise(
         &mut brancher,
         &mut Cancellation(control),
@@ -628,8 +630,32 @@ pub(super) fn search(
         LinearSatUnsat::new(
             OptimisationDirection::Maximise,
             objective,
-            |_: &Solver, _: SolutionReference, _: &CountBrancher, _: &ResolutionResolver| {
+            |_: &Solver, solution: SolutionReference, _: &CountBrancher, _: &ResolutionResolver| {
+                let selected: Vec<_> = counts
+                    .iter()
+                    .map(|&v| solution.get_integer_value(v))
+                    .collect();
+                match reconstruct(
+                    registry,
+                    request,
+                    profile,
+                    atoms,
+                    &selected,
+                    solution.get_integer_value(objective) as u32,
+                    control,
+                ) {
+                    Ok(Some(_)) => {}
+                    Ok(None) => {
+                        incumbent_cancelled = true;
+                        return ControlFlow::<()>::Break(());
+                    }
+                    Err(error) => {
+                        incumbent_error = Some(error);
+                        return ControlFlow::<()>::Break(());
+                    }
+                }
                 if control.is_cancelled(PlanningSearchPhase::IncumbentFound) {
+                    incumbent_cancelled = true;
                     ControlFlow::<()>::Break(())
                 } else {
                     ControlFlow::Continue(())
@@ -637,6 +663,12 @@ pub(super) fn search(
             },
         ),
     );
+    if let Some(error) = incumbent_error {
+        return Err(error);
+    }
+    if incumbent_cancelled {
+        return Ok(PlanningSearchOutcome::Cancelled);
+    }
     let solution=match outcome {
         OptimisationResult::Optimal(s)=>s,
         OptimisationResult::Unsatisfiable=>return Ok(PlanningSearchOutcome::Infeasible {diagnostics:vec![PlanningDiagnostic {required_input_indices:(0..request.required.len()).collect(),rule_id:None,message:"No permitted composition satisfies the required occurrences, exclusions and profile roles.".into()}]}),

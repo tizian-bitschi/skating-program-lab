@@ -1,0 +1,3 @@
+Setup attempt 1: expected-revision guard rejected a mistyped full revision before output creation or API execution.
+Setup attempt 2: sandbox Get-CimInstance Win32_Processor failed: no access to CIM resource. Output directory contained only Cargo.lock; no API execution.
+Successful attempt: automatic approval review allowed the same native benchmark harness with read-only Windows CIM inventory. Measured revision 5279ff11bc4beba261875aa61a1a54b64d38cca5. All216 API requests completed and remain in observations.csv.

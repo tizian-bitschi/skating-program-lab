@@ -29,6 +29,7 @@ pub enum PlanningSearchPhase {
     Domain,
     Model,
     Solve,
+    /// An internal candidate passed shared reconstruction and manual assessment.
     IncumbentFound,
     Reconstruction,
     MaximumProved,
