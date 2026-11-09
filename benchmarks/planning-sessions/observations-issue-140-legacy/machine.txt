@@ -1,0 +1,4 @@
+Processor: Intel64 Family 6 Model 183 Stepping 1, GenuineIntel
+Logical processors: 32
+OS: Microsoft Windows NT 10.0.26200.0
+Native Windows; background load uncontrolled; CPU model query via CIM unavailable in sandbox.

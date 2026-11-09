@@ -16,7 +16,7 @@ families. Assessment admits their supported profile mechanisms explicitly, even
 when no submitted element exercises a family. The verdict requires every family
 entry and rejects unknown/unsupported input findings. It never infers complete
 coverage from an empty partial finding list. Search reconstruction, every equal
-optimum, neutral ignored-Waltz augmentation and step-ceiling reassessment use this
+optimum, required ignored-movement restoration and step-ceiling reassessment use this
 same verdict; disagreement returns `InconsistentAssessment`.
 
 ## Source editions and audited inventory

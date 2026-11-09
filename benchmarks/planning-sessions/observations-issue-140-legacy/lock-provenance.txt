@@ -1,0 +1,2 @@
+Both builds reused the same generated, ignored Cargo.lock in issue-140-integration. Cargo.toml is identical at c295da4 and 4d79c12; no dependency updates occurred.
+sha256=4687DFF3C4302E35738ED1B09FDC9DD9DF47C6B076A3B42AB573099B5570F9E8

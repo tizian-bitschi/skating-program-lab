@@ -204,3 +204,18 @@ programs are reassessed and revalidated. Objective proof, generation completenes
 tie enumeration and regulatory coverage remain separate. Broad six-slot native
 domains do not produce incumbents within the measured 250 ms budget; this is a
 recorded performance limit, not evidence of infeasibility or global optimality.
+
+## Complete incremental planning (#140–#143)
+
+`PlanningSearchSession` provides separate maximum proof and uncapped incremental
+collection, cooperative pause/resume, retained confirmed results and explicit
+exhaustion. Existing search functions retain at most five results. Session inputs
+and registry selection stay fixed for its lifetime; no persistence or background
+worker is supplied. The six built-in profiles and registered synthetic policies
+exercise unrestricted, required-only, restricted-only and combined workflows.
+Neutral ignored movements follow policy mechanisms, while required ignored
+occurrences and counted zero-value intentions retain their identity. Shared fresh
+manual assessment checks each delivered composition. The
+[acceptance report](planning-session-acceptance.md) records tests, limitations and
+native proof/collection measurements. Planned-construction compliance excludes
+actual execution and duration.

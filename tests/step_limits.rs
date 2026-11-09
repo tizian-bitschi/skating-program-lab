@@ -122,6 +122,50 @@ fn search_caps_steps_with_other_limits_exclusions_and_exact_requirements() {
     else {
         panic!("maximum");
     };
+    struct Collect;
+    impl PlanningCollectionControl for Collect {
+        fn action(&self, _: PlanningSearchPhase) -> PlanningCollectionAction {
+            PlanningCollectionAction::Continue
+        }
+    }
+    let mut session = PlanningSearchSession::new(&registry, request.clone(), Some(Level::One));
+    assert_eq!(
+        session.prove(&Continue).unwrap(),
+        PlanningSessionState::Collecting
+    );
+    assert_eq!(
+        session.maximum_base_hundredths(),
+        Some(maximum.maximum_base_hundredths)
+    );
+    let batch = session
+        .collect(std::num::NonZeroUsize::new(2).unwrap(), &Collect)
+        .unwrap();
+    assert!(!batch.alternatives.is_empty());
+    for alternative in &batch.alternatives {
+        let manual = assess_manual_bv_with_step_limit(
+            &registry,
+            &ManualBvRequest {
+                profile: request.profile.clone(),
+                scoring_table: request.scoring_table,
+                personal_limits: request.personal_limits.clone(),
+                rotation_preference: request.rotation_preference,
+                submission: SubmissionState::Complete,
+                elements: alternative.elements.clone(),
+            },
+            Some(Level::One),
+        )
+        .unwrap();
+        assert_eq!(
+            manual.total.exact_hundredths,
+            Some(i64::from(maximum.maximum_base_hundredths))
+        );
+        assert_eq!(
+            manual.planning_compliance(),
+            Ok(PlanningCompliance::Compliant)
+        );
+        assert!(manual.personal_conflicts.is_empty());
+        assert!(manual.rotation_conflicts.is_empty());
+    }
     for alternative in maximum.alternatives {
         assert!(alternative.elements.iter().any(|e| e.code == "StSq1"));
         let step = alternative
@@ -147,6 +191,12 @@ fn search_caps_steps_with_other_limits_exclusions_and_exact_requirements() {
             .unwrap(),
         PlanningSearchOutcome::Infeasible { .. }
     ));
+    let mut impossible = PlanningSearchSession::new(&registry, request.clone(), Some(Level::One));
+    assert_eq!(
+        impossible.prove(&Continue).unwrap(),
+        PlanningSessionState::Infeasible
+    );
+    assert!(impossible.confirmed().is_empty());
     request.exclusions.pop();
     request.required.insert(
         0,
@@ -160,6 +210,15 @@ fn search_caps_steps_with_other_limits_exclusions_and_exact_requirements() {
     else {
         panic!("required conflict");
     };
+    let mut invalid = PlanningSearchSession::new(&registry, request.clone(), Some(Level::Basic));
+    let Err(PlanningSessionError::Search(PlanningSearchError::PersonalLimitConflict(
+        session_conflicts,
+    ))) = invalid.prove(&Continue)
+    else {
+        panic!("indexed conflict")
+    };
+    assert_eq!(session_conflicts, conflicts);
+    assert_eq!(invalid.state(), PlanningSessionState::Failed);
     assert_eq!(conflicts[0].element_index, 1);
     assert_eq!(request.required[1].element.code, "StSq1");
 }

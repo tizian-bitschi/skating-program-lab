@@ -45,14 +45,16 @@ Personal listed-rotation ceilings leave this single-class intention available;
 semantic Axel/1A exclusions also inspect its called identity. Exact whole-code
 exclusions distinguish W from clean 1A and leave other compounds available.
 
-Ignored Bronze W has unbounded optional multiplicity. Search proves the BV
-objective without this neutral movement, restores every required occurrence
-with its original input identity, and reassesses every already collected composition. If fewer than five remain,
-it adds compositions differing in optional W multiplicity until five are available
-or collection is cancelled. Cancellation preserves every confirmed composition. Its alternatives are `LimitReached`, never
-`Exhausted`. Excluding W restores finite-domain alternative exhaustion. This
-also holds when the proved maximum is zero. Cancellation retains separate
-maximum-proof and alternative-collection semantics.
+Ignored W has unbounded optional multiplicity in manual input. Maximum search
+identifies compositions by counted whole-element content under the resolved
+profile mechanism. Optional ignored W therefore creates no alternative. Search
+proves the BV objective without W, restores every explicitly required occurrence
+with its original input identity and exact multiplicity, and reassesses every
+confirmed composition. Finite alternative exhaustion remains possible with W
+available, including the single empty composition when the maximum is zero.
+Cancellation preserves every confirmed composition and its required occurrences.
+Called zero-value W remains counted and distinguishes compositions. This search
+identity changes no versioned source or profile policy.
 
 ## Verification for #136
 

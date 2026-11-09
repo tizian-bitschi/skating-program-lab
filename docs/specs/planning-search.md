@@ -125,7 +125,12 @@ cancellation emits no incumbent notification. MaximumProved occurs after a
 returned representative has passed manual assessment. Alternative collection
 has its own Exhausted, LimitReached or Cancelled status. After proving the optimum and validating its first representative, the model
 fixes credited BV to the proved value and enumerates up to five distinct
-whole-element multisets. At fixed optimum, a sparse nogood requires at least one selected atomic count
+whole-element multisets. Optional movements ignored by the resolved profile
+mechanism do not create alternatives; only explicitly required ignored occurrences
+are restored, with exact multiplicity, stable caller IDs and provenance. This
+does not discard counted zero-value elements. Whole-element reordering and
+required-ID swaps do not create alternatives; permitted internal compound jump
+orders remain distinct. No profile policy or source edition changes. At fixed optimum, a sparse nogood requires at least one selected atomic count
 to decrease. This is equivalent to excluding its complete count vector in the
 positive-value built-in profiles: any strict supermultiset increases credited BV.
 Adult credit is additive; a second identical advanced Senior solo adds its
@@ -217,3 +222,74 @@ than category identity. Jump rules must consistently select `JumpPlanV1` with
 does not implement new mechanisms. Source-edition compatibility, event override
 precedence and partial legality coverage remain in force. Registered policies
 cannot be replaced at individual consumer boundaries.
+
+
+## Incremental search sessions (#142)
+
+`PlanningSearchSession::new(&registry, owned_request, maximum_step_level)` stores
+fixed inputs without constructing a domain or running a solver. The registry
+stays immutably borrowed. Changing a profile/table, required occurrence,
+exclusion, rotation preference or personal ceiling requires a new session.
+The [approved API contract](planning-search-session-proposal.md) defines the
+complete signatures and lifecycle.
+
+Call `prove(&control)` once while `Unproved`. Existing `PlanningSearchControl`
+phase polls expose proof progress and cooperative cancellation. Only a proved
+maximum and its freshly assessed representative establish `Some(M)` and
+`Collecting`; proof delivers no alternative. Cancellation before that commit
+leaves no maximum. Cancellation at `MaximumProved` retains M. Invalid or
+unsupported input returns `PlanningSessionError::Search` and enters `Failed`;
+proved contradictions enter `Infeasible` with indexed `diagnostics()`.
+
+In `Collecting` or `Paused`, call `collect(NonZeroUsize, &control)` to receive at
+most that many new alternatives. `PlanningCollectionControl` returns `Continue`,
+`Pause` or `Cancel` at `Alternatives` and `Reconstruction` checkpoints, including
+solver termination polls. The first pause/cancel observed in a call is latched.
+For Pumpkin 0.5.0, termination at root is deferred until a branching decision
+establishes a safe non-root checkpoint; backtracking clears that witness. This
+avoids its root-timeout reset defect while retaining the same solver.
+A paused call can return an empty or partial batch. Calling `collect` again
+resumes the same prepared model. The solver, learned constraints, brancher,
+resolver, fixed objective, pruning cursors, pending count vector and delivery
+history survive. An interrupted SAT call restarts from the solver root; an
+interrupted reconstruction retains its copied count vector for the next call.
+Cooperative interruption has no response-time guarantee.
+
+Each delivery passes shared reconstruction and manual BV assessment against M.
+A delivery atomically records its full whole-element count vector, appends it to
+`confirmed()` and adds it to the batch. Exclusions prevent repeated delivery;
+whole-element permutations and auxiliary solver assignments add no alternatives.
+Required ignored occurrences and their IDs are restored in every result.
+Full count-vector blocking preserves counted zero-value distinctions.
+
+A full batch returns `Collecting` immediately. Even when its size equals the
+entire solution set, another call is required to prove `Exhausted`. Only an
+unsatisfiable solve with all delivered vectors excluded establishes exhaustion.
+Append returned batches **or** read `confirmed()` as the complete snapshot;
+combining both duplicates results in caller storage. Returned state always
+matches `state()`.
+
+`Infeasible`, `Exhausted`, `Cancelled` and `Failed` are terminal. Disallowed calls
+return `InvalidState` and preserve session data. Cancellation retains all
+confirmed programs, and post-proof terminal states retain M. A collection error
+also retains committed programs, including those committed earlier in that
+failed call; inspect `confirmed()` because an error returns no batch.
+
+This state belongs to one open in-process session. Dropping it releases the
+solver and memory. Reload persistence, HTTP, UI, WASM integration and `Send`/`Sync`
+are outside the contract. The existing `search_maximum_bv` functions keep their
+five-alternative cap and `LimitReached` semantics.
+
+
+### Workflow acceptance (#143)
+
+`tests/backend_acceptance.rs` exercises all six built-in profiles and four request
+workflows through the public session boundary, with source-derived literal maxima,
+continued delivery, required provenance and fresh independent manual assessment.
+`tests/registered_planning.rs` exhausts all four workflows under a registered
+synthetic two-jump policy. `tests/planning_alternatives.rs` establishes complete
+finite sets, more than five results, required ignored movements and counted
+zero-value identity. Step/jump/spin ceilings, rotation preferences and indexed
+conflicts remain public-boundary regression obligations. See
+[acceptance evidence](../planning-session-acceptance.md) and the
+[native measurement protocol](../../benchmarks/planning-sessions/README.md).

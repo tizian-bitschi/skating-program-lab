@@ -57,7 +57,7 @@ fn silver_waltz_repeats_as_single_axel_and_consumes_a_jump_box() {
 
 #[cfg(feature = "optimizer")]
 #[test]
-fn ignored_waltz_has_unbounded_optimal_multiplicity_and_exact_required_identity() {
+fn ignored_waltz_preserves_exact_required_multiplicity_and_identity() {
     struct Continue;
     impl PlanningSearchControl for Continue {
         fn is_cancelled(&self, _: PlanningSearchPhase) -> bool {
@@ -90,7 +90,7 @@ fn ignored_waltz_has_unbounded_optimal_multiplicity_and_exact_required_identity(
     assert_eq!(result.alternatives.len(), 5);
     let mut identities = std::collections::BTreeSet::new();
     for program in result.alternatives {
-        assert!(program.elements.iter().filter(|e| e.code == "W").count() >= 7);
+        assert_eq!(program.elements.iter().filter(|e| e.code == "W").count(), 7);
         let mut identity: Vec<_> = program.elements.iter().map(|e| e.code.clone()).collect();
         identity.sort();
         assert!(identities.insert(identity));
@@ -116,6 +116,23 @@ fn ignored_waltz_has_unbounded_optimal_multiplicity_and_exact_required_identity(
             7
         );
         assert_eq!(program.assessment.total.exact_hundredths, Some(1100));
+        let assessment = assess_manual_bv(
+            &ProfileRegistry::adult(),
+            &ManualBvRequest {
+                personal_limits: request.personal_limits.clone(),
+                rotation_preference: request.rotation_preference,
+                profile: request.profile.clone(),
+                scoring_table: request.scoring_table,
+                submission: SubmissionState::Complete,
+                elements: program.elements.clone(),
+            },
+        )
+        .unwrap();
+        assert_eq!(assessment, program.assessment);
+        assert_eq!(
+            assessment.planning_compliance(),
+            Ok(PlanningCompliance::Compliant)
+        );
     }
     assert_eq!(identities.len(), 5);
 }
@@ -174,7 +191,7 @@ fn declared_called_waltz_compounds_have_zero_component_value_and_axel_semantics(
 
 #[cfg(feature = "optimizer")]
 #[test]
-fn ignored_waltz_keeps_zero_optima_nonempty_and_infinite() {
+fn ignored_waltz_has_one_empty_zero_optimum() {
     struct Continue;
     impl PlanningSearchControl for Continue {
         fn is_cancelled(&self, _: PlanningSearchPhase) -> bool {
@@ -213,49 +230,29 @@ fn ignored_waltz_keeps_zero_optima_nonempty_and_infinite() {
         panic!("zero maximum")
     };
     assert_eq!(maximum.maximum_base_hundredths, 0);
-    assert_eq!(maximum.alternatives.len(), 5);
+    assert_eq!(maximum.alternatives.len(), 1);
+    assert!(maximum.alternatives[0].elements.is_empty());
     assert_eq!(
         maximum.alternative_status,
-        PlanningAlternativeStatus::LimitReached
+        PlanningAlternativeStatus::Exhausted
     );
-    struct CancelAugmentation(std::cell::Cell<usize>);
-    impl PlanningSearchControl for CancelAugmentation {
-        fn is_cancelled(&self, phase: PlanningSearchPhase) -> bool {
-            if phase == PlanningSearchPhase::Alternatives {
-                self.0.set(self.0.get() + 1);
-            }
-            self.0.get() >= 4
-        }
-    }
-    let PlanningSearchOutcome::ProvenMaximum(cancelled) = search_maximum_bv(
+    let assessment = assess_manual_bv(
         &registry,
-        &request,
-        &CancelAugmentation(std::cell::Cell::new(0)),
+        &ManualBvRequest {
+            personal_limits: request.personal_limits.clone(),
+            rotation_preference: request.rotation_preference,
+            profile: request.profile.clone(),
+            scoring_table: request.scoring_table,
+            submission: SubmissionState::Complete,
+            elements: vec![],
+        },
     )
-    .unwrap() else {
-        panic!("zero maximum survives augmentation cancellation")
-    };
-    assert_eq!(cancelled.maximum_base_hundredths, 0);
+    .unwrap();
+    assert_eq!(assessment, maximum.alternatives[0].assessment);
     assert_eq!(
-        cancelled.alternative_status,
-        PlanningAlternativeStatus::Cancelled
+        assessment.planning_compliance(),
+        Ok(PlanningCompliance::Compliant)
     );
-    assert_eq!(cancelled.alternatives.len(), 2);
-    assert_eq!(
-        cancelled
-            .alternatives
-            .iter()
-            .map(|p| p.elements.len())
-            .collect::<Vec<_>>(),
-        [0, 1]
-    );
-    for candidate in cancelled.alternatives {
-        assert_eq!(candidate.assessment.total.exact_hundredths, Some(0));
-        assert_eq!(
-            candidate.assessment.planning_compliance(),
-            Ok(PlanningCompliance::Compliant)
-        );
-    }
 }
 #[cfg(feature = "optimizer")]
 #[test]

@@ -1,0 +1,24 @@
+baseline_revision=c295da41527bb2fe13353f4138865e56f4e9b143
+current_revision=4d79c128d04a2214154bf0afb2bdd2f1640da95d
+runs=3
+external_watchdog_seconds=120
+baseline_binary_sha256=A5289D40C44E032C524BAD14A8B3AFEC645AB48E9E2FECA513BFE2722C6A6AE0
+current_binary_sha256=A187FAC75C7DE6BC388491E7B4D271723656383E7EDA3607BA3BCA14E20E01D0
+machine=native-host-A
+os=Microsoft Windows NT 10.0.26200.0
+processor=Intel64 Family 6 Model 183 Stepping 1, GenuineIntel
+logical_processors=32
+rustc 1.99.1 (58cf8f9c3 2026-10-13)
+binary: rustc
+commit-hash: 58cf8f9c35b355199727627d07ae34a4e2846d67
+commit-date: 2026-10-13
+host: x86_64-pc-windows-msvc
+release: 1.99.1
+LLVM version: 23.1.1
+cargo 1.99.1 (5f94df478 2026-08-27)
+Native Release, Pumpkin0.5.0; binary source revisions supplied explicitly; build logs and Cargo.lock retained alongside evidence.
+Serial fresh process per row; no warmup discarded; compilation and ACK excluded; host background load and thermal state uncontrolled.
+proof_us=start to MaximumProved poll, includes initial reconstruction/assessment; alternatives_us=that poll to legacy capped return.
+peak_working_set_bytes=Windows process lifetime peak sampled while child waits for ACK after API return.
+Request manifests must match byte-for-byte across both revisions and every repetition. Bronze required changes from five nominal alternatives to four distinct exhausted compositions.
+WatchdogFailure is experimental termination, never infeasibility. No API deadline or browser latency guarantee.

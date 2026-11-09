@@ -87,7 +87,7 @@ fn exactly_five_atomic_partitions_are_retained_without_requiring_four_jump_entri
 }
 
 #[test]
-fn bronze_required_flip_has_four_positive_partitions_and_unbounded_neutral_waltzes() {
+fn bronze_required_flip_has_four_distinct_compositions_even_with_optional_waltzes() {
     // Announcement p11 and SOV: jump bound270 requires twoLz plus threeF/Lo.
     // A required solo F leaves precisely these four sorted whole-element multisets.
     let mut request = restricted(&[JumpKind::Lutz, JumpKind::Flip, JumpKind::Loop]);
@@ -117,10 +117,18 @@ fn bronze_required_flip_has_four_positive_partitions_and_unbounded_neutral_waltz
         .retain(|e| *e != PlanningExclusion::JumpKind(JumpKind::Waltz));
     let neutral = proved(&request, &Continue);
     assert_eq!(neutral.maximum_base_hundredths, 1100);
-    assert_eq!(neutral.alternatives.len(), 5);
+    for candidate in &neutral.alternatives {
+        assert_required_and_assessed(&ProfileRegistry::adult(), &request, candidate, 1100);
+    }
+    assert_eq!(neutral.alternatives.len(), 4);
+    assert_eq!(jump_codes(&neutral), jump_codes(&result));
+    assert!(neutral
+        .alternatives
+        .iter()
+        .all(|p| p.elements.iter().all(|e| e.code != "W")));
     assert_eq!(
         neutral.alternative_status,
-        PlanningAlternativeStatus::LimitReached
+        PlanningAlternativeStatus::Exhausted
     );
 }
 
@@ -266,6 +274,28 @@ fn more_than_five_maxima_match_an_independent_bounded_atomic_oracle() {
         JumpKind::Flip,
         JumpKind::Loop,
     ]);
+    let registry = ProfileRegistry::adult();
+    let mut session = PlanningSearchSession::new(&registry, request.clone(), None);
+    assert_eq!(
+        session.prove(&Continue).unwrap(),
+        PlanningSessionState::Collecting
+    );
+    let mut all = Vec::new();
+    while session.state() == PlanningSessionState::Collecting {
+        let batch = session
+            .collect(std::num::NonZeroUsize::new(3).unwrap(), &CollectionContinue)
+            .unwrap();
+        assert_eq!(batch.state, session.state());
+        assert!(batch.alternatives.len() <= 3);
+        all.extend(batch.alternatives);
+    }
+    assert_eq!(session.state(), PlanningSessionState::Exhausted);
+    assert_eq!(all.len(), maxima.len());
+    assert_eq!(session.confirmed(), all);
+    assert_eq!(program_jump_codes(&all), maxima);
+    for candidate in &all {
+        assert_required_and_assessed(&registry, &request, candidate, 1070);
+    }
     let result = proved(&request, &Continue);
     assert_eq!(result.maximum_base_hundredths, 830 + best);
     assert_eq!(result.alternatives.len(), 5);
@@ -441,5 +471,587 @@ fn cancellation_with_ignored_waltzes_preserves_all_collected_maxima_and_required
             assessment.planning_compliance(),
             Ok(PlanningCompliance::Compliant)
         );
+    }
+}
+
+#[test]
+fn registered_ignored_mechanism_exhausts_required_waltz_compositions() {
+    let mut profile = adult_profile(AdultCategory::Bronze);
+    profile.id.name = "synthetic-ignored-movement-identity".into();
+    profile.category = "Synthetic identity fixture".into();
+    profile.provenance = ProfileProvenance::Synthetic;
+    let mut policy = adult_program_policy(AdultCategory::Bronze);
+    policy.spins.profile = profile.id.clone();
+    profile
+        .sources
+        .extend(policy.spins.positions.iter().map(|p| p.source.clone()));
+    profile
+        .sources
+        .extend(policy.spins.per_foot.iter().map(|p| p.source.clone()));
+    profile.sources.extend([
+        policy.spins.source.clone(),
+        policy.step_source.clone(),
+        policy.choreography_source.clone(),
+        policy.feature_source.clone(),
+    ]);
+    let mut registry = ProfileRegistry::adult();
+    registry
+        .register_with_program_policy(profile.clone(), policy)
+        .unwrap();
+    let mut request = restricted(&[JumpKind::ToeLoop, JumpKind::Waltz]);
+    request.profile = profile.id;
+    for id in ["first-waltz", "second-waltz"] {
+        request.required.push(RequiredPlanningElement {
+            id: id.into(),
+            element: AssumedRecognition::new("W"),
+        });
+    }
+    let PlanningSearchOutcome::ProvenMaximum(result) =
+        search_maximum_bv(&registry, &request, &Continue).unwrap()
+    else {
+        panic!("maximum expected")
+    };
+    assert_eq!(result.maximum_base_hundredths, 910);
+    assert_eq!(
+        result.alternative_status,
+        PlanningAlternativeStatus::Exhausted
+    );
+    assert_eq!(
+        jump_codes(&result),
+        [vec!["1T".into(), "1T".into()], vec!["1T+1T".into()]]
+            .into_iter()
+            .collect()
+    );
+    for candidate in &result.alternatives {
+        assert_eq!(
+            candidate.elements.iter().filter(|e| e.code == "W").count(),
+            2
+        );
+        assert_required_and_assessed(&registry, &request, candidate, 910);
+    }
+    let mut session = PlanningSearchSession::new(&registry, request.clone(), None);
+    session.prove(&Continue).unwrap();
+    while session.state() == PlanningSessionState::Collecting {
+        session
+            .collect(std::num::NonZeroUsize::new(1).unwrap(), &CollectionContinue)
+            .unwrap();
+    }
+    assert_eq!(session.state(), PlanningSessionState::Exhausted);
+    assert_eq!(session.confirmed().len(), 2);
+    assert_eq!(program_jump_codes(session.confirmed()), jump_codes(&result));
+    for candidate in session.confirmed() {
+        assert_eq!(
+            candidate.elements.iter().filter(|e| e.code == "W").count(),
+            2
+        );
+        assert_required_and_assessed(&registry, &request, candidate, 910);
+    }
+    request
+        .exclusions
+        .push(PlanningExclusion::ExactElement("W".into()));
+    assert!(matches!(
+        search_maximum_bv(&registry, &request, &Continue),
+        Err(PlanningSearchError::InvalidRequest { .. })
+    ));
+}
+
+fn assert_required_and_assessed(
+    registry: &ProfileRegistry,
+    request: &PlanningSearchRequest,
+    candidate: &PlanningProgram,
+    value: i64,
+) {
+    for (input_index, required) in request.required.iter().enumerate() {
+        let index = candidate
+            .provenance
+            .iter()
+            .position(|p| {
+                *p == PlanningProvenance::Required {
+                    id: required.id.clone(),
+                    input_index,
+                }
+            })
+            .unwrap();
+        assert_eq!(candidate.elements[index], required.element);
+    }
+    let assessment = assess_manual_bv(
+        registry,
+        &ManualBvRequest {
+            personal_limits: request.personal_limits.clone(),
+            rotation_preference: request.rotation_preference,
+            profile: request.profile.clone(),
+            scoring_table: request.scoring_table,
+            submission: SubmissionState::Complete,
+            elements: candidate.elements.clone(),
+        },
+    )
+    .unwrap();
+    assert_eq!(assessment.total.exact_hundredths, Some(value));
+    assert_eq!(
+        assessment.planning_compliance(),
+        Ok(PlanningCompliance::Compliant)
+    );
+    assert_eq!(candidate.assessment, assessment);
+}
+
+#[test]
+fn counted_zero_value_waltzes_remain_distinct_optional_elements() {
+    let registry = ProfileRegistry::adult();
+    let profile = adult_profile(AdultCategory::Silver);
+    let mut request = PlanningSearchRequest {
+        personal_limits: PersonalLimits::default(),
+        rotation_preference: RotationPreference::default(),
+        profile: profile.id,
+        scoring_table: ScoringTableId::Isu2786June2_2026,
+        required: ["CSSp2", "ChSp1", "ChSq1"]
+            .map(|code| RequiredPlanningElement {
+                id: code.into(),
+                element: AssumedRecognition::new(code),
+            })
+            .to_vec(),
+        exclusions: vec![],
+    };
+    request.exclusions = selectable_jump_elements(
+        &registry,
+        &request.profile,
+        request.scoring_table,
+        request.rotation_preference,
+    )
+    .unwrap()
+    .into_iter()
+    .filter(|e| e.code != "W")
+    .map(|e| PlanningExclusion::ExactElement(e.code))
+    .collect();
+    let PlanningSearchOutcome::ProvenMaximum(result) =
+        search_maximum_bv(&registry, &request, &Continue).unwrap()
+    else {
+        panic!("maximum expected")
+    };
+    // Silver W is a counted downgraded Axel: zero BV, at most two occurrences.
+    // CSSp2=280, ChSp1=350, ChSq1=350 (Communication 2786).
+    assert_eq!(result.maximum_base_hundredths, 980);
+    assert_eq!(
+        result.alternative_status,
+        PlanningAlternativeStatus::Exhausted
+    );
+    assert_eq!(
+        result
+            .alternatives
+            .iter()
+            .map(|p| p.elements.iter().filter(|e| e.code == "W").count())
+            .collect::<std::collections::BTreeSet<_>>(),
+        [0, 1, 2].into_iter().collect()
+    );
+    assert_eq!(result.alternatives.len(), 3);
+    let mut session = PlanningSearchSession::new(&registry, request.clone(), None);
+    session.prove(&Continue).unwrap();
+    while session.state() == PlanningSessionState::Collecting {
+        session
+            .collect(std::num::NonZeroUsize::new(1).unwrap(), &CollectionContinue)
+            .unwrap();
+    }
+    assert_eq!(session.state(), PlanningSessionState::Exhausted);
+    assert_eq!(session.confirmed().len(), 3);
+    assert_eq!(
+        session
+            .confirmed()
+            .iter()
+            .map(|p| p.elements.iter().filter(|e| e.code == "W").count())
+            .collect::<std::collections::BTreeSet<_>>(),
+        [0, 1, 2].into_iter().collect()
+    );
+    for candidate in session.confirmed() {
+        assert_required_and_assessed(&registry, &request, candidate, 980);
+    }
+    for candidate in &result.alternatives {
+        assert_required_and_assessed(&registry, &request, candidate, 980);
+    }
+}
+
+#[test]
+fn session_filled_batch_requires_a_separate_exhaustion_proof() {
+    let registry = ProfileRegistry::adult();
+    let mut session = PlanningSearchSession::new(
+        &registry,
+        restricted(&[JumpKind::Flip, JumpKind::Loop]),
+        None,
+    );
+    assert_eq!(session.state(), PlanningSessionState::Unproved);
+    assert_eq!(session.maximum_base_hundredths(), None);
+    assert!(session.confirmed().is_empty());
+    assert_eq!(
+        session.prove(&Continue).unwrap(),
+        PlanningSessionState::Collecting
+    );
+    assert_eq!(session.maximum_base_hundredths(), Some(1030));
+    assert!(session.confirmed().is_empty());
+    struct Collect;
+    impl PlanningCollectionControl for Collect {
+        fn action(&self, _: PlanningSearchPhase) -> PlanningCollectionAction {
+            PlanningCollectionAction::Continue
+        }
+    }
+    let batch = session
+        .collect(std::num::NonZeroUsize::new(5).unwrap(), &Collect)
+        .unwrap();
+    assert_eq!(batch.alternatives.len(), 5);
+    assert_eq!(batch.state, PlanningSessionState::Collecting);
+    assert_eq!(session.confirmed(), batch.alternatives);
+    let final_batch = session
+        .collect(std::num::NonZeroUsize::new(5).unwrap(), &Collect)
+        .unwrap();
+    assert!(final_batch.alternatives.is_empty());
+    assert_eq!(final_batch.state, PlanningSessionState::Exhausted);
+}
+
+struct CollectionContinue;
+impl PlanningCollectionControl for CollectionContinue {
+    fn action(&self, _: PlanningSearchPhase) -> PlanningCollectionAction {
+        PlanningCollectionAction::Continue
+    }
+}
+fn program_jump_codes(programs: &[PlanningProgram]) -> std::collections::BTreeSet<Vec<String>> {
+    programs
+        .iter()
+        .map(|p| {
+            p.elements
+                .iter()
+                .filter(|e| e.code.starts_with('1'))
+                .map(|e| e.code.clone())
+                .collect()
+        })
+        .collect()
+}
+
+struct CollectionActionAt(PlanningSearchPhase, PlanningCollectionAction);
+impl PlanningCollectionControl for CollectionActionAt {
+    fn action(&self, phase: PlanningSearchPhase) -> PlanningCollectionAction {
+        if phase == self.0 {
+            self.1
+        } else {
+            PlanningCollectionAction::Continue
+        }
+    }
+}
+#[test]
+fn session_resumes_after_pause_at_every_collection_checkpoint() {
+    struct PauseAfter(std::cell::Cell<usize>);
+    impl PlanningCollectionControl for PauseAfter {
+        fn action(&self, _: PlanningSearchPhase) -> PlanningCollectionAction {
+            match self.0.get().checked_sub(1) {
+                Some(remaining) => {
+                    self.0.set(remaining);
+                    PlanningCollectionAction::Continue
+                }
+                None => PlanningCollectionAction::Pause,
+            }
+        }
+    }
+
+    let registry = ProfileRegistry::adult();
+    let request = restricted(&[JumpKind::ToeLoop]);
+    // Bronze permits two 1T occurrences, as solos or one indivisible pair.
+    // Communication 2786: 2 * 40 + 240 + 240 + 350 = 910 hundredths.
+    let expected = [vec!["1T".into(), "1T".into()], vec!["1T+1T".into()]]
+        .into_iter()
+        .collect();
+    let size = std::num::NonZeroUsize::new(3).unwrap();
+
+    // Sweep every prefix of cooperative checkpoints, including solver polls.
+    // Stop at uninterrupted exhaustion rather than assuming a poll count or order.
+    for prefix in 0.. {
+        let mut session = PlanningSearchSession::new(&registry, request.clone(), None);
+        assert_eq!(
+            session.prove(&Continue).unwrap(),
+            PlanningSessionState::Collecting
+        );
+        let first = session
+            .collect(size, &PauseAfter(std::cell::Cell::new(prefix)))
+            .unwrap();
+        assert_eq!(session.state(), first.state);
+        assert_eq!(session.confirmed(), first.alternatives);
+        assert_eq!(session.maximum_base_hundredths(), Some(910));
+        let paused = first.state == PlanningSessionState::Paused;
+        let mut all = first.alternatives;
+        if paused {
+            let retained = session.confirmed().to_vec();
+            let resumed = session.collect(size, &CollectionContinue).unwrap();
+            assert_eq!(resumed.state, PlanningSessionState::Exhausted);
+            assert!(session.confirmed().starts_with(&retained));
+            all.extend(resumed.alternatives);
+        }
+        assert_eq!(session.state(), PlanningSessionState::Exhausted);
+        assert_eq!(session.maximum_base_hundredths(), Some(910));
+        assert_eq!(all.len(), 2, "pause after checkpoint prefix {prefix}");
+        assert_eq!(program_jump_codes(&all), expected);
+        assert_eq!(session.confirmed(), all);
+        for candidate in &all {
+            assert_required_and_assessed(&registry, &request, candidate, 910);
+        }
+        if !paused {
+            break;
+        }
+    }
+}
+
+#[test]
+fn session_pauses_empty_and_interrupted_reconstruction_then_resumes_without_duplicates() {
+    let registry = ProfileRegistry::adult();
+    let request = restricted(&[JumpKind::Flip, JumpKind::Loop]);
+    let mut session = PlanningSearchSession::new(&registry, request.clone(), None);
+    session.prove(&Continue).unwrap();
+    let size = std::num::NonZeroUsize::new(2).unwrap();
+    let pause = session
+        .collect(
+            size,
+            &CollectionActionAt(
+                PlanningSearchPhase::Alternatives,
+                PlanningCollectionAction::Pause,
+            ),
+        )
+        .unwrap();
+    assert_eq!(pause.state, PlanningSessionState::Paused);
+    assert!(pause.alternatives.is_empty());
+    assert!(session.confirmed().is_empty());
+    let first = session.collect(size, &CollectionContinue).unwrap();
+    assert_eq!(first.alternatives.len(), 2);
+    let pause = session
+        .collect(
+            size,
+            &CollectionActionAt(
+                PlanningSearchPhase::Reconstruction,
+                PlanningCollectionAction::Pause,
+            ),
+        )
+        .unwrap();
+    assert_eq!(pause.state, PlanningSessionState::Paused);
+    assert!(pause.alternatives.is_empty());
+    assert_eq!(session.confirmed(), first.alternatives);
+    assert_eq!(session.maximum_base_hundredths(), Some(1030));
+    let mut all = first.alternatives;
+    while matches!(
+        session.state(),
+        PlanningSessionState::Paused | PlanningSessionState::Collecting
+    ) {
+        all.extend(
+            session
+                .collect(size, &CollectionContinue)
+                .unwrap()
+                .alternatives,
+        );
+    }
+    assert_eq!(all.len(), 5);
+    assert_eq!(
+        program_jump_codes(&all),
+        jump_codes(&proved(&request, &Continue))
+    );
+    assert_eq!(session.confirmed(), all);
+    for candidate in &all {
+        assert_required_and_assessed(&registry, &request, candidate, 1030);
+    }
+}
+
+#[test]
+fn session_cancellation_is_terminal_and_retains_only_proved_deliveries() {
+    struct CancelAt(PlanningSearchPhase);
+    impl PlanningSearchControl for CancelAt {
+        fn is_cancelled(&self, phase: PlanningSearchPhase) -> bool {
+            phase == self.0
+        }
+    }
+    let registry = ProfileRegistry::adult();
+    let request = restricted(&[JumpKind::ToeLoop]);
+    let size = std::num::NonZeroUsize::new(1).unwrap();
+    for phase in [
+        PlanningSearchPhase::Domain,
+        PlanningSearchPhase::Model,
+        PlanningSearchPhase::Solve,
+        PlanningSearchPhase::Reconstruction,
+        PlanningSearchPhase::IncumbentFound,
+        PlanningSearchPhase::MaximumProved,
+    ] {
+        let mut session = PlanningSearchSession::new(&registry, request.clone(), None);
+        assert_eq!(
+            session.prove(&CancelAt(phase)).unwrap(),
+            PlanningSessionState::Cancelled
+        );
+        assert_eq!(
+            session.maximum_base_hundredths(),
+            (phase == PlanningSearchPhase::MaximumProved).then_some(910)
+        );
+        assert!(session.confirmed().is_empty());
+        assert_eq!(
+            session.prove(&Continue),
+            Err(PlanningSessionError::InvalidState {
+                state: PlanningSessionState::Cancelled
+            })
+        );
+        assert_eq!(
+            session.collect(size, &CollectionContinue),
+            Err(PlanningSessionError::InvalidState {
+                state: PlanningSessionState::Cancelled
+            })
+        );
+    }
+    for phase in [
+        PlanningSearchPhase::Alternatives,
+        PlanningSearchPhase::Reconstruction,
+    ] {
+        let mut session = PlanningSearchSession::new(&registry, request.clone(), None);
+        session.prove(&Continue).unwrap();
+        let first = session.collect(size, &CollectionContinue).unwrap();
+        let cancelled = session
+            .collect(
+                size,
+                &CollectionActionAt(phase, PlanningCollectionAction::Cancel),
+            )
+            .unwrap();
+        assert_eq!(cancelled.state, PlanningSessionState::Cancelled);
+        assert!(cancelled.alternatives.is_empty());
+        assert_eq!(session.confirmed(), first.alternatives);
+        assert_eq!(session.maximum_base_hundredths(), Some(910));
+    }
+}
+
+#[test]
+fn session_distinguishes_invalid_requests_infeasibility_and_single_solution() {
+    let registry = ProfileRegistry::adult();
+    let mut request = restricted(&[JumpKind::ToeLoop]);
+    for id in ["first", "second"] {
+        request.required.push(RequiredPlanningElement {
+            id: id.into(),
+            element: AssumedRecognition::new("1T"),
+        });
+    }
+    let size = std::num::NonZeroUsize::new(1).unwrap();
+    let mut session = PlanningSearchSession::new(&registry, request.clone(), None);
+    assert_eq!(
+        session.collect(size, &CollectionContinue),
+        Err(PlanningSessionError::InvalidState {
+            state: PlanningSessionState::Unproved
+        })
+    );
+    session.prove(&Continue).unwrap();
+    assert_eq!(
+        session.prove(&Continue),
+        Err(PlanningSessionError::InvalidState {
+            state: PlanningSessionState::Collecting
+        })
+    );
+    let batch = session.collect(size, &CollectionContinue).unwrap();
+    assert_eq!(batch.state, PlanningSessionState::Collecting);
+    assert_eq!(batch.alternatives.len(), 1);
+    assert_required_and_assessed(&registry, &request, &batch.alternatives[0], 910);
+    assert_eq!(
+        session.collect(size, &CollectionContinue).unwrap().state,
+        PlanningSessionState::Exhausted
+    );
+    assert_eq!(
+        session.collect(size, &CollectionContinue),
+        Err(PlanningSessionError::InvalidState {
+            state: PlanningSessionState::Exhausted
+        })
+    );
+    request.required.push(RequiredPlanningElement {
+        id: "third".into(),
+        element: AssumedRecognition::new("1T"),
+    });
+    let mut impossible = PlanningSearchSession::new(&registry, request.clone(), None);
+    assert_eq!(
+        impossible.prove(&Continue).unwrap(),
+        PlanningSessionState::Infeasible
+    );
+    assert!(impossible.maximum_base_hundredths().is_none());
+    assert!(!impossible.diagnostics().is_empty());
+    assert!(impossible.confirmed().is_empty());
+    request.required[0].id = request.required[1].id.clone();
+    let mut invalid = PlanningSearchSession::new(&registry, request, None);
+    assert!(matches!(
+        invalid.prove(&Continue),
+        Err(PlanningSessionError::Search(
+            PlanningSearchError::InvalidRequest { .. }
+        ))
+    ));
+    assert_eq!(invalid.state(), PlanningSessionState::Failed);
+    assert!(invalid.diagnostics().is_empty());
+    assert!(invalid.maximum_base_hundredths().is_none());
+}
+
+#[test]
+fn session_required_compound_is_indivisible_and_exact_exclusion_keeps_internal_order_distinct() {
+    let registry = ProfileRegistry::adult();
+    let mut request = restricted(&[JumpKind::Flip, JumpKind::Loop]);
+    request.required.push(RequiredPlanningElement {
+        id: "connection".into(),
+        element: AssumedRecognition::new("1Lo+1F"),
+    });
+    request
+        .exclusions
+        .push(PlanningExclusion::ExactElement("1F+1Lo".into()));
+    let mut session = PlanningSearchSession::new(&registry, request.clone(), None);
+    session.prove(&Continue).unwrap();
+    let batch = session
+        .collect(
+            std::num::NonZeroUsize::new(10).unwrap(),
+            &CollectionContinue,
+        )
+        .unwrap();
+    assert_eq!(batch.state, PlanningSessionState::Exhausted);
+    assert_eq!(batch.alternatives.len(), 1);
+    let candidate = &batch.alternatives[0];
+    assert_eq!(
+        program_jump_codes(&batch.alternatives),
+        [vec!["1F".into(), "1Lo".into(), "1Lo+1F".into()]]
+            .into_iter()
+            .collect()
+    );
+    assert_required_and_assessed(&registry, &request, candidate, 1030);
+}
+
+#[test]
+fn session_partial_batches_preserve_committed_deliveries_on_pause_and_cancel() {
+    struct AfterReconstruction {
+        reconstructed: std::cell::Cell<bool>,
+        action: PlanningCollectionAction,
+    }
+    impl PlanningCollectionControl for AfterReconstruction {
+        fn action(&self, phase: PlanningSearchPhase) -> PlanningCollectionAction {
+            if phase == PlanningSearchPhase::Reconstruction {
+                self.reconstructed.set(true);
+            }
+            if phase == PlanningSearchPhase::Alternatives && self.reconstructed.get() {
+                self.action
+            } else {
+                PlanningCollectionAction::Continue
+            }
+        }
+    }
+    let registry = ProfileRegistry::adult();
+    let request = restricted(&[JumpKind::Flip, JumpKind::Loop]);
+    for (action, state) in [
+        (
+            PlanningCollectionAction::Pause,
+            PlanningSessionState::Paused,
+        ),
+        (
+            PlanningCollectionAction::Cancel,
+            PlanningSessionState::Cancelled,
+        ),
+    ] {
+        let mut session = PlanningSearchSession::new(&registry, request.clone(), None);
+        session.prove(&Continue).unwrap();
+        let batch = session
+            .collect(
+                std::num::NonZeroUsize::new(5).unwrap(),
+                &AfterReconstruction {
+                    reconstructed: std::cell::Cell::new(false),
+                    action,
+                },
+            )
+            .unwrap();
+        assert_eq!(batch.state, state);
+        assert_eq!(batch.alternatives.len(), 1);
+        assert_eq!(session.confirmed(), batch.alternatives);
+        assert_required_and_assessed(&registry, &request, &batch.alternatives[0], 1030);
     }
 }

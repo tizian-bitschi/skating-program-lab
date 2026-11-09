@@ -3,6 +3,11 @@ use skating_program_lab::*;
 use std::collections::BTreeSet;
 
 struct Continue;
+impl PlanningCollectionControl for Continue {
+    fn action(&self, _: PlanningSearchPhase) -> PlanningCollectionAction {
+        PlanningCollectionAction::Continue
+    }
+}
 impl PlanningSearchControl for Continue {
     fn is_cancelled(&self, _: PlanningSearchPhase) -> bool {
         false
@@ -181,18 +186,30 @@ fn six_category_four_workflow_matrix_has_independent_credited_bounds() {
                     vec![]
                 },
             };
-            let PlanningSearchOutcome::ProvenMaximum(maximum) =
-                search_maximum_bv(&registry, &request, &Continue).unwrap()
-            else {
-                panic!("{} case {case}", profile.id.name)
-            };
+            let mut session = PlanningSearchSession::new(&registry, request.clone(), None);
             assert_eq!(
-                maximum.maximum_base_hundredths, bound,
+                session.prove(&Continue).unwrap(),
+                PlanningSessionState::Collecting
+            );
+            assert!(session.confirmed().is_empty());
+            assert_eq!(
+                session.maximum_base_hundredths(),
+                Some(bound),
                 "{} case {case}",
                 profile.id.name
             );
             let mut identities = BTreeSet::new();
-            for candidate in maximum.alternatives {
+            // A practical prefix exercises continued delivery without requiring
+            // exhaustive collection of unrestricted advanced repertoires.
+            for _ in 0..2 {
+                if session.state() == PlanningSessionState::Collecting {
+                    session
+                        .collect(std::num::NonZeroUsize::new(1).unwrap(), &Continue)
+                        .unwrap();
+                }
+            }
+            assert!(!session.confirmed().is_empty());
+            for candidate in session.confirmed() {
                 let mut identity: Vec<_> = candidate
                     .elements
                     .iter()
@@ -227,7 +244,7 @@ fn six_category_four_workflow_matrix_has_independent_credited_bounds() {
                         personal_limits: PersonalLimits::default(),
                         rotation_preference: RotationPreference::default(),
                         submission: SubmissionState::Complete,
-                        elements: candidate.elements,
+                        elements: candidate.elements.clone(),
                     },
                 )
                 .unwrap();
@@ -236,6 +253,7 @@ fn six_category_four_workflow_matrix_has_independent_credited_bounds() {
                     manual.planning_compliance(),
                     Ok(PlanningCompliance::Compliant)
                 );
+                assert!(manual.personal_conflicts.is_empty());
                 let inventory: Vec<_> = manual.planning_rule_inventory().collect();
                 assert_eq!(inventory.len(), 8);
                 assert!(inventory
