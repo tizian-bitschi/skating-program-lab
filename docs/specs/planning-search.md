@@ -4,8 +4,25 @@ Issues #121–#123 implement the four Adult categories and both source-bound Sen
 profiles in #117. The public seam is
 `search_maximum_bv(registry, request, control)`. Required occurrences contain a
 stable caller ID and an exact `AssumedRecognition`; their input order does not
-constrain placement. Exclusions name jump kinds, exact listed jumps and named
-regular-spin kinds. Duplicate IDs are invalid requests.
+constrain placement. Exclusions name jump kinds, exact listed jumps, named
+regular-spin kinds and exact whole selectable codes (`ExactElement`). An exact
+compound exclusion leaves its components available in other whole elements;
+semantic jump exclusions still inspect every compound component. Exact spin
+codes retain their level, flying-entry, foot-change and V distinctions. Step
+sequences and choreographic codes use the same whole-code exclusion. The code
+identity is independent of supplied transition evidence. Duplicate IDs are
+invalid requests; conflicting duplicate required occurrences retain every input
+index in the exclusion diagnostic.
+
+`selectable_elements_with_exclusions` and
+`selectable_jump_elements_with_exclusions` intersect the existing selection
+interfaces with maxima and the same exclusion matcher used by maximum search.
+The jump adapter also retains the selected rotation preference. Existing
+selection interfaces remain unrestricted by exclusions. An exclusion absent
+from a category's repertoire has no effect and never expands that repertoire.
+Unknown or malformed whole codes are invalid input; the search diagnostic names
+the exclusion's input index. A published supported code from another category
+is a valid exclusion with no effect where that code is already unavailable.
 
 `request.rotation_preference` selects the personal connection restriction.
 `RotationPreference::default()` permits same-direction compounds;

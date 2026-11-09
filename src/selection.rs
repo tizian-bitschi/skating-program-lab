@@ -4,6 +4,111 @@ use crate::program_validation::{
 };
 use crate::*;
 
+/// Personal exclusions of whole codes or semantic jump/spin content.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum PlanningExclusion {
+    /// Excludes this whole intended code, independently of transition evidence.
+    ExactElement(String),
+    JumpKind(JumpKind),
+    ExactJump(ListedJump),
+    SpinKind(RegularSpinKind),
+}
+
+impl PlanningExclusion {
+    pub(crate) fn valid(&self, selection: &Selection<'_>, table: ScoringTableId) -> bool {
+        let Self::ExactElement(code) = self else {
+            return true;
+        };
+        let assumption = AssumedRecognition {
+            code: code.clone(),
+            direct_transitions_assumed: code.ends_with("+SEQ"),
+        };
+        // Check notation and published value independently of category admission.
+        crate::manual_bv::resolve_selection(
+            selection,
+            table,
+            RulesetId::IsuSenior2026_27June12,
+            &assumption,
+        )
+        .2
+        .is_some()
+    }
+
+    pub(crate) fn excludes(&self, code: &str) -> bool {
+        match self {
+            Self::ExactElement(excluded) => code == excluded,
+            Self::JumpKind(kind) => code.split('+').filter_map(clean_jump).any(|j| j.0 == *kind),
+            Self::ExactJump(jump) => {
+                code.split('+')
+                    .filter_map(clean_jump)
+                    .any(|(kind, rotations)| {
+                        jump.kind == Some(kind) && jump.rotations == Some(rotations)
+                    })
+            }
+            Self::SpinKind(kind) => crate::assumed_recognition::spin_abbreviation(code)
+                .is_some_and(|spin| spin.kind == *kind),
+        }
+    }
+}
+
+/// Individual choices intersected with personal maxima and planning exclusions.
+pub fn selectable_elements_with_exclusions(
+    registry: &ProfileRegistry,
+    profile: &ProfileId,
+    table: ScoringTableId,
+    limits: &PersonalLimits,
+    exclusions: &[PlanningExclusion],
+) -> Result<Vec<SelectableElement>, ProfileSelectionError> {
+    validate_exclusions(registry, profile, table, exclusions)?;
+    Ok(
+        selectable_elements_with_limits(registry, profile, table, limits)?
+            .into_iter()
+            .filter(|choice| !exclusions.iter().any(|e| e.excludes(choice.row.notation)))
+            .collect(),
+    )
+}
+
+/// Complete whole jump choices intersected with maxima, rotation and exclusions.
+pub fn selectable_jump_elements_with_exclusions(
+    registry: &ProfileRegistry,
+    profile: &ProfileId,
+    table: ScoringTableId,
+    rotation_preference: RotationPreference,
+    limits: &PersonalLimits,
+    exclusions: &[PlanningExclusion],
+) -> Result<Vec<AssumedRecognition>, ProfileSelectionError> {
+    validate_exclusions(registry, profile, table, exclusions)?;
+    Ok(
+        selectable_jump_elements_with_limits(
+            registry,
+            profile,
+            table,
+            rotation_preference,
+            limits,
+        )?
+        .into_iter()
+        .filter(|choice| !exclusions.iter().any(|e| e.excludes(&choice.code)))
+        .collect(),
+    )
+}
+
+fn validate_exclusions(
+    registry: &ProfileRegistry,
+    profile: &ProfileId,
+    table: ScoringTableId,
+    exclusions: &[PlanningExclusion],
+) -> Result<(), ProfileSelectionError> {
+    let selection = Selection::new(registry, profile, table)?;
+    if let Some(index) = exclusions.iter().position(|e| !e.valid(&selection, table)) {
+        return Err(ProfileSelectionError {
+            profile: profile.clone(),
+            kind: ProfileErrorKind::Invalid,
+            reason: format!("Malformed exact whole-element exclusion at index {index}."),
+        });
+    }
+    Ok(())
+}
+
 /// A published single-element choice. The catalog row identifies its edition,
 /// exact code, level (if numbered or Basic), value and source.
 #[derive(Debug, Clone, PartialEq, Eq)]
