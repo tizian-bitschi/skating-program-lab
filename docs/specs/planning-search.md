@@ -184,3 +184,19 @@ five optima exist. See the [implementation evidence](../planning-bound-pruning.m
 
 Legacy ordered completion and evidence-based entry points retain their contracts.
 
+
+## Registered categories
+
+`ProfileRegistry::register_with_program_policy(profile, policy)` atomically
+registers a category and its explicit immutable program policy. The policy binds
+to the profile identity; its family and spin citations must be included in the
+profile sources. Existing `register` callers remain compatible. A custom profile
+registered without a program policy still needs a supplied policy in APIs that
+accept one, and cannot use the complete search or automatic selection.
+
+Search admission depends on supported mechanisms and resolved policy, rather
+than category identity. Jump rules must consistently select `JumpPlanV1` with
+`AdultScoringV1`, or `SeniorJumpPlanV1` with `SeniorScoringV1`. A registration
+does not implement new mechanisms. Source-edition compatibility, event override
+precedence and partial legality coverage remain in force. Registered policies
+cannot be replaced at individual consumer boundaries.

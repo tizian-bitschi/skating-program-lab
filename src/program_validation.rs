@@ -407,7 +407,7 @@ pub(crate) fn validate_program_scope_with_credit(
         kind: ProfileErrorKind::Invalid,
         reason: reason.into(),
     };
-    crate::profiles::resolve_program_policy(profile, Some(policy))?;
+    registry.program_policy(profile, Some(policy))?;
     if [
         &policy.step_source,
         &policy.choreography_source,

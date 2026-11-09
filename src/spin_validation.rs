@@ -411,7 +411,7 @@ pub(crate) fn validate_profile_program_with_assumptions(
     ProfileSelectionError,
 > {
     let profile = registry.resolve(&program.profile, program.scoring_table)?;
-    let resolved = crate::profiles::resolve_spin_policy(profile, policy)?;
+    let resolved = registry.spin_policy(profile, policy)?;
     let policy = resolved.as_ref();
     if let Some(p) = policy {
         let sources = std::iter::once(&p.source)
