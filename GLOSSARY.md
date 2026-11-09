@@ -28,6 +28,14 @@ competition eligibility without changing scoring or competition rules.
 A personal restriction removing one exact whole jump combination or jump sequence.
 Its component jumps remain available as solos or in other whole elements.
 
+**Planning request**:
+A selected category and rule edition together with personal restrictions and required whole-element occurrences.
+It defines the compositions considered by an optimization.
+
+**Required element occurrence**:
+One exact whole planned element that must remain unchanged in a composition, with freely chosen placement.
+Multiple required occurrences must each be retained.
+
 **Listed rotation class**:
 The notation class Single through Quintuple. Single Axel means 1A; it does not
 mean a literal count of physical turns.
