@@ -7,6 +7,10 @@ deterministic lifecycle cancellation runs retained the required proof boundary.
 No measured request hit the declared external 120-second watchdog or returned
 an assessment, solver or process error.
 
+This report records the pre-#132 baseline. Silver values below are historical;
+current source-complete Silver maxima are 14.80 (empty/excluded) and 14.70
+(required compound and CSSp2). See [current acceptance](milestone-132.md).
+
 ## Public workflow and correctness evidence
 
 `selectable_elements`, `selectable_jump_elements`, `assess_manual_bv` and

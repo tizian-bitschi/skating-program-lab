@@ -8,6 +8,8 @@ from collections import Counter
 from pathlib import Path
 
 directory = Path(sys.argv[1])
+edition = sys.argv[2] if len(sys.argv) > 2 else "issue-132"
+assert edition in {"baseline-caa4127", "issue-132"}, edition
 rows = list(csv.DictReader((directory / "observations.csv").open(newline="")))
 profiles = ["Bronze", "Silver", "Gold", "Masters", "Women", "Men"]
 scenarios = ["empty", "required", "excluded", "impossible"]
@@ -22,6 +24,9 @@ expected = {
     "Women": [13310, 12020, 13310, None],
     "Men": [13310, 12020, 13310, None],
 }
+if edition == "issue-132":
+    # A July16 p10 permits optional ChSp (350) in place of CCoSp2 (300).
+    expected["Silver"] = [1480, 1470, 1480, None]
 counts = Counter((r["profile"], r["scenario"], r["cancel_phase"]) for r in rows)
 assert set(counts) == {
     (p, s, "") for p in profiles for s in scenarios
@@ -62,7 +67,11 @@ for row in rows:
     else:
         assert row["outcome"] == "ProvenMaximum", row
         assert int(row["maximum_hundredths"]) == maximum, row
-        assert int(row["alternatives"]) == 5 and row["alternative_status"] == "LimitReached", row
+        # Independent four-multiset oracle: planning_alternatives.rs. The baseline
+        # lacks neutral ignored-W augmentation; current Bronze W is unbounded.
+        four = edition == "baseline-caa4127" and row["profile"] == "Bronze" and row["scenario"] == "required"
+        assert int(row["alternatives"]) == (4 if four else 5), row
+        assert row["alternative_status"] == ("Exhausted" if four else "LimitReached"), row
         assert 0 <= int(row["first_valid_us"]) <= int(row["proof_us"]) <= int(row["total_us"]), row
 if raw:
     raw.close()
@@ -73,7 +82,7 @@ def median_ms(group, key):
     return f"{statistics.median(values):.3f}" if values else "—"
 
 
-lines = ["# Native Release observations", "",
+lines = ["# Native Release observations", "", f"Expectation edition: `{edition}`.", "",
          "All 216 processes passed: 72 primary requests and 144 cancellation requests.",
          "Three fresh-process repetitions per identical request; no watchdog failures.", "",
          "Times below are median milliseconds. Range is minimum–maximum total time.",
