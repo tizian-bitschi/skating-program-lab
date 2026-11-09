@@ -73,7 +73,7 @@ These are scoped practical gates informed by WCAG 2.2 A/AA. They do not on their
 
 ## 4. Proposed small real-user check (Q4)
 
-The user performs or organizes a short evaluation with at least one skater aged 12–17 and one adult skater who did not help develop the interface. Basic skating knowledge is appropriate; memorized ISU codes or knowledge of this UI is not assumed. The agent prepares the tasks and applies identified corrections.
+The user performs or organizes a short evaluation with at least one skater aged 12–14 (as close to the minimum age as practical) and one adult skater who did not help develop the interface. Basic skating knowledge is appropriate; memorized ISU codes or knowledge of this UI is not assumed. The agent prepares the tasks and applies identified corrections.
 
 Use the same five tasks, expressed as goals rather than click instructions:
 
