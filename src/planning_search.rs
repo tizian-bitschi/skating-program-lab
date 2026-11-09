@@ -10,13 +10,6 @@ pub struct RequiredPlanningElement {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum PlanningExclusion {
-    JumpKind(JumpKind),
-    ExactJump(ListedJump),
-    SpinKind(RegularSpinKind),
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PlanningSearchRequest {
     pub personal_limits: PersonalLimits,
     pub rotation_preference: RotationPreference,
@@ -128,11 +121,9 @@ impl Atom {
         self.family() == ProfileElementFamily::Combination
     }
     fn excluded(&self, exclusions: &[PlanningExclusion]) -> bool {
-        exclusions.iter().any(|exclusion| match exclusion {
-            PlanningExclusion::JumpKind(kind) => self.jumps.iter().any(|j| j.kind == Some(*kind)),
-            PlanningExclusion::ExactJump(jump) => self.jumps.contains(jump),
-            PlanningExclusion::SpinKind(kind) => self.spin.is_some_and(|a| a.kind == *kind),
-        })
+        exclusions
+            .iter()
+            .any(|exclusion| exclusion.excludes(&self.assumption.code))
     }
 }
 
@@ -333,6 +324,21 @@ pub fn search_maximum_bv_with_step_limit(
         }
     }
     if request.exclusions.iter().any(|e| matches!(e,PlanningExclusion::ExactJump(j) if j.kind.is_none() || j.rotations.is_none_or(|r| r==0))) { return Err(invalid("Exact jump exclusions require a kind and positive rotation count.", vec![])); }
+    let selection =
+        crate::selection::Selection::new(registry, &request.profile, request.scoring_table)
+            .map_err(PlanningSearchError::Profile)?;
+    if let Some(index) = request
+        .exclusions
+        .iter()
+        .position(|e| !e.valid(&selection, request.scoring_table))
+    {
+        let mut error = invalid("Malformed exact whole-element exclusion.", vec![]);
+        if let PlanningSearchError::InvalidRequest { diagnostics, .. } = &mut error {
+            diagnostics[0].message =
+                format!("Malformed exact whole-element exclusion at index {index}.");
+        }
+        return Err(error);
+    }
     let required_inputs = request.required.iter().map(|r| r.element.clone()).collect();
     let required_assessment = assess_manual_bv_with_step_limit(
         registry,
@@ -353,6 +359,7 @@ pub fn search_maximum_bv_with_step_limit(
     let Some(mut atoms) = domain(registry, request, profile, maximum, control)? else {
         return Ok(PlanningSearchOutcome::Cancelled);
     };
+    let mut excluded_required = Vec::new();
     for (i, required) in request.required.iter().enumerate() {
         let atom = match atoms.iter().find(|a| a.assumption == required.element) {
             Some(atom) => atom,
@@ -387,11 +394,14 @@ pub fn search_maximum_bv_with_step_limit(
             }
         };
         if atom.excluded(&request.exclusions) {
-            return Err(invalid(
-                "Required element conflicts with a global exclusion.",
-                vec![i],
-            ));
+            excluded_required.push(i);
         }
+    }
+    if !excluded_required.is_empty() {
+        return Err(invalid(
+            "Required element conflicts with a global exclusion.",
+            excluded_required,
+        ));
     }
     let required: Vec<_> = request.required.iter().map(|r| r.element.clone()).collect();
     let assessment = assess_manual_bv(registry, &manual(request, required, SubmissionState::Draft))
