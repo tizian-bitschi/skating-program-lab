@@ -63,7 +63,7 @@ category ceilings, exclusions, manual BV and detailed manual assessment, finite
 optional filtering and required alternatives, immutable conflicts and provenance.
 Independent limited-domain bounds verify Bronze 10.20 and Senior Women/Men 21.70
 when all regular spins are capped at Basic and all jumps at Single. Baseline
-Silver remains 14.30, or 13.00 with Axel excluded.
+Silver reaches 14.80, or 13.50 with Axel excluded, including optional ChSp1.
 
 
 ## Step-sequence maximum (#135)

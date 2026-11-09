@@ -986,7 +986,7 @@ pub fn adult_program_policy(category: AdultCategory) -> ProgramPolicy {
         spins: adult_regular_spin_policy(category),
         max_steps: usize::from(d.advanced),
         max_choreographic_sequences: usize::from(!d.advanced),
-        max_choreographic_spins: usize::from(d.advanced),
+        max_choreographic_spins: usize::from(d.advanced || category == AdultCategory::Silver),
         require_choreographic_spin: d.advanced,
         max_step_level: d.step_level,
         step_movement_required: d.step_movement,

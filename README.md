@@ -11,6 +11,10 @@ exact required occurrences and semantic exclusions. It runs until proof or
 cooperative cancellation. It returns up to five equally optimal whole-element compositions, with
 separate maximum-proof and alternative-exhaustion status. See the [planning-search contract](docs/specs/planning-search.md).
 
+Complete category construction verdicts are available through
+`ManualBvAssessment::planning_compliance()` with a
+[positive source inventory](docs/specs/planning-compliance.md).
+
 For theoretical program construction, use `assess_manual_bv` to calculate
 base value from ordered SOV codes and check composition without supplying
 spin or step feature evidence. See the [assumed-recognition API](docs/specs/assumed-recognition.md).

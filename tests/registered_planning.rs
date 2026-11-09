@@ -150,3 +150,74 @@ fn invalid_registered_policy_does_not_publish_profile() {
         ProfileErrorKind::Unknown
     );
 }
+
+#[test]
+fn registered_twelve_jump_policy_has_consistent_search_and_manual_capability() {
+    // Independent synthetic policy: 12 slots, each exact single <=2, kinds<=3.
+    let mut profile = adult_profile(AdultCategory::Bronze);
+    profile.id.name = "synthetic-twelve-slots".into();
+    profile.provenance = ProfileProvenance::Synthetic;
+    profile.category = "Synthetic twelve-slot fixture".into();
+    profile.jumps.max_jumps = 12;
+    let source = SourceReference {
+        document: "Synthetic twelve-slot specification".into(),
+        version: "v1".into(),
+        location: "12 jump slots; remaining Bronze mechanism limits retained".into(),
+    };
+    profile.sources.push(source.clone());
+    let mut policy = adult_program_policy(AdultCategory::Bronze);
+    policy.spins.profile = profile.id.clone();
+    policy.spins.source = source.clone();
+    profile
+        .sources
+        .extend(policy.spins.positions.iter().map(|p| p.source.clone()));
+    profile
+        .sources
+        .extend(policy.spins.per_foot.iter().map(|p| p.source.clone()));
+    profile.sources.extend([
+        policy.step_source.clone(),
+        policy.choreography_source.clone(),
+        policy.feature_source.clone(),
+    ]);
+    let mut registry = ProfileRegistry::adult();
+    registry
+        .register_with_program_policy(profile.clone(), policy)
+        .unwrap();
+    let r = PlanningSearchRequest {
+        personal_limits: PersonalLimits::default(),
+        rotation_preference: RotationPreference::default(),
+        profile: profile.id.clone(),
+        scoring_table: profile.scoring_table,
+        required: vec![],
+        exclusions: vec![PlanningExclusion::JumpKind(JumpKind::Waltz)],
+    };
+    let PlanningSearchOutcome::ProvenMaximum(maximum) =
+        search_maximum_bv(&registry, &r, &Continue).unwrap()
+    else {
+        panic!("expected maximum")
+    };
+    // Two each Lz(.60), F(.50), Lo(.50), S(.40), T(.40) =4.80; spins4.80 +ChSq3.50.
+    assert_eq!(maximum.maximum_base_hundredths, 1310);
+    for alternative in maximum.alternatives {
+        assert_eq!(
+            alternative.assessment.planning_compliance(),
+            Ok(PlanningCompliance::Compliant)
+        );
+        let manual = assess_manual_bv(
+            &registry,
+            &ManualBvRequest {
+                personal_limits: PersonalLimits::default(),
+                rotation_preference: RotationPreference::default(),
+                profile: profile.id.clone(),
+                scoring_table: profile.scoring_table,
+                submission: SubmissionState::Complete,
+                elements: alternative.elements,
+            },
+        )
+        .unwrap();
+        assert_eq!(
+            manual.planning_compliance(),
+            Ok(PlanningCompliance::Compliant)
+        );
+    }
+}

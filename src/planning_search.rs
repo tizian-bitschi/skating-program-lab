@@ -304,7 +304,7 @@ pub fn search_maximum_bv_with_step_limit(
             profile: request.profile.clone(),
             reason: "Complete planning search requires an explicit supported program policy.",
         })?;
-    // Keep registered policies within the audited arithmetic and search envelope.
+    // Keep each count representable; the count model checks aggregate activity.
     if [
         profile.jumps.max_jumps,
         profile.jumps.max_compounds,
@@ -319,11 +319,12 @@ pub fn search_maximum_bv_with_step_limit(
         policy.max_choreographic_spins,
     ]
     .into_iter()
-    .any(|n| n > 11)
+    .try_fold(0usize, |sum, n| sum.checked_add(n))
+    .is_none_or(|sum| sum > i32::MAX as usize / u16::MAX as usize)
     {
         return Err(PlanningSearchError::UnsupportedCoverage {
             profile: request.profile.clone(),
-            reason: "Planning policy exceeds the audited eleven-occurrence bounds.",
+            reason: "Planning policy exceeds supported exact integer arithmetic.",
         });
     }
     let mut ids = std::collections::BTreeSet::new();
@@ -501,8 +502,9 @@ pub fn search_maximum_bv_with_step_limit(
                     ),
                 )
                 .map_err(PlanningSearchError::Profile)?;
-                if assessment.total.exact_hundredths
-                    != Some(i64::from(result.maximum_base_hundredths))
+                if assessment.planning_compliance() != Ok(PlanningCompliance::Compliant)
+                    || assessment.total.exact_hundredths
+                        != Some(i64::from(result.maximum_base_hundredths))
                     || !assessment
                         .legality
                         .validation
@@ -532,7 +534,9 @@ pub fn search_maximum_bv_with_step_limit(
                     maximum,
                 )
                 .map_err(PlanningSearchError::Profile)?;
-                if !assessment.personal_conflicts.is_empty() {
+                if assessment.planning_compliance() != Ok(PlanningCompliance::Compliant)
+                    || !assessment.personal_conflicts.is_empty()
+                {
                     return Err(PlanningSearchError::InconsistentAssessment);
                 }
                 alternative.assessment = assessment;

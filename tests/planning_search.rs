@@ -196,8 +196,8 @@ fn empty_silver_request_proves_the_source_derived_maximum() {
         panic!("expected a proved maximum")
     };
     // Seven listed jumps: 2*1A(110)+2*1Lz(60)+2*1F(50)+1Lo(50)=490.
-    // CCoSp2=300 and CLSp2=290, ChSq1=350; Eu is zero value.
-    assert_eq!(result.maximum_base_hundredths, 1430);
+    // ChSp1=350 and mandatory-role CLSp2=290, ChSq1=350; Eu is zero value.
+    assert_eq!(result.maximum_base_hundredths, 1480);
 }
 
 fn require(request: &mut PlanningSearchRequest, id: &str, code: &str) {
@@ -221,7 +221,7 @@ fn silver_preserves_exact_free_placement_and_duplicate_occurrences() {
     require(&mut r, "spin", "CSSp2");
     require(&mut r, "compound", "1F+1Lo");
     let result = proved(&r);
-    assert_eq!(result.maximum_base_hundredths, 1420);
+    assert_eq!(result.maximum_base_hundredths, 1470);
     for (input_index, required) in r.required.iter().enumerate() {
         let c = &result.alternatives[0];
         let index = c
@@ -276,8 +276,8 @@ fn semantic_exclusions_cover_compounds_rotations_and_named_spin_forms() {
         PlanningExclusion::SpinKind(RegularSpinKind::Layback),
     ];
     let result = proved(&r);
-    // Seven permitted components: Lz,Lz,F,F,Lo,Lo,S =360. Best spins300+280.
-    assert_eq!(result.maximum_base_hundredths, 1290);
+    // Seven components Lz,Lz,F,F,Lo,Lo,S=360; ChSp350+CSSp280+ChSq350.
+    assert_eq!(result.maximum_base_hundredths, 1340);
     let c = &result.alternatives[0];
     assert!(c
         .elements
@@ -287,7 +287,7 @@ fn semantic_exclusions_cover_compounds_rotations_and_named_spin_forms() {
         kind: Some(JumpKind::Axel),
         rotations: Some(1),
     })];
-    assert_eq!(proved(&r).maximum_base_hundredths, 1300);
+    assert_eq!(proved(&r).maximum_base_hundredths, 1350);
 }
 
 #[test]
