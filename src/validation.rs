@@ -89,6 +89,12 @@ pub(crate) fn adult_bindings(
             id: rule.id(category),
             mechanism: if rule == Rule::Scoring {
                 crate::RuleMechanism::AdultScoringV1
+            } else if rule == Rule::Eligibility && category != AdultCategory::Masters {
+                crate::RuleMechanism::AdultWaltzPlanV1(if category == AdultCategory::Bronze {
+                    crate::WaltzPolicy::Ignored
+                } else {
+                    crate::WaltzPolicy::CalledAsDowngradedAxel
+                })
             } else {
                 crate::RuleMechanism::JumpPlanV1
             },
@@ -263,6 +269,33 @@ impl<'a> Validator<'a> {
         });
     }
     fn jump(&mut self, jump: &ListedJump, index: usize, component: Option<usize>) {
+        if jump.kind == Some(JumpKind::Waltz) {
+            if jump.rotations != Some(1) {
+                self.add(
+                    FindingKind::Violation,
+                    Rule::Input,
+                    Some(index),
+                    component,
+                    "A Waltz intention uses its own single half-revolution class.",
+                );
+                return;
+            }
+            if self.profile.waltz_policy() == Some(crate::WaltzPolicy::Ignored) {
+                self.apply(Rule::Eligibility, Some(index), component);
+                return;
+            }
+            if self.profile.waltz_policy() == Some(crate::WaltzPolicy::CalledAsDowngradedAxel) {
+                self.jump(
+                    &ListedJump {
+                        kind: Some(JumpKind::Axel),
+                        rotations: Some(1),
+                    },
+                    index,
+                    component,
+                );
+                return;
+            }
+        }
         self.apply(Rule::Input, Some(index), component);
         self.apply(Rule::Eligibility, Some(index), component);
         self.apply(Rule::Repetition, Some(index), component);
@@ -512,14 +545,16 @@ impl<'a> Validator<'a> {
                         [
                             JumpPart::Jump(_),
                             JumpPart::Jump(ListedJump {
-                                kind: Some(JumpKind::Axel),
+                                kind: Some(JumpKind::Axel | JumpKind::Waltz),
                                 ..
                             })
                         ]
                     )
                 })
             } else {
-                later.iter().any(|j| j.kind == Some(JumpKind::Axel))
+                later
+                    .iter()
+                    .any(|j| matches!(j.kind, Some(JumpKind::Axel | JumpKind::Waltz)))
             };
             if !qualifying_axel {
                 self.add(
@@ -763,7 +798,10 @@ pub(crate) fn validate_elements_traced(
                 validator.axel_unknown = true;
             }
             PlannedElement::Jump(jump) => {
-                validator.jump_count += 1;
+                if !matches!(jump, JumpElement::Solo(j) if j.kind == Some(JumpKind::Waltz) && profile.waltz_policy() == Some(crate::WaltzPolicy::Ignored))
+                {
+                    validator.jump_count += 1;
+                }
                 match jump {
                     JumpElement::Solo(j) => validator.jump(j, index, None),
                     JumpElement::Combination(parts) => validator.compound(parts, index, false),

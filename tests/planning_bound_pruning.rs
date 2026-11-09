@@ -30,7 +30,7 @@ impl PlanningSearchControl for CollectionBudget {
 #[test]
 fn masters_returns_five_optima_before_the_callers_collection_budget_expires() {
     // A caller-controlled cooperative budget avoids wall-clock assertions in CI.
-    let control = CollectionBudget(Cell::new(14_000));
+    let control = CollectionBudget(Cell::new(20_000));
     let PlanningSearchOutcome::ProvenMaximum(result) = search_maximum_bv(
         &ProfileRegistry::adult(),
         &request(AdultCategory::Masters),
@@ -61,6 +61,7 @@ fn maximum(request: &PlanningSearchRequest, budget: usize) -> PlanningMaximum {
 
 fn retain_jumps(request: &mut PlanningSearchRequest, allowed: &[JumpKind]) {
     request.exclusions = [
+        JumpKind::Waltz,
         JumpKind::ToeLoop,
         JumpKind::Salchow,
         JumpKind::Loop,

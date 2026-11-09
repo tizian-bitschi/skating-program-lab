@@ -57,10 +57,13 @@ pub(crate) fn conflict(
         let compatible = match gap {
             [] => {
                 matches!(kind, JumpKind::ToeLoop | JumpKind::Loop)
-                    || (sequence && kind == JumpKind::Axel)
+                    || (sequence && matches!(kind, JumpKind::Axel | JumpKind::Waltz))
             }
             [JumpPart::Euler] => {
-                matches!(kind, JumpKind::Salchow | JumpKind::Flip | JumpKind::Axel)
+                matches!(
+                    kind,
+                    JumpKind::Salchow | JumpKind::Flip | JumpKind::Axel | JumpKind::Waltz
+                )
             }
             _ => true, // Malformed Euler placement belongs to structure validation.
         };

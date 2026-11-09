@@ -200,6 +200,9 @@ fn listed_compound_sum(
         .iter()
         .map(|part| match part {
             JumpPart::Euler => catalog_row(table, "Eu"),
+            JumpPart::Jump(jump) if jump.kind == Some(JumpKind::Waltz) => {
+                catalog_row(table, "1A<<")
+            }
             JumpPart::Jump(jump) => catalog_row(
                 table,
                 crate::plan_recognition::jump_component(jump)?.as_str(),
@@ -239,6 +242,23 @@ pub(crate) fn resolve_selection(
     let jump_evidence = ElementPlanEvidence::Jump {
         direct_transitions_assumed: false,
     };
+    if matches!(code, "W" | "W(1A<<)") && selection.check(code).is_ok() {
+        let row = catalog_row(table, "1A<<").expect("Waltz scoring row");
+        return (
+            PlannedElement::Jump(JumpElement::Solo(ListedJump {
+                kind: Some(JumpKind::Waltz),
+                rotations: Some(1),
+            })),
+            jump_evidence,
+            Some(BaseValue {
+                hundredths: 0,
+                table,
+                notation: code.into(),
+                source: row.source.reference("1A<<"),
+            }),
+            None,
+        );
+    }
     if let Some(row) = catalog_row(table, code) {
         return match selection.resolve_row(row) {
             Ok(resolved) => (
@@ -277,6 +297,9 @@ pub(crate) fn resolve_selection(
                 return JumpPart::Euler;
             }
             let jump = clean_jump(component);
+            if jump.is_some_and(|(kind, _)| kind == JumpKind::Waltz) && selection.policy_waltz() == Some(WaltzPolicy::Ignored) {
+                restriction.get_or_insert((ElementSelectionError::UnsupportedCode { source: table.source_reference("Ignored Waltz has no recognized compound-component identity; preparation requires separate transition information".into()) }, Some(index)));
+            }
             if let Err(error) = selection.check(component) {
                 restriction.get_or_insert((error, Some(index)));
             } else if jump.is_none() {

@@ -177,6 +177,7 @@ fn details(v: &ProgramVariant) -> RecognitionDetails {
     let (code, level) = match (&v.element, &v.evidence) {
         (PlannedElement::Jump(JumpElement::Solo(j)), _) => {
             let suffix = match j.kind.unwrap() {
+                JumpKind::Waltz => unreachable!("clean listed-jump benchmark fixture"),
                 JumpKind::Axel => "A",
                 JumpKind::ToeLoop => "T",
                 JumpKind::Salchow => "S",

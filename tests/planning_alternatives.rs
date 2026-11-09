@@ -22,6 +22,7 @@ fn restricted(allowed: &[JumpKind]) -> PlanningSearchRequest {
             })
             .collect(),
         exclusions: [
+            JumpKind::Waltz,
             JumpKind::ToeLoop,
             JumpKind::Salchow,
             JumpKind::Loop,

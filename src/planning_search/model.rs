@@ -274,7 +274,8 @@ pub(super) fn search(
     let senior = match &profile.binding(ProfileRule::Repetition).mechanism {
         RuleMechanism::JumpPlanV1 => false,
         RuleMechanism::SeniorJumpPlanV1 => true,
-        RuleMechanism::AdultScoringV1
+        RuleMechanism::AdultWaltzPlanV1(_)
+        | RuleMechanism::AdultScoringV1
         | RuleMechanism::SeniorScoringV1
         | RuleMechanism::Unsupported(_) => {
             return Err(PlanningSearchError::UnsupportedCoverage {
@@ -589,6 +590,7 @@ pub(super) fn search(
                     a.spin.is_some()
                 }
             })
+            .filter(|(a, _)| a.value != 0)
             .map(|(a, v)| v.scaled(a.value))
             .collect();
         if jumps {
@@ -625,6 +627,7 @@ pub(super) fn search(
         .iter()
         .zip(&counts)
         .filter(|(a, _)| a.jumps.is_empty() && a.spin.is_none())
+        .filter(|(a, _)| a.value != 0)
         .map(|(a, v)| v.scaled(a.value))
         .collect();
     terms.extend([
