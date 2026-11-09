@@ -1,3 +1,4 @@
 # Retain the exact measured manifests, lockfile and native logs on every platform.
 benchmarks/planning-readiness/observations-2026-11-08/* -text
 benchmarks/planning-readiness/observations-issue-132/** -text whitespace=cr-at-eol
+benchmarks/planning-sessions/observations-issue-140-*/** -text whitespace=cr-at-eol

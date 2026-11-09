@@ -1,2 +1,2 @@
 REQUEST	PlanningSearchRequest { personal_limits: PersonalLimits { jump_rotations: [], spin_levels: [] }, rotation_preference: SameDirection, profile: ProfileId { name: "isu-senior-2026-27-women-free", version: "2026-06-12" }, scoring_table: Isu2786June2_2026, required: [], exclusions: [JumpKind(ToeLoop)] }
-METRIC	Women,excluded,,ProvenMaximum,13310,5,LimitReached,231256,12706,248628,250387,68645,319033,,true
+METRIC	Women,excluded,,ProvenMaximum,13310,5,LimitReached,236585,13063,254714,256723,69417,326141,,true

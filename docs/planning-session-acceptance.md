@@ -53,7 +53,8 @@ reproduction commands and observable boundaries. On 2026-11-09, native-host-A
 (Windows 10.0.26200, Intel64 Family 6 Model 183 Stepping 1, 32 logical processors),
 rustc 1.99.1 / Cargo 1.99.1, x86_64-pc-windows-msvc, Pumpkin 0.5.0,
 ran three fresh serial Release processes per session mode after all compiler/test
-jobs finished. Source revision was `d747ed3efa3be4f5c590fc8d8a8c78118c7ccd0e`.
+jobs finished. Source revision was `4d79c128d04a2214154bf0afb2bdd2f1640da95d`,
+including the reviewed solver-pause correction.
 The [environment record](../benchmarks/planning-sessions/observations-issue-140-session/environment.txt)
 contains binary and lock hashes. No warmup was excluded.
 
@@ -66,11 +67,11 @@ the remaining set without duplicates.
 | Median of three processes | Uninterrupted | Paused/resumed |
 | --- | ---: | ---: |
 | Session construction | 2 microseconds | 2 microseconds |
-| Maximum proof including initial assessment | 8.551ms | 8.472ms |
-| First five deliveries | 1.641ms | 1.505ms |
-| Active collection through exhaustion (16 deliveries) | 5.291ms | 4.946ms |
-| First resumed batch (three deliveries) | - | 0.826ms |
-| Process lifetime peak resident memory | 6,721,536 bytes | 6,729,728 bytes |
+| Maximum proof including initial assessment | 8.929ms | 8.474ms |
+| First five deliveries | 1.580ms | 1.565ms |
+| Active collection through exhaustion (16 deliveries) | 5.148ms | 5.343ms |
+| First resumed batch (three deliveries) | - | 0.897ms |
+| Process lifetime peak resident memory | 6,725,632 bytes | 6,742,016 bytes |
 
 The pause call measured below 1 microsecond at integer-microsecond resolution
 in each process; this is not a zero-cost or response-time guarantee. Active
@@ -85,7 +86,7 @@ is reported separately.
 
 The same host and toolchain ran 144 fresh serial Release processes against parent
 baseline `c295da41527bb2fe13353f4138865e56f4e9b143` and integrated implementation
-`913ba5b4938eefd3e1af2a44682b2facf47cb342`: six profiles, four scenarios
+`4d79c128d04a2214154bf0afb2bdd2f1640da95d`: six profiles, four scenarios
 (empty, required, excluded, impossible), three runs and two revisions. All 144
 passed. The runner compared each full request manifest byte-for-byte across both
 revisions and all repetitions. The summary verifier checks 144 unique rows,
@@ -96,12 +97,17 @@ provenance, machine, full toolchain, requests and stdout/stderr are retained wit
 
 The [median summary](../benchmarks/planning-sessions/observations-issue-140-legacy/summary.csv)
 uses three processes per request and revision. The largest observed proof
-regression was Senior Men required: 332.797 to 360.266ms (+8.3%, 27.469ms).
-The largest collection regression was Senior Men excluded: 68.110 to 81.274ms
-(+19.3%, 13.164ms); its total rose from 324.199 to 355.608ms (+9.7%). These
+regression was Masters excluded: 52.372 to 53.827ms (+2.8%, 1.455ms).
+The largest collection regression was also Masters excluded: 10.613 to 11.519ms
+(+8.5%, 0.906ms); its total rose from 62.786 to 65.059ms (+3.6%). These
 observations do not identify a causal change or establish a latency threshold.
-No additional repeat set or excluded warmup was used. Background host load and
-thermal conditions were uncontrolled.
+No warmup was excluded. Background host load and thermal conditions were
+uncontrolled. All measurements were refreshed after the solver-pause production
+fix. The earlier pre-fix batch at `913ba5b` observed maxima of +8.3% proof time
+(Senior Men required) and +19.3% collection time (Senior Men excluded). Its raw
+data and report remain in commit `fa91577`; it was not discarded as a warmup.
+The batches use different implementation revisions and do not establish a causal
+performance change.
 
 Bronze required changed from five nominal alternatives in the baseline to four
 distinct exhausted compositions after ignored-movement normalization. Collection
@@ -112,16 +118,16 @@ are in the [measurement protocol](../benchmarks/planning-sessions/README.md).
 
 ## Prescribed checks
 
-These commands passed after merging #142's retained objective check:
+These commands passed after the reviewed solver-pause correction `428395e`:
 
 | Check | Result |
 | --- | --- |
 | `cargo build --offline` | Pass |
 | `cargo fmt --check` | Pass |
-| `cargo clippy --offline --all-targets -- -D warnings` | Pass; final rerun emitted environment-only incremental-cache hardlink/copy warnings, no lint errors |
-| `cargo test --offline` | 451 passed, 0 failed |
+| `cargo clippy --offline --all-targets -- -D warnings` | Pass |
+| `cargo test --offline` | Complete default-feature suite passed, including the new checkpoint sweep; 0 failed |
 | `cargo test --offline --no-default-features` | 274 passed, 0 failed |
-| Focused backend/registered/alternative/rotation/step tests | 32 passed, 0 failed |
+| Focused public alternative/session tests | 16 passed, 0 failed; earlier cross-workflow focused run: 32 passed |
 | `cargo build --offline --release --example planning_sessions` | Pass |
 | Six fresh-process session examples | Pass; all 16 identities and independent manual checks in every process |
 | `git diff --check` | Pass |
@@ -130,4 +136,7 @@ The parent integration additionally checked solver-comparison formatting,
 Clippy, its two tests and run, plus the Senior benchmark-runner test. Its initial
 Windows native archive overwrite failed under sandbox restrictions and succeeded
 outside the sandbox. No public signatures, CI, profile policy or version data
-changed in #143. No additional production gap was found in these acceptance checks.
+changed in #143. The subsequent independent review found missing in-solver pause
+coverage. The added test exposed a real root-timeout resume panic and passed
+after `428395e` corrected it. Both review axes then reported zero open findings;
+see the [review record](planning-session-review.md).

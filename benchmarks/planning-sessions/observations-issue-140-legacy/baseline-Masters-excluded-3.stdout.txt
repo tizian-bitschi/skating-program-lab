@@ -1,2 +1,2 @@
 REQUEST	PlanningSearchRequest { personal_limits: PersonalLimits { jump_rotations: [], spin_levels: [] }, rotation_preference: SameDirection, profile: ProfileId { name: "isu-adult-2026-27-masters", version: "2026-07-16" }, scoring_table: Isu2786June2_2026, required: [], exclusions: [JumpKind(ToeLoop)] }
-METRIC	Masters,excluded,,ProvenMaximum,3340,5,LimitReached,47436,1809,50348,51024,10814,61838,,true
+METRIC	Masters,excluded,,ProvenMaximum,3340,5,LimitReached,48926,1770,51856,52540,10613,63153,,true

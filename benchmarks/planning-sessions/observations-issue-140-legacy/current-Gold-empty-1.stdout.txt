@@ -1,2 +1,2 @@
 REQUEST	PlanningSearchRequest { personal_limits: PersonalLimits { jump_rotations: [], spin_levels: [] }, rotation_preference: SameDirection, profile: ProfileId { name: "isu-adult-2026-27-gold", version: "2026-07-16" }, scoring_table: Isu2786June2_2026, required: [], exclusions: [] }
-METRIC	Gold,empty,,ProvenMaximum,2420,5,LimitReached,32580,1680,35542,36116,8846,44963,,true
+METRIC	Gold,empty,,ProvenMaximum,2420,5,LimitReached,30174,1648,33038,33595,8836,42432,,true

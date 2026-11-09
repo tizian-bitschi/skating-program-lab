@@ -47,14 +47,14 @@ UI, browser or WASM readiness. Host load and thermal conditions remain uncontrol
 
 Build `planning_readiness` in separate clean checkouts at baseline
 `c295da41527bb2fe13353f4138865e56f4e9b143` and current
-`913ba5b4938eefd3e1af2a44682b2facf47cb342` with
+`4d79c128d04a2214154bf0afb2bdd2f1640da95d` with
 `cargo build --offline --release --example planning_readiness`. Reuse the same
 retained generated `Cargo.lock` for both builds; the observation directory contains
 both copies and their provenance/hash. Preserve the two binaries separately.
-The recorded run used the following command from the #143 worktree:
+The final recorded run used the following command from the integration worktree:
 
 ```powershell
-pwsh -NoProfile -File benchmarks/planning-sessions/run-legacy-comparison.ps1 -BaselineBinary ../issue-140-evidence/baseline-c295da4.exe -BaselineRevision c295da41527bb2fe13353f4138865e56f4e9b143 -CurrentBinary ../issue-140-evidence/current-913ba5b.exe -CurrentRevision 913ba5b4938eefd3e1af2a44682b2facf47cb342 -OutputDirectory ../issue-140-evidence/legacy-measurements -Runs 3 -WatchdogSeconds 120
+pwsh -NoProfile -File benchmarks/planning-sessions/run-legacy-comparison.ps1 -BaselineBinary ../issue-140-evidence/baseline-c295da4.exe -BaselineRevision c295da41527bb2fe13353f4138865e56f4e9b143 -CurrentBinary target/release/examples/planning_readiness.exe -CurrentRevision 4d79c128d04a2214154bf0afb2bdd2f1640da95d -OutputDirectory ../issue-140-evidence/legacy-final -Runs 3 -WatchdogSeconds 120
 python benchmarks/planning-sessions/summarize-legacy.py benchmarks/planning-sessions/observations-issue-140-legacy
 ```
 
@@ -68,3 +68,4 @@ for preflight infeasibility stay empty. The Bronze required case intentionally
 changes from five nominal legacy alternatives to four distinct exhausted
 compositions; collection timings there cover different delivered amounts.
 Retained raw outputs and observations permit independent recomputation.
+Git attributes preserve their measured bytes across Windows and Unix checkouts.
