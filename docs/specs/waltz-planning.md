@@ -47,8 +47,9 @@ exclusions distinguish W from clean 1A and leave other compounds available.
 
 Ignored Bronze W has unbounded optional multiplicity. Search proves the BV
 objective without this neutral movement, restores every required occurrence
-with its original input identity, and reassesses five compositions differing
-in optional W multiplicity. Its alternatives are `LimitReached`, never
+with its original input identity, and reassesses every already collected composition. If fewer than five remain,
+it adds compositions differing in optional W multiplicity until five are available
+or collection is cancelled. Cancellation preserves every confirmed composition. Its alternatives are `LimitReached`, never
 `Exhausted`. Excluding W restores finite-domain alternative exhaustion. This
 also holds when the proved maximum is zero. Cancellation retains separate
 maximum-proof and alternative-collection semantics.

@@ -383,3 +383,63 @@ fn cancellation_after_collecting_one_more_maximum_preserves_both() {
         PlanningAlternativeStatus::Cancelled
     );
 }
+#[test]
+fn cancellation_with_ignored_waltzes_preserves_all_collected_maxima_and_required_ids() {
+    let mut request = restricted(&[JumpKind::Flip, JumpKind::Loop, JumpKind::Waltz]);
+    for id in ["first-waltz", "second-waltz"] {
+        request.required.push(RequiredPlanningElement {
+            id: id.into(),
+            element: AssumedRecognition::new("W"),
+        });
+    }
+    let result = proved(
+        &request,
+        &CancelSecondCollectionReconstruction {
+            last: std::cell::Cell::new(PlanningSearchPhase::Domain),
+            collections: std::cell::Cell::new(0),
+        },
+    );
+    assert_eq!(result.maximum_base_hundredths, 1030);
+    assert_eq!(result.alternatives.len(), 2);
+    assert_eq!(jump_codes(&result).len(), 2);
+    assert_eq!(
+        result.alternative_status,
+        PlanningAlternativeStatus::Cancelled
+    );
+    for candidate in result.alternatives {
+        assert_eq!(
+            candidate.elements.iter().filter(|e| e.code == "W").count(),
+            2
+        );
+        for (input_index, required) in request.required.iter().enumerate() {
+            let index = candidate
+                .provenance
+                .iter()
+                .position(|p| {
+                    *p == PlanningProvenance::Required {
+                        id: required.id.clone(),
+                        input_index,
+                    }
+                })
+                .unwrap();
+            assert_eq!(candidate.elements[index], required.element);
+        }
+        let assessment = assess_manual_bv(
+            &ProfileRegistry::adult(),
+            &ManualBvRequest {
+                personal_limits: request.personal_limits.clone(),
+                rotation_preference: request.rotation_preference,
+                profile: request.profile.clone(),
+                scoring_table: request.scoring_table,
+                submission: SubmissionState::Complete,
+                elements: candidate.elements,
+            },
+        )
+        .unwrap();
+        assert_eq!(candidate.assessment, assessment);
+        assert_eq!(
+            assessment.planning_compliance(),
+            Ok(PlanningCompliance::Compliant)
+        );
+    }
+}
