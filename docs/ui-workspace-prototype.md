@@ -25,7 +25,7 @@ Open `http://127.0.0.1:8766/ui-workspace.prototype.html?variant=A`. No install, 
 - C: repertoire-first wide family matrix above the program and suggestions.
 - C2: a user-requested subvariant of C with vertical, discrete mixer faders. Open `?variant=C2` or use the existing comparison switcher; A/B/C remain available.
 
-A shared comparison switcher changes `?variant=A|B|C|C2`; it sits at the bottom in A/B/C and in the header of desktop C2. Left/right keys switch when not editing or operating a control. Variants share in-memory request state. Language can switch among German, English and Russian without clearing the plan. Display names/translations are prototype copy awaiting native-domain review.
+A shared comparison switcher changes `?variant=A|B|C|C2`; it is part of the unified navbar. Left/right keys switch when not editing or operating a control. Variants share in-memory request state. Language can switch among German, English and Russian without clearing the plan. Display names/translations are prototype copy awaiting native-domain review.
 
 ## Interaction scope
 
@@ -111,3 +111,13 @@ The prototype uses a curated sample repertoire, not a newly implemented domain r
 Observed Chrome checks: Lutz → Toeloop excluded only `1Lz+1T` while all jump-kind permissions remained true; Axel → Axel in sequence mode additionally excluded `1A+1A+SEQ`; allowing the Lutz connection again preserved the sequence exclusion. The optional third-jump path remained visible after excluding the exact two-jump whole. A 390px viewport showed no horizontal dialog overflow and no text-entry fields. Keyboard focus moves to the next choices or the whole-connection action. Syntax and whitespace checks pass; no physical-phone, participant or full-rule coverage claim is made.
 
 [Builder desktop screenshot](prototype-ui-review/connections/builder-desktop.jpg) · [Builder mobile screenshot](prototype-ui-review/connections/builder-mobile.jpg)
+
+## Unified navbar revision
+
+The user explicitly requested removal of the persistent prototype/sample/no-calculation banner and the redundant “Mein Programm” page heading. Category, the displayed season, language and the comparison switcher now live in one navbar, for all prototype variants. There is no separate page-heading/category row. C2's workspace starts at y=62 rather than y=142, reclaiming 80px for editing/results. The navbar wraps within the same header on narrow screens.
+
+This user direction supersedes the earlier review's recommendation to retain that banner. It does not turn sample calculations into real optimization. Prototype status is recorded in artifact metadata, the browser title and existing per-feature sample labels; no replacement banner was added.
+
+Observed Chrome checks: one header, no demo-strip/pagehead nodes, and category/language/switcher descendants inside that header. At 1280×720 the document dimensions equal the viewport; selecting Masters and switching to Russian preserves category state and still fits. At 390px the page has no horizontal overflow. Syntax and whitespace checks pass. No backend integration or physical-device test was added.
+
+[Unified-navbar screenshot](prototype-ui-review/navbar/c2-single-navbar.jpg)
