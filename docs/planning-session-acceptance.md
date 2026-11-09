@@ -58,6 +58,11 @@ including the reviewed solver-pause correction.
 The [environment record](../benchmarks/planning-sessions/observations-issue-140-session/environment.txt)
 contains binary and lock hashes. No warmup was excluded.
 
+At the requesting user's direction, the native host is published under the alias
+`native-host-A`. Unpublished commits and their revision references were rewritten
+only to anonymize this metadata. Compiled Rust sources, tests, examples, binary
+hashes, request manifests and measured values are unchanged.
+
 Every process proved 1070, collected exactly 16 distinct compositions in five
 batches and proved exhaustion. Complete identity hashes match across all six
 processes and both modes. Same-mode request manifests match byte-for-byte.
