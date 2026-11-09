@@ -1,6 +1,6 @@
 # Native service feasibility — planning experiment
 
-**Throwaway, loopback-only technical prototype. Not production implementation, not an approved API, no production deployment or PR.** The selected C2 UI and Rust domain library are unchanged. This experiment resolves the native-service evidence question in [Demonstrate browser-worker and native session feasibility](https://github.com/tizian-bitschi/skating-program-lab/issues/153). The user favored a service and explicitly reaffirmed the planning-only boundary; no WASM comparison was attempted.
+**Throwaway, loopback-only technical prototype. Not production implementation, not an approved API, no production deployment or PR.** The selected C2 UI and Rust domain library are unchanged. This experiment resolves the native-service evidence question in [Demonstrate native service integration and search-session control](https://github.com/tizian-bitschi/skating-program-lab/issues/153). The user favored a service and explicitly reaffirmed the planning-only boundary; no WASM comparison was attempted.
 
 ## Finding
 
