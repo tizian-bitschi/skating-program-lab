@@ -1,25 +1,25 @@
-# UI acceptance criteria proposal
+# Accepted UI acceptance criteria
 
-**DRAFT for live user review. Planning only. No implementation, new prototype, performance run or participant test was performed by this document.**
+**Accepted for planning on 2026-11-09, with the user’s explicit Q1/Q4 simplifications. No implementation, new prototype or acceptance run was performed by this document.**
 
 Decision: [Set measurable UI performance and usability acceptance criteria](https://github.com/tizian-bitschi/skating-program-lab/issues/152). Scope: the selected C2 UI, [accepted service contract](service-contract.md), [local workspace/recovery policy](https://github.com/tizian-bitschi/skating-program-lab/issues/149#issuecomment-6750385948), and [language contract](language-contract.md).
 
 The [technical source notes](acceptance-technical-notes.md) distinguish standards, external guidance and the proposed product targets below. The old native service and prototype observations remain feasibility evidence, not acceptance of the integrated application.
 
-## 1. Proposed supported environments (Q1)
+## 1. Browser and viewport scope
 
 - Desktop: current stable Chrome, Edge and Firefox at acceptance time. Record actual browser/OS versions.
-- Phone: current Android Chrome on one real middle-range Android phone, and Safari on one real iPhone. Record actual models, OS/browser versions and viewports. Browser emulation supplements, not replaces, these checks.
+- Phone targets: Android Chrome and iPhone Safari layouts. Browser-engine, viewport and touch emulation are sufficient for planned acceptance. Real smartphone testing is optional, not a required gate. Record the actual browser/engine and emulation profile; WebKit emulation is not a claim that real iPhone Safari was tested.
 - Default-zoom desktop at or above 1280×720 CSS pixels: category/language, complete repertoire controls, program, primary actions and result area fit without document scrolling. Program/result content may scroll inside its panel when necessary.
 - Normal phone layout from 360 CSS pixels wide: vertical scrolling is allowed, horizontal page scrolling and clipped essential controls are not.
 - Accessible reflow/zoom remains required at an equivalent 320 CSS-pixel width. It may introduce vertical document scrolling instead of enforcing the desktop fixed-height console. Test 200% text/zoom use and 320px reflow; preserve information and functionality.
 - All three language layouts receive automated/screenshot checks, including long German names, Cyrillic, state/error messages and language switching.
 
-The user supplies or organizes access to real reference devices when not available in the development environment. Missing environments are reported as pending, not silently counted as passed. Other browsers/older versions are not presumed certified by these samples.
+Record actual tested browsers and emulated viewports. Optional real-device feedback can supplement these checks, but its absence does not block acceptance. Do not describe emulation as a physical-device result or infer certification of other browsers/older versions.
 
-## 2. Proposed timing targets (Q2)
+## 2. Accepted timing targets
 
-Use the built production-mode application and a running reference service, not the development server or the old prototype. Record service host characteristics, build, browser/device, cache state, network and workloads. Proposed repeatable network profile: 4 Mbit/s down, 1 Mbit/s up and 100ms round-trip latency. These are test conditions, not a claim about a mobile network generation.
+Use the built production-mode application and a running reference service, not the development server or the old prototype. Record service host characteristics, build, browser/engine, viewport/emulation, reference host, any CPU throttling, cache state, network and workloads. Repeatable network profile: 4 Mbit/s down, 1 Mbit/s up and 100ms round-trip latency. These are test conditions, not a claim about a mobile network generation.
 
 | Target | Start and end |
 | --- | --- |
@@ -29,13 +29,13 @@ Use the built production-mode application and a running reference service, not t
 | New result batch usable within 200ms of receipt | Completed response received to appended, selectable result rows and updated count. Measure separately from result generation/network transfer. |
 | State update within 2 seconds of service acknowledgement | A confirmed service transition becomes visible under the normal online polling profile. This is not a core pause/cancel interruption guarantee. |
 
-Run three controlled cold-start repetitions per reference device class and repeated representative interactions. Targets must pass in those recorded valid runs; preserve failed/outlier observations and rerun with an explanation after fixing or identifying an invalid test environment. Do not call a three-run statistic field p75, INP or population coverage.
+Run three controlled cold-start repetitions per reference browser configuration and repeated representative interactions. Targets must pass in those recorded valid runs; preserve failed/outlier observations and rerun with an explanation after fixing or identifying an invalid test environment. Do not call a three-run statistic field p75, INP or population coverage.
 
 Capture maximum-proof duration, first confirmed result, collection time, pause/cancel confirmation time and exhaustion separately for the six profiles and bounded fixtures. No arbitrary total optimum/enumeration deadline or total result cap is added here. Do not claim that immediate feedback proves quick optimization, or turn a test timeout into infeasibility, optimality or exhaustion. A bounded control test that hangs is a failure to investigate, not a successful cancellation.
 
 LCP/INP/CLS can be recorded as diagnostics using their proper definitions; these application targets are not identical to Core Web Vitals. No field-performance conformance claim follows from the lab runs.
 
-## 3. Functional and practical accessibility gates (Q3)
+## 3. Functional and practical accessibility gates
 
 Test behavior at the browser and public HTTP contract boundaries, reusing independent source-derived library/finite-oracle fixtures where appropriate. Internal component layout, helper calls and private solver branching are not acceptance expectations.
 
@@ -71,9 +71,9 @@ Report retained data and memory growth versus result count, and after repeated d
 
 These are scoped practical gates informed by WCAG 2.2 A/AA. They do not on their own authorize a blanket AA conformance claim; that requires a complete applicable-page/process evaluation.
 
-## 4. Proposed small real-user check (Q4)
+## 4. Perspective-based understandability review
 
-The user performs or organizes a short evaluation with at least one skater aged 12–14 (as close to the minimum age as practical) and one adult skater who did not help develop the interface. Basic skating knowledge is appropriate; memorized ISU codes or knowledge of this UI is not assumed. The agent prepares the tasks and applies identified corrections.
+The user explicitly replaced the planned participant evaluation with perspective-based review. The agent and user walk through the interface from the viewpoint of a twelve-year-old skater and an adult skater. Basic skating knowledge is reasonable; familiarity with this UI or memorized ISU codes must not be assumed. No recruitment, scheduled interviews or minimum number of real participants is required.
 
 Use the same five tasks, expressed as goals rather than click instructions:
 
@@ -83,23 +83,25 @@ Use the same five tasks, expressed as goals rather than click instructions:
 4. Enter/change a manual plan, recognize a concrete category finding, and correct the responsible input. Distinguish rule findings from personal constraints.
 5. Pause/continue collection, adopt a program, reload and recognize the restored workspace/new-search behavior. Explain the difference between a proved maximum and all alternatives being found.
 
-Pass this small check only when both observed participants finish the core tasks without step-by-step coaching and no critical misunderstanding remains. Self-correction is allowed. Record assistance, wrong turns and unresolved barriers; retest affected tasks after a correction. Do not treat successful reading of an explanation supplied by the evaluator as self-explanatory UI.
+Use these tasks as a structured heuristic walkthrough. Identify unclear actions, redundant text, missing names, misleading states and difficult recovery; correct blocking issues and repeat the affected walkthrough. Do not add long explanations merely to compensate for ambiguous controls.
 
-Record device/language coverage, and try the mixer, builder and key recovery controls on a phone. The domain-language review of all three catalogs remains the separately agreed responsibility. Two participants are formative/task-specific evidence, not population-wide proof across ages, languages or devices. Do not generalize German-only task observations into Russian/English comprehension evidence.
+Record the perspectives/scenarios considered, observations and unresolved assumptions. This is heuristic review, not an observed child/adult test: do not invent participant actions, quotations or completion rates, and do not claim that actual twelve-year-olds have been tested. The separately agreed language workflow still applies.
 
-Use anonymous participant references/age bands in reports. No participant names or recordings are needed for this gate.
+The user may occasionally ask other people for feedback and feed useful findings into corrections. This is optional and informal; it is not a separately scheduled work package or release gate.
 
 ## 5. Acceptance outcome
 
-Keep separate statuses for technical behavior, performance/accessibility checks, language review and observed usability. Overall final acceptance requires the agreed critical checks to pass. Missing real-device/participant/language evidence is **pending/unverified**, not passed. Engineering work can be ready for owner validation without being falsely described as fully accepted.
+Keep separate statuses for technical behavior, performance/accessibility checks, language review and heuristic understandability review. Overall acceptance uses the agreed browser/emulation and perspective-based methods. Physical-device and recruited-participant evidence are optional; their absence is not a blocker. Never relabel a heuristic review as empirical user evidence or an emulated viewport as a physical device. Required checks that were not performed remain pending rather than passed.
 
-Wrong score/constraints, false positive compliance or optimum/exhaustion claims, lost saved plan, broken access isolation, unusable essential controls and unresolved critical participant confusion block final acceptance. Native feasibility timings, a clean automated scan or attractive prototype screenshots do not replace these checks.
+Wrong score/constraints, false positive compliance or optimum/exhaustion claims, lost saved plan, broken access isolation, unusable essential controls and unresolved blocking ambiguity identified in the perspective walkthrough block final acceptance. Native feasibility timings, a clean automated scan or attractive prototype screenshots do not replace the required checks.
 
-## 6. Review frontier
+## 6. Acceptance record
 
-- **Q1:** proposed browser/device/reflow scope and real reference-device checks?
-- **Q2:** 3s usable start, 200ms local feedback/result presentation, 1s ordinary assessment, with the defined reference profile and separate solver timings?
-- **Q3:** functional acceptance at UI/HTTP boundaries plus the listed practical keyboard/touch/focus/contrast/reflow/screen-reader checks?
-- **Q4:** small two-age-group/five-task evaluation organized by the user, with actual evidence and missing coverage reported honestly?
+The user accepted Q2/Q3 unchanged and Q1/Q4 with explicit simplifications on 2026-11-09:
 
-All four are recommendations awaiting live confirmation. Nothing in this draft implements or executes the gates.
+1. Browser/viewport checks suffice; real smartphones are not mandatory.
+2. The 3s usable-start, 200ms feedback/presentation and 1s ordinary-assessment targets and separate solver-time measurement are accepted.
+3. Functional testing at browser/HTTP boundaries and the practical accessibility checklist are accepted. These are also the agreed high-level test seams for specification/implementation planning.
+4. Use child/adult perspective-taking; no explicit participant-testing plan is required. The user will seek occasional informal feedback at their discretion.
+
+No additional unticketed planning decision is identified by these choices. These criteria define future acceptance; they do not assert that the not-yet-implemented product has passed.

@@ -19,3 +19,8 @@ Usable-start is not LCP. An individual feedback interval is not the page's INP, 
 ## Participant evidence
 
 A proposed two-participant evaluation involving a person aged twelve or older and an adult can reveal task-specific problems and comprehension failures. It cannot establish usability across the age range, languages, devices, experience levels or disabilities. Report observed outcomes with denominators, participant characteristics, tasks and moderator assistance. This is an application of WAI's explicit caution against generalizing from a couple of participants; WAI also requires combining user involvement with standards evaluation when assessing accessibility. No universal success rate or sufficient participant count follows from this guidance. [WAI user evaluation and reporting guidance](https://www.w3.org/WAI/test-evaluate/involving-users/)
+
+
+## Subsequent user scope decision
+
+The user later made real-smartphone tests and planned participant studies optional, choosing browser/viewport checks and perspective-based walkthroughs for acceptance. The accepted criteria govern required gates. The source cautions above still apply: emulation and heuristic review must not be presented as physical-device or empirical participant evidence.
