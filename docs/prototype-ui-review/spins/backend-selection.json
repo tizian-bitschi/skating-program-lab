@@ -1,0 +1,76 @@
+{
+  "bronze": [
+    "CCSp",
+    "CLSp",
+    "CSSp",
+    "CSp",
+    "CUSp",
+    "LSp",
+    "SSp",
+    "USp"
+  ],
+  "silver": [
+    "CCSp",
+    "CCoSp",
+    "CLSp",
+    "CSSp",
+    "CSp",
+    "CUSp",
+    "CoSp",
+    "FCCSp",
+    "FCCoSp",
+    "FCLSp",
+    "FCSSp",
+    "FCSp",
+    "FCUSp",
+    "FCoSp",
+    "FLSp",
+    "FSSp",
+    "FUSp",
+    "LSp",
+    "SSp",
+    "USp"
+  ],
+  "gold": [
+    "CCoSp",
+    "FCCSp",
+    "FCCoSp",
+    "FCLSp",
+    "FCSSp",
+    "FCSp",
+    "FCUSp",
+    "FCoSp",
+    "FLSp",
+    "FSSp",
+    "FUSp"
+  ],
+  "masters": [
+    "CCoSp",
+    "CoSp",
+    "FCSp",
+    "FCoSp",
+    "FLSp",
+    "FSSp",
+    "FUSp"
+  ],
+  "women": [
+    "CCoSp",
+    "CoSp",
+    "FCCoSp",
+    "FCSp",
+    "FCoSp",
+    "FLSp",
+    "FSSp",
+    "FUSp"
+  ],
+  "men": [
+    "CCoSp",
+    "CoSp",
+    "FCCoSp",
+    "FCSp",
+    "FCoSp",
+    "FLSp",
+    "FSSp",
+    "FUSp"
+  ]
+}
