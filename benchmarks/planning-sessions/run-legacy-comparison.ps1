@@ -15,7 +15,7 @@ $output = (Resolve-Path -LiteralPath $OutputDirectory).Path
 @("baseline_revision=$BaselineRevision", "current_revision=$CurrentRevision", "runs=$Runs", "external_watchdog_seconds=$WatchdogSeconds",
     "baseline_binary_sha256=$((Get-FileHash -LiteralPath $binaries.baseline -Algorithm SHA256).Hash)",
     "current_binary_sha256=$((Get-FileHash -LiteralPath $binaries.current -Algorithm SHA256).Hash)",
-    "os=$([Environment]::OSVersion.VersionString)", "processor=$([Environment]::GetEnvironmentVariable('PROCESSOR_IDENTIFIER'))", "logical_processors=$([Environment]::ProcessorCount)",
+    "machine=$env:COMPUTERNAME", "os=$([Environment]::OSVersion.VersionString)", "processor=$([Environment]::GetEnvironmentVariable('PROCESSOR_IDENTIFIER'))", "logical_processors=$([Environment]::ProcessorCount)",
     (rustc -Vv), (cargo -V),
     'Native Release, Pumpkin0.5.0; binary source revisions supplied explicitly; build logs and Cargo.lock retained alongside evidence.',
     'Serial fresh process per row; no warmup discarded; compilation and ACK excluded; host background load and thermal state uncontrolled.',
