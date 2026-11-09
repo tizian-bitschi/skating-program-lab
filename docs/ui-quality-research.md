@@ -77,4 +77,3 @@ Record task outcome (independent/assisted/failed), recoverable and critical erro
 ## Decisions still owned by humans
 
 Select supported devices/browsers, formal WCAG conformance scope/level, measurable UI budgets, batch presentation policy and memory budgets after baseline evidence. Agree recruitment coverage, participant counts, minor research arrangements, translation ownership, domain terminology and task-success criteria. Decide how long sessions remain viable on mobile suspension and how uncapped retained results are managed without silently capping collection. There is no selected maximum-proof or exhaustion deadline in this report. No performance, accessibility or user-test results are claimed.
-
