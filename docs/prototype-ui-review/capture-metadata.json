@@ -1,0 +1,76 @@
+{
+  "prototype_commit": "ccb317da1b209f33249bc73c217eca6894337ddb",
+  "date": "2026-11-09",
+  "browser": "Connected desktop Chrome; mobile captures use responsive viewport overrides, not physical phones",
+  "locale": "de",
+  "source_changed": false,
+  "comparison_note": "Use b-mobile-top.jpg for variant B initial screen. b-mobile.jpg is a scrolled supplementary view. Conflict and result captures are separate states.",
+  "screenshots": [
+    {
+      "file": "a-desktop.jpg",
+      "width": 1920,
+      "height": 935,
+      "bytes": 121169
+    },
+    {
+      "file": "a-mobile-conflict.jpg",
+      "width": 375,
+      "height": 812,
+      "bytes": 38339
+    },
+    {
+      "file": "a-mobile-filter.jpg",
+      "width": 375,
+      "height": 812,
+      "bytes": 36947
+    },
+    {
+      "file": "a-mobile.jpg",
+      "width": 375,
+      "height": 812,
+      "bytes": 36079
+    },
+    {
+      "file": "b-desktop.jpg",
+      "width": 1905,
+      "height": 928,
+      "bytes": 83920
+    },
+    {
+      "file": "b-mobile-results-lower.jpg",
+      "width": 375,
+      "height": 812,
+      "bytes": 33566
+    },
+    {
+      "file": "b-mobile-results.jpg",
+      "width": 375,
+      "height": 812,
+      "bytes": 40034
+    },
+    {
+      "file": "b-mobile-top.jpg",
+      "width": 375,
+      "height": 812,
+      "bytes": 35288
+    },
+    {
+      "file": "b-mobile.jpg",
+      "width": 375,
+      "height": 812,
+      "bytes": 38009
+    },
+    {
+      "file": "c-desktop.jpg",
+      "width": 1905,
+      "height": 928,
+      "bytes": 92609
+    },
+    {
+      "file": "c-mobile.jpg",
+      "width": 375,
+      "height": 812,
+      "bytes": 41428
+    }
+  ]
+}
