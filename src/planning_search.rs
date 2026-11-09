@@ -2,6 +2,8 @@
 use crate::*;
 mod model;
 mod senior_bound;
+mod session;
+pub use session::*;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RequiredPlanningElement {
@@ -101,6 +103,7 @@ pub enum PlanningSearchOutcome {
     ProvenMaximum(PlanningMaximum),
 }
 
+#[derive(Clone)]
 pub(super) struct Atom {
     assumption: AssumedRecognition,
     element: PlannedElement,
@@ -274,6 +277,17 @@ pub fn search_maximum_bv_with_step_limit(
     maximum: Option<Level>,
     control: &impl PlanningSearchControl,
 ) -> Result<PlanningSearchOutcome, PlanningSearchError> {
+    search_prepared(registry, request, maximum, control, None)
+}
+
+fn search_prepared(
+    registry: &ProfileRegistry,
+    request: &PlanningSearchRequest,
+    maximum: Option<Level>,
+    control: &impl PlanningSearchControl,
+    retained: Option<&mut Option<model::Prepared>>,
+) -> Result<PlanningSearchOutcome, PlanningSearchError> {
+    let session_proof = retained.is_some();
     let profile = registry
         .resolve(&request.profile, request.scoring_table)
         .map_err(PlanningSearchError::Profile)?;
@@ -448,76 +462,93 @@ pub fn search_maximum_bv_with_step_limit(
     if neutral_waltz {
         atoms.retain(|a| a.assumption.code != "W");
     }
-    let mut outcome = model::search(registry, request, profile, &policy, &atoms, control)?;
-    if neutral_waltz {
-        if let PlanningSearchOutcome::ProvenMaximum(result) = &mut outcome {
-            let maximum_base_hundredths = result.maximum_base_hundredths;
-            let reassess = |candidate: &mut PlanningProgram| -> Result<(), PlanningSearchError> {
-                let (assessment, program, _) = crate::manual_bv::assess_selections(
-                    registry,
-                    profile,
-                    &manual(
-                        request,
-                        candidate.elements.clone(),
-                        SubmissionState::Complete,
-                    ),
-                )
-                .map_err(PlanningSearchError::Profile)?;
-                if assessment.planning_compliance() != Ok(PlanningCompliance::Compliant)
-                    || assessment.total.exact_hundredths != Some(i64::from(maximum_base_hundredths))
-                    || !assessment
-                        .legality
-                        .validation
-                        .validation
-                        .findings
-                        .is_empty()
-                {
-                    return Err(PlanningSearchError::InconsistentAssessment);
-                }
-                candidate.program = program;
-                candidate.assessment = assessment;
-                Ok(())
-            };
-            // Restore ignored required occurrences in every confirmed composition,
-            // even when collection has already been cancelled.
-            for candidate in &mut result.alternatives {
-                for (input_index, required) in request
-                    .required
-                    .iter()
-                    .enumerate()
-                    .filter(|(_, r)| r.element.code == "W")
-                {
-                    candidate.elements.push(required.element.clone());
-                    candidate.provenance.push(PlanningProvenance::Required {
-                        id: required.id.clone(),
-                        input_index,
-                    });
-                }
-                reassess(candidate)?;
-            }
+    let mut outcome = model::search(
+        registry, request, profile, &policy, &atoms, control, retained,
+    )?;
+    if let PlanningSearchOutcome::ProvenMaximum(result) = &mut outcome {
+        for candidate in &mut result.alternatives {
+            finish_candidate(
+                registry,
+                request,
+                profile,
+                maximum,
+                result.maximum_base_hundredths,
+                candidate,
+            )?;
         }
     }
-    if maximum.is_some() {
-        if let PlanningSearchOutcome::ProvenMaximum(result) = &mut outcome {
-            for alternative in &mut result.alternatives {
-                let assessment = assess_manual_bv_with_step_limit(
-                    registry,
-                    &manual(
-                        request,
-                        alternative.elements.clone(),
-                        SubmissionState::Complete,
-                    ),
-                    maximum,
-                )
-                .map_err(PlanningSearchError::Profile)?;
-                if assessment.planning_compliance() != Ok(PlanningCompliance::Compliant)
-                    || !assessment.personal_conflicts.is_empty()
-                {
-                    return Err(PlanningSearchError::InconsistentAssessment);
-                }
-                alternative.assessment = assessment;
-            }
-        }
+    if session_proof
+        && matches!(outcome, PlanningSearchOutcome::ProvenMaximum(_))
+        && control.is_cancelled(PlanningSearchPhase::Reconstruction)
+    {
+        return Ok(PlanningSearchOutcome::Cancelled);
     }
     Ok(outcome)
+}
+
+fn finish_candidate(
+    registry: &ProfileRegistry,
+    request: &PlanningSearchRequest,
+    profile: &RuleProfile,
+    step_limit: Option<Level>,
+    maximum: u32,
+    candidate: &mut PlanningProgram,
+) -> Result<(), PlanningSearchError> {
+    if profile.waltz_policy() == Some(WaltzPolicy::Ignored) {
+        for (input_index, required) in request
+            .required
+            .iter()
+            .enumerate()
+            .filter(|(_, r)| r.element.code == "W")
+        {
+            candidate.elements.push(required.element.clone());
+            candidate.provenance.push(PlanningProvenance::Required {
+                id: required.id.clone(),
+                input_index,
+            });
+        }
+    }
+    if profile.waltz_policy() == Some(WaltzPolicy::Ignored)
+        && request.required.iter().any(|r| r.element.code == "W")
+    {
+        let (assessment, program, _) = crate::manual_bv::assess_selections(
+            registry,
+            profile,
+            &manual(
+                request,
+                candidate.elements.clone(),
+                SubmissionState::Complete,
+            ),
+        )
+        .map_err(PlanningSearchError::Profile)?;
+        candidate.program = program;
+        candidate.assessment = assessment;
+    }
+    if step_limit.is_some() {
+        candidate.assessment = assess_manual_bv_with_step_limit(
+            registry,
+            &manual(
+                request,
+                candidate.elements.clone(),
+                SubmissionState::Complete,
+            ),
+            step_limit,
+        )
+        .map_err(PlanningSearchError::Profile)?;
+    }
+    let assessment = &candidate.assessment;
+    if assessment.planning_compliance() != Ok(PlanningCompliance::Compliant)
+        || assessment.total.exact_hundredths != Some(i64::from(maximum))
+        || !assessment.personal_conflicts.is_empty()
+        || !assessment.rotation_conflicts.is_empty()
+        || !assessment
+            .legality
+            .validation
+            .validation
+            .findings
+            .is_empty()
+    {
+        return Err(PlanningSearchError::InconsistentAssessment);
+    }
+    Ok(())
 }

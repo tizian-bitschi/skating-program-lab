@@ -9,7 +9,10 @@ theoretical Adult Bronze, Silver, Gold, Masters or Senior Women/Men composition
 from complete profile- and preference-selected choices,
 exact required occurrences and semantic exclusions. It runs until proof or
 cooperative cancellation. It returns up to five equally optimal whole-element compositions, with
-separate maximum-proof and alternative-exhaustion status. See the [planning-search contract](docs/specs/planning-search.md).
+separate maximum-proof and alternative-exhaustion status. `PlanningSearchSession`
+adds uncapped collection in caller-sized batches, with cooperative pause/resume
+and explicit exhaustion in the same open session. See the
+[planning-search contract](docs/specs/planning-search.md).
 
 Complete category construction verdicts are available through
 `ManualBvAssessment::planning_compliance()` with a
