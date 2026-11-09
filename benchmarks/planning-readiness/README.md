@@ -61,7 +61,9 @@ writing the summary. Its worked value bounds are recorded in the [readiness repo
 For the pre-#132 baseline at `caa4127`, pass `baseline-caa4127` as the second
 summary argument. The default `issue-132` expectation edition retains the new
 Silver 14.80/14.70 maxima. The baseline keeps 14.30/14.20 and its four exhausted
-Bronze required-1F alternatives. `bronze_required_flip_has_four_positive_partitions_and_unbounded_neutral_waltzes`
-independently enumerates those four positive partitions; current ignored Waltz
-augmentation has unbounded optimal multiplicity and returns five with LimitReached.
+Bronze required-1F alternatives. `bronze_required_flip_has_four_distinct_compositions_even_with_optional_waltzes`
+independently enumerates those four compositions. Since #141, optional ignored
+Waltz multiplicity does not distinguish compositions, so the request returns four
+with Exhausted. Historical #132 measurements retain their original five-result
+expectations; new measurements need the #140 expectation edition.
 This versioning changes no baseline rows and retains all matrix/hash/status checks.

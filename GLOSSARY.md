@@ -26,3 +26,12 @@ competition eligibility without changing scoring or competition rules.
 **Listed rotation class**:
 The notation class Single through Quintuple. Single Axel means 1A; it does not
 mean a literal count of physical turns.
+
+**Distinct optimal composition**:
+A multiset of whole counted elements at the proved maximum credited base value
+under the selected profile and personal restrictions. Whole-element order does
+not distinguish compositions; permitted internal jump order in a compound does.
+Optional movements ignored by the resolved profile mechanism do not distinguish
+compositions. Every required occurrence retains its exact multiplicity and caller
+identity, including required ignored movements. Counted zero-value elements remain
+part of composition identity.

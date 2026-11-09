@@ -1,5 +1,11 @@
 # Backend planning acceptance #132 / #138
 
+This report records #132 behavior and measurements. Since #141, optional ignored
+Waltz multiplicity no longer distinguishes optimal compositions; the required-1F
+fixture returns four Exhausted alternatives. Historical timings below retain the
+original behavior. See the current [search contract](specs/planning-search.md).
+
+
 The acceptance scope is complete theoretical category construction, credited BV,
 exact required occurrences and personal repertoire restrictions through the public
 search and manual-assessment APIs. Duration, actual execution, GOE/PCS optimization

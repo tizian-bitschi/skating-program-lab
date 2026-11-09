@@ -87,7 +87,7 @@ fn exactly_five_atomic_partitions_are_retained_without_requiring_four_jump_entri
 }
 
 #[test]
-fn bronze_required_flip_has_four_positive_partitions_and_unbounded_neutral_waltzes() {
+fn bronze_required_flip_has_four_distinct_compositions_even_with_optional_waltzes() {
     // Announcement p11 and SOV: jump bound270 requires twoLz plus threeF/Lo.
     // A required solo F leaves precisely these four sorted whole-element multisets.
     let mut request = restricted(&[JumpKind::Lutz, JumpKind::Flip, JumpKind::Loop]);
@@ -117,10 +117,18 @@ fn bronze_required_flip_has_four_positive_partitions_and_unbounded_neutral_waltz
         .retain(|e| *e != PlanningExclusion::JumpKind(JumpKind::Waltz));
     let neutral = proved(&request, &Continue);
     assert_eq!(neutral.maximum_base_hundredths, 1100);
-    assert_eq!(neutral.alternatives.len(), 5);
+    for candidate in &neutral.alternatives {
+        assert_required_and_assessed(&ProfileRegistry::adult(), &request, candidate, 1100);
+    }
+    assert_eq!(neutral.alternatives.len(), 4);
+    assert_eq!(jump_codes(&neutral), jump_codes(&result));
+    assert!(neutral
+        .alternatives
+        .iter()
+        .all(|p| p.elements.iter().all(|e| e.code != "W")));
     assert_eq!(
         neutral.alternative_status,
-        PlanningAlternativeStatus::LimitReached
+        PlanningAlternativeStatus::Exhausted
     );
 }
 
@@ -441,5 +449,162 @@ fn cancellation_with_ignored_waltzes_preserves_all_collected_maxima_and_required
             assessment.planning_compliance(),
             Ok(PlanningCompliance::Compliant)
         );
+    }
+}
+
+#[test]
+fn registered_ignored_mechanism_exhausts_required_waltz_compositions() {
+    let mut profile = adult_profile(AdultCategory::Bronze);
+    profile.id.name = "synthetic-ignored-movement-identity".into();
+    profile.category = "Synthetic identity fixture".into();
+    profile.provenance = ProfileProvenance::Synthetic;
+    let mut policy = adult_program_policy(AdultCategory::Bronze);
+    policy.spins.profile = profile.id.clone();
+    profile
+        .sources
+        .extend(policy.spins.positions.iter().map(|p| p.source.clone()));
+    profile
+        .sources
+        .extend(policy.spins.per_foot.iter().map(|p| p.source.clone()));
+    profile.sources.extend([
+        policy.spins.source.clone(),
+        policy.step_source.clone(),
+        policy.choreography_source.clone(),
+        policy.feature_source.clone(),
+    ]);
+    let mut registry = ProfileRegistry::adult();
+    registry
+        .register_with_program_policy(profile.clone(), policy)
+        .unwrap();
+    let mut request = restricted(&[JumpKind::ToeLoop, JumpKind::Waltz]);
+    request.profile = profile.id;
+    for id in ["first-waltz", "second-waltz"] {
+        request.required.push(RequiredPlanningElement {
+            id: id.into(),
+            element: AssumedRecognition::new("W"),
+        });
+    }
+    let PlanningSearchOutcome::ProvenMaximum(result) =
+        search_maximum_bv(&registry, &request, &Continue).unwrap()
+    else {
+        panic!("maximum expected")
+    };
+    assert_eq!(result.maximum_base_hundredths, 910);
+    assert_eq!(
+        result.alternative_status,
+        PlanningAlternativeStatus::Exhausted
+    );
+    assert_eq!(
+        jump_codes(&result),
+        [vec!["1T".into(), "1T".into()], vec!["1T+1T".into()]]
+            .into_iter()
+            .collect()
+    );
+    for candidate in &result.alternatives {
+        assert_eq!(
+            candidate.elements.iter().filter(|e| e.code == "W").count(),
+            2
+        );
+        assert_required_and_assessed(&registry, &request, candidate, 910);
+    }
+    request
+        .exclusions
+        .push(PlanningExclusion::ExactElement("W".into()));
+    assert!(matches!(
+        search_maximum_bv(&registry, &request, &Continue),
+        Err(PlanningSearchError::InvalidRequest { .. })
+    ));
+}
+
+fn assert_required_and_assessed(
+    registry: &ProfileRegistry,
+    request: &PlanningSearchRequest,
+    candidate: &PlanningProgram,
+    value: i64,
+) {
+    for (input_index, required) in request.required.iter().enumerate() {
+        let index = candidate
+            .provenance
+            .iter()
+            .position(|p| {
+                *p == PlanningProvenance::Required {
+                    id: required.id.clone(),
+                    input_index,
+                }
+            })
+            .unwrap();
+        assert_eq!(candidate.elements[index], required.element);
+    }
+    let assessment = assess_manual_bv(
+        registry,
+        &ManualBvRequest {
+            personal_limits: request.personal_limits.clone(),
+            rotation_preference: request.rotation_preference,
+            profile: request.profile.clone(),
+            scoring_table: request.scoring_table,
+            submission: SubmissionState::Complete,
+            elements: candidate.elements.clone(),
+        },
+    )
+    .unwrap();
+    assert_eq!(assessment.total.exact_hundredths, Some(value));
+    assert_eq!(
+        assessment.planning_compliance(),
+        Ok(PlanningCompliance::Compliant)
+    );
+    assert_eq!(candidate.assessment, assessment);
+}
+
+#[test]
+fn counted_zero_value_waltzes_remain_distinct_optional_elements() {
+    let registry = ProfileRegistry::adult();
+    let profile = adult_profile(AdultCategory::Silver);
+    let mut request = PlanningSearchRequest {
+        personal_limits: PersonalLimits::default(),
+        rotation_preference: RotationPreference::default(),
+        profile: profile.id,
+        scoring_table: ScoringTableId::Isu2786June2_2026,
+        required: ["CSSp2", "ChSp1", "ChSq1"]
+            .map(|code| RequiredPlanningElement {
+                id: code.into(),
+                element: AssumedRecognition::new(code),
+            })
+            .to_vec(),
+        exclusions: vec![],
+    };
+    request.exclusions = selectable_jump_elements(
+        &registry,
+        &request.profile,
+        request.scoring_table,
+        request.rotation_preference,
+    )
+    .unwrap()
+    .into_iter()
+    .filter(|e| e.code != "W")
+    .map(|e| PlanningExclusion::ExactElement(e.code))
+    .collect();
+    let PlanningSearchOutcome::ProvenMaximum(result) =
+        search_maximum_bv(&registry, &request, &Continue).unwrap()
+    else {
+        panic!("maximum expected")
+    };
+    // Silver W is a counted downgraded Axel: zero BV, at most two occurrences.
+    // CSSp2=280, ChSp1=350, ChSq1=350 (Communication 2786).
+    assert_eq!(result.maximum_base_hundredths, 980);
+    assert_eq!(
+        result.alternative_status,
+        PlanningAlternativeStatus::Exhausted
+    );
+    assert_eq!(
+        result
+            .alternatives
+            .iter()
+            .map(|p| p.elements.iter().filter(|e| e.code == "W").count())
+            .collect::<std::collections::BTreeSet<_>>(),
+        [0, 1, 2].into_iter().collect()
+    );
+    assert_eq!(result.alternatives.len(), 3);
+    for candidate in &result.alternatives {
+        assert_required_and_assessed(&registry, &request, candidate, 980);
     }
 }

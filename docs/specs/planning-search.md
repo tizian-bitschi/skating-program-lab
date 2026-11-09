@@ -125,7 +125,12 @@ cancellation emits no incumbent notification. MaximumProved occurs after a
 returned representative has passed manual assessment. Alternative collection
 has its own Exhausted, LimitReached or Cancelled status. After proving the optimum and validating its first representative, the model
 fixes credited BV to the proved value and enumerates up to five distinct
-whole-element multisets. At fixed optimum, a sparse nogood requires at least one selected atomic count
+whole-element multisets. Optional movements ignored by the resolved profile
+mechanism do not create alternatives; only explicitly required ignored occurrences
+are restored, with exact multiplicity, stable caller IDs and provenance. This
+does not discard counted zero-value elements. Whole-element reordering and
+required-ID swaps do not create alternatives; permitted internal compound jump
+orders remain distinct. No profile policy or source edition changes. At fixed optimum, a sparse nogood requires at least one selected atomic count
 to decrease. This is equivalent to excluding its complete count vector in the
 positive-value built-in profiles: any strict supermultiset increases credited BV.
 Adult credit is additive; a second identical advanced Senior solo adds its
