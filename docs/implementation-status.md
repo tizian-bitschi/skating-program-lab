@@ -205,7 +205,7 @@ tie enumeration and regulatory coverage remain separate. Broad six-slot native
 domains do not produce incumbents within the measured 250 ms budget; this is a
 recorded performance limit, not evidence of infeasibility or global optimality.
 
-## Complete incremental planning (#140–#143)
+## Complete incremental planning (#140â€“#143)
 
 `PlanningSearchSession` provides separate maximum proof and uncapped incremental
 collection, cooperative pause/resume, retained confirmed results and explicit

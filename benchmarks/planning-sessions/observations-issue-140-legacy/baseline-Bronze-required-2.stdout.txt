@@ -1,0 +1,2 @@
+REQUEST	PlanningSearchRequest { personal_limits: PersonalLimits { jump_rotations: [], spin_levels: [] }, rotation_preference: SameDirection, profile: ProfileId { name: "isu-adult-2026-27-bronze", version: "2026-07-16" }, scoring_table: Isu2786June2_2026, required: [RequiredPlanningElement { id: "required-0", element: AssumedRecognition { code: "1F", direct_transitions_assumed: false } }], exclusions: [] }
+METRIC	Bronze,required,,ProvenMaximum,1100,5,LimitReached,8485,116,8940,9198,3287,12485,,true

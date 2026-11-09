@@ -1,0 +1,16 @@
+revision=d747ed3efa3be4f5c590fc8d8a8c78118c7ccd0e
+runs=3
+binary_sha256=BA2C0DC6251D69B85B4233159E35B87F70E89B81BF8EAF5D0F565A3C829FAAAB
+lock_sha256=4687DFF3C4302E35738ED1B09FDC9DD9DF47C6B076A3B42AB573099B5570F9E8
+machine=native-host-A
+os=Microsoft Windows NT 10.0.26200.0
+cpu=Intel64 Family 6 Model 183 Stepping 1, GenuineIntel
+rustc 1.99.1 (58cf8f9c3 2026-10-13)
+binary: rustc
+commit-hash: 58cf8f9c35b355199727627d07ae34a4e2846d67
+commit-date: 2026-10-13
+host: x86_64-pc-windows-msvc
+release: 1.99.1
+LLVM version: 23.1.1
+cargo 1.99.1 (5f94df478 2026-08-27)
+Native Release. Serial fresh processes. No excluded warmup. No concurrent builds/tests/benchmarks. Host background load and thermal state uncontrolled. Windows lifetime peak resident memory sampled after metrics while child waits for ACK.

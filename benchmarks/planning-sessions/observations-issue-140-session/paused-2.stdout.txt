@@ -1,0 +1,8 @@
+REQUEST	PlanningSearchRequest { personal_limits: PersonalLimits { jump_rotations: [], spin_levels: [] }, rotation_preference: AllowMixedDirections, profile: ProfileId { name: "isu-adult-2026-27-bronze", version: "2026-07-16" }, scoring_table: Isu2786June2_2026, required: [RequiredPlanningElement { id: "CCSp1", element: AssumedRecognition { code: "CCSp1", direct_transitions_assumed: false } }, RequiredPlanningElement { id: "CLSp1", element: AssumedRecognition { code: "CLSp1", direct_transitions_assumed: false } }, RequiredPlanningElement { id: "ChSq1", element: AssumedRecognition { code: "ChSq1", direct_transitions_assumed: false } }], exclusions: [JumpKind(Waltz), JumpKind(Lutz), JumpKind(Axel)] }; maximum_step_level=None; first_batch=5; later_batch=3; paused=true
+BATCH	0,1505,5,Collecting
+BATCH	1,765,3,Collecting
+BATCH	2,998,3,Collecting
+BATCH	3,916,3,Collecting
+BATCH	4,739,2,Exhausted
+IDENTITIES	{["1F", "1F", "1Lo", "1Lo+1S"], ["1F", "1F", "1Lo", "1Lo+1T"], ["1F", "1F", "1Lo", "1S+1Lo"], ["1F", "1F", "1Lo", "1T+1Lo"], ["1F", "1F", "1Lo+1Lo", "1S"], ["1F", "1F", "1Lo+1Lo", "1T"], ["1F", "1F+1Lo", "1Lo", "1S"], ["1F", "1F+1Lo", "1Lo", "1T"], ["1F", "1F+1S", "1Lo", "1Lo"], ["1F", "1F+1T", "1Lo", "1Lo"], ["1F", "1Lo", "1Lo", "1S+1F"], ["1F", "1Lo", "1Lo", "1T+1F"], ["1F", "1Lo", "1Lo+1F", "1S"], ["1F", "1Lo", "1Lo+1F", "1T"], ["1F+1F", "1Lo", "1Lo", "1S"], ["1F+1F", "1Lo", "1Lo", "1T"]}
+METRIC	2,8472,1505,4923,0,765,16,5,Exhausted,true
