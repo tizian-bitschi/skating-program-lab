@@ -12,7 +12,8 @@ cooperative cancellation. It returns up to five equally optimal whole-element co
 separate maximum-proof and alternative-exhaustion status. `PlanningSearchSession`
 adds uncapped collection in caller-sized batches, with cooperative pause/resume
 and explicit exhaustion in the same open session. See the
-[planning-search contract](docs/specs/planning-search.md).
+[planning-search contract](docs/specs/planning-search.md) and the
+[session acceptance evidence](docs/planning-session-acceptance.md).
 
 Complete category construction verdicts are available through
 `ManualBvAssessment::planning_compliance()` with a

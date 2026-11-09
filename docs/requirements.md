@@ -63,3 +63,21 @@ remaining coverage limits. A proven finite BV objective, complete declared
 candidate generation, complete tie enumeration and full regulatory coverage are
 four separate claims. The current model establishes the first three only in
 explicit bounded conditional cases; regulatory coverage remains partial.
+
+## Complete incremental planning (#140)
+
+The public session proves the theoretical credited maximum before delivering
+alternatives, then collects distinct optimal compositions in caller-sized batches
+without a total cap. Pause retains confirmed results and pending work; continuation
+uses the same immutable request in the same open process. Only a subsequent
+unsatisfiable fixed-maximum search establishes exhaustion. Cancellation is terminal.
+Legacy search APIs retain their five-result contract.
+
+Unrestricted, exact-required, restricted and combined workflows apply to supported
+built-in and registered profile policies. Every delivery preserves required IDs,
+whole-code identity, multiplicity and all personal ceilings and passes shared
+manual planned-construction assessment. Optional profile-ignored movements do not
+add compositions; counted zero-value intentions do. Complete construction verdicts
+do not certify duration, actual execution or official judging. Persistence, UI,
+HTTP and cross-process continuation remain outside scope. See the
+[acceptance report](planning-session-acceptance.md).

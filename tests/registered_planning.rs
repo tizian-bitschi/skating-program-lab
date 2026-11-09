@@ -2,6 +2,11 @@
 use skating_program_lab::*;
 
 struct Continue;
+impl PlanningCollectionControl for Continue {
+    fn action(&self, _: PlanningSearchPhase) -> PlanningCollectionAction {
+        PlanningCollectionAction::Continue
+    }
+}
 impl PlanningSearchControl for Continue {
     fn is_cancelled(&self, _: PlanningSearchPhase) -> bool {
         false
@@ -81,6 +86,59 @@ fn registered_category_supports_all_four_planning_workflows() {
         else {
             panic!("maximum expected")
         };
+        let mut session = PlanningSearchSession::new(&registry, r.clone(), None);
+        assert_eq!(
+            session.prove(&Continue).unwrap(),
+            PlanningSessionState::Collecting
+        );
+        assert_eq!(
+            session.maximum_base_hundredths(),
+            Some(result.maximum_base_hundredths)
+        );
+        while session.state() == PlanningSessionState::Collecting {
+            session
+                .collect(std::num::NonZeroUsize::new(1).unwrap(), &Continue)
+                .unwrap();
+        }
+        assert_eq!(session.state(), PlanningSessionState::Exhausted);
+        assert_eq!(session.confirmed().len(), result.alternatives.len());
+        for candidate in session.confirmed() {
+            let manual = assess_manual_bv_with_step_limit(
+                &registry,
+                &ManualBvRequest {
+                    profile: r.profile.clone(),
+                    scoring_table: r.scoring_table,
+                    personal_limits: r.personal_limits.clone(),
+                    rotation_preference: r.rotation_preference,
+                    submission: SubmissionState::Complete,
+                    elements: candidate.elements.clone(),
+                },
+                None,
+            )
+            .unwrap();
+            assert_eq!(
+                manual.total.exact_hundredths,
+                Some(i64::from(result.maximum_base_hundredths))
+            );
+            assert_eq!(
+                manual.planning_compliance(),
+                Ok(PlanningCompliance::Compliant)
+            );
+            assert!(manual.personal_conflicts.is_empty());
+            for (input_index, required) in r.required.iter().enumerate() {
+                let index = candidate
+                    .provenance
+                    .iter()
+                    .position(|p| {
+                        *p == PlanningProvenance::Required {
+                            id: required.id.clone(),
+                            input_index,
+                        }
+                    })
+                    .unwrap();
+                assert_eq!(candidate.elements[index], required.element);
+            }
+        }
         assert!(result.alternatives.len() <= 5);
         for alternative in &result.alternatives {
             assert_eq!(
@@ -207,6 +265,23 @@ fn unsupported_registered_mechanism_never_becomes_infeasibility_or_compliance() 
             ..
         }))
     ));
+    for (name, kind) in [
+        (search.profile.name.clone(), ProfileErrorKind::Unsupported),
+        ("unknown-session-profile".into(), ProfileErrorKind::Unknown),
+    ] {
+        let mut request = search.clone();
+        request.profile.name = name;
+        let mut session = PlanningSearchSession::new(&registry, request, None);
+        let Err(PlanningSessionError::Search(PlanningSearchError::Profile(error))) =
+            session.prove(&Continue)
+        else {
+            panic!("profile error")
+        };
+        assert_eq!(error.kind, kind);
+        assert_eq!(session.state(), PlanningSessionState::Failed);
+        assert!(session.maximum_base_hundredths().is_none());
+        assert!(session.confirmed().is_empty());
+    }
     assert!(matches!(
         assess_manual_bv(
             &registry,

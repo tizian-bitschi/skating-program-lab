@@ -3,7 +3,8 @@
 Status: approved by the requesting user on 2026-11-09 before implementation.
 Parent: [#140](https://github.com/tizian-bitschi/skating-program-lab/issues/140).
 Contract: [#142](https://github.com/tizian-bitschi/skating-program-lab/issues/142).
-Baseline: `c295da4`. This document adds no public Rust interface yet.
+Baseline: `c295da4`. The approved interface below is implemented by #142; this
+document retains the approval contract. #143 records workflow acceptance.
 
 ## Proposed public interface
 

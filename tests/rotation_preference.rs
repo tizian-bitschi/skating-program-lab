@@ -230,8 +230,22 @@ mod automatic {
                 component_indices: vec![0, 1]
             }]
         );
+        let mut session = PlanningSearchSession::new(&registry, r.clone(), None);
+        let Err(PlanningSessionError::Search(PlanningSearchError::RotationPreferenceConflict(
+            indexed,
+        ))) = session.prove(&Continue)
+        else {
+            panic!("rotation conflict")
+        };
+        assert_eq!(indexed, conflicts);
+        assert_eq!(session.state(), PlanningSessionState::Failed);
         assert_eq!(r.required[0].element.code, "1Lz+1Lz");
         r.rotation_preference = RotationPreference::AllowMixedDirections;
+        let mut session = PlanningSearchSession::new(&registry, r.clone(), None);
+        assert_eq!(
+            session.prove(&Continue).unwrap(),
+            PlanningSessionState::Collecting
+        );
         assert!(matches!(
             search_maximum_bv(&registry, &r, &Continue),
             Ok(PlanningSearchOutcome::ProvenMaximum(_))
