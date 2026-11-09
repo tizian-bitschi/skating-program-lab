@@ -9,6 +9,26 @@ pub(super) fn jump_upper_bound(
     profile: &RuleProfile,
     request: &PlanningSearchRequest,
 ) -> i32 {
+    upper_bound(atoms, profile, request, None)
+}
+
+// Requiring a component does not require a solo or reserve a whole element.
+// Every completion containing it remains in this relaxed credited-value DP.
+pub(super) fn component_upper_bound(
+    atoms: &[Atom],
+    profile: &RuleProfile,
+    request: &PlanningSearchRequest,
+    component: &ListedJump,
+) -> i32 {
+    upper_bound(atoms, profile, request, Some(component))
+}
+
+fn upper_bound(
+    atoms: &[Atom],
+    profile: &RuleProfile,
+    request: &PlanningSearchRequest,
+    component: Option<&ListedJump>,
+) -> i32 {
     let required: Vec<_> = request
         .required
         .iter()
@@ -42,6 +62,7 @@ pub(super) fn jump_upper_bound(
         fn vectors(
             solos: &[&Atom],
             required: &[&Atom],
+            component: Option<&ListedJump>,
             i: usize,
             state: ComponentState,
             value: i32,
@@ -58,7 +79,8 @@ pub(super) fn jump_upper_bound(
                 .iter()
                 .flat_map(|a| &a.jumps)
                 .filter(|j| *j == jump)
-                .count();
+                .count()
+                .max(usize::from(component == Some(jump)));
             let required_solos = required
                 .iter()
                 .filter(|a| !a.combination() && !a.sequence() && a.jumps[0] == *jump)
@@ -79,6 +101,7 @@ pub(super) fn jump_upper_bound(
                 vectors(
                     solos,
                     required,
+                    component,
                     i + 1,
                     (
                         state.0 + n,
@@ -92,7 +115,15 @@ pub(super) fn jump_upper_bound(
                 );
             }
         }
-        vectors(&solos, &required, 0, (0, 0, 0, 0, false), 0, &mut options);
+        vectors(
+            &solos,
+            &required,
+            component,
+            0,
+            (0, 0, 0, 0, false),
+            0,
+            &mut options,
+        );
         let mut next = BTreeMap::new();
         for (&(c, q, r, h, a), &value) in &dp {
             for &((dc, dq, dr, dh, da), dv) in &options {
