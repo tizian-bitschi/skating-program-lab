@@ -17,6 +17,7 @@ $output = (Resolve-Path -LiteralPath $OutputDirectory).Path
 'new_us,proof_us,first_five_us,active_collection_us,pause_us,resumed_batch_us,alternatives,batches,state,passed,mode,run,peak_working_set_bytes,request_sha256,identity_sha256' | Set-Content -LiteralPath (Join-Path $output 'observations.csv')
 $utf8 = [Text.UTF8Encoding]::new($false)
 $expectedIdentity = $null
+$requests = @{}
 foreach ($run in 1..$Runs) {
     foreach ($mode in @('uninterrupted','paused')) {
         $info = [Diagnostics.ProcessStartInfo]::new()
@@ -32,10 +33,10 @@ foreach ($run in 1..$Runs) {
         [void]$process.Start()
         $errorRead = $process.StandardError.ReadToEndAsync()
         $lines = [Collections.Generic.List[string]]::new()
-        $metric = $null; $request = $null; $identity = $null
+        $metric = $null; $request = $null; $identity = $null; $timedOut = $false
         while (!$metric) {
             $read = $process.StandardOutput.ReadLineAsync()
-            if (!$read.Wait(120000)) { $process.Kill($true); throw 'WatchdogFailure, never infeasibility' }
+            if (!$read.Wait(120000)) { $timedOut = $true; break }
             $line = $read.Result
             if ($null -eq $line) { break }
             $lines.Add($line)
@@ -45,12 +46,19 @@ foreach ($run in 1..$Runs) {
         }
         $process.Refresh(); $peak = $process.PeakWorkingSet64
         if ($metric) { $process.StandardInput.WriteLine('ACK'); $process.StandardInput.Flush() }
+        elseif (!$process.HasExited) { $process.Kill($true) }
         if (!$process.WaitForExit(10000)) { $process.Kill($true); $process.WaitForExit() }
         $label = "$mode-$run"
         [IO.File]::WriteAllText((Join-Path $output "$label.stdout.txt"), ($lines -join "`n") + "`n", $utf8)
         [IO.File]::WriteAllText((Join-Path $output "$label.stderr.txt"), $errorRead.GetAwaiter().GetResult(), $utf8)
-        if (!$metric -or $process.ExitCode -ne 0 -or !$identity -or !$request) { throw "Experiment failed: $label" }
-        if ($expectedIdentity -and $identity -ne $expectedIdentity) { throw 'Pause/resume or repetition changed complete identity set' }
+        "exit_code=$($process.ExitCode); watchdog_failure=$timedOut" | Set-Content -LiteralPath (Join-Path $output "$label.exit.txt")
+        if (!$metric -or $process.ExitCode -ne 0 -or !$identity -or !$request) {
+            $process.Dispose()
+            throw "Experiment failed: $label (watchdog=$timedOut); raw output and exit status retained; never infeasibility"
+        }
+        if ($requests.ContainsKey($mode) -and $requests[$mode] -cne $request) { $process.Dispose(); throw "Request changed across repetitions: $label" }
+        $requests[$mode] = $request
+        if ($expectedIdentity -and $identity -ne $expectedIdentity) { $process.Dispose(); throw 'Pause/resume or repetition changed complete identity set' }
         $expectedIdentity = $identity
         $requestFile = Join-Path $output "$label.request.txt"
         $identityFile = Join-Path $output "$label.identities.txt"
