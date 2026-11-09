@@ -65,37 +65,43 @@ requirements; planned code recognition does not supply performed evidence.
 
 Technical acceptance passed. All required checks and 216 current native Release
 processes passed, with no watchdog failure, solver/assessment mismatch or unrun
-required check. The full default suite passed 442 tests; minimal features passed 274.
+required check. The final full default suite passed 443 tests; minimal features passed 274.
 The separate solver comparison passed both independent fixture/reference tests
 and both Pumpkin/Z3 runs (proven120 and infeasible under exclusion).
 
-Verified implementation revision: `81f63b3`; measured revision:
-`79229adc2efd8b1cce6f4877f11993b6dc92d4aa` (only README/historical-report changes
-after the implementation commit). The branch includes integration
-`46addab9068ed5ff3fa797c6abe7cc4797402c8e`; the integration merge check was already
-up to date. Later commits contain this report and evidence only.
+Final verified and measured revision:
+`d298c274ace7d97beaff599bda7675a6b34afd0c`, including review fix `3eccb82`.
+All five checks, the separate solver run/tests, Release build and 216-process
+measurement were rerun after that fix. The acceptance worktree fast-forwarded
+to this integration tip before verification; the final integration merge check
+was already up to date. Later commits contain this report and evidence only.
+The initial acceptance revision `81f63b3` and measurements at `79229ad` remain
+historical evidence, not the current snapshot.
 
 | Command | Result |
 | --- | --- |
 | `cargo build --offline` | exit 0 |
 | `cargo fmt --check` | exit 0 |
 | `cargo clippy --offline --all-targets -- -D warnings` | exit 0 |
-| `cargo test --offline` | exit 0; 442 passed |
+| `cargo test --offline` | exit 0; 443 passed |
 | `cargo test --offline --no-default-features` | exit 0; 274 passed |
 | `cargo run --offline --manifest-path solver-comparison/Cargo.toml --locked` | exit 0; `CARGO_BUILD_JOBS=2`, fresh native target, escalated |
 | `cargo test --offline --manifest-path solver-comparison/Cargo.toml --locked` | exit 0; 2 passed, same environment |
 | `cargo build --offline --release --example planning_readiness` | exit 0 |
-| `pwsh -NoProfile -File benchmarks/planning-readiness/run.ps1 -ExpectedRevision <measured-revision> -OutputDirectory ../issue-138-native-release -Runs 3 -WatchdogSeconds 120` | exit 0; 216 passed |
+| `pwsh -NoProfile -File benchmarks/planning-readiness/run.ps1 -ExpectedRevision <measured-revision> -OutputDirectory ../issue-138-final-native-release -Runs 3 -WatchdogSeconds 120` | exit 0; 216 passed |
 | `python benchmarks/planning-readiness/summarize.py ../issue-132-baseline baseline-caa4127` | exit 0; 216 verified |
-| `python benchmarks/planning-readiness/summarize.py ../issue-138-native-release` | exit 0; 216 verified |
-| `python benchmarks/planning-readiness/compare.py ../issue-132-baseline ../issue-138-native-release` | exit 0; 24 byte-identical manifests |
+| `python benchmarks/planning-readiness/summarize.py ../issue-138-final-native-release` | exit 0; 216 verified |
+| `python benchmarks/planning-readiness/compare.py ../issue-132-baseline ../issue-138-final-native-release` | exit 0; 24 byte-identical manifests |
 
 Evidence is retained in
 [`observations-issue-132`](../benchmarks/planning-readiness/observations-issue-132/):
 baseline/current CSVs, environments, 24 request manifests each, exact root locks,
 432 raw stdout/stderr files per edition in ZIPs, full summaries, the proof versus
-alternatives comparison and compressed verification logs. The latter also contains
-the exact separate solver-comparison lock. To reverify archived observations,
+alternatives comparison and compressed verification logs. `final-verification-logs.zip`
+contains the final checks, exact separate solver-comparison lock, review-fix logs
+and historical sibling native-build failure. `verification-logs.zip` retains the
+initial checks/setup failures; `historical-current-79229ad.zip` retains the entire
+pre-review current snapshot. The baseline snapshot is unchanged. To reverify archived observations,
 run `summarize.py <baseline-dir> baseline-caa4127`,
 `summarize.py <current-dir>` and `compare.py <baseline-dir> <current-dir>`.
 The original baseline at `caa4127cdd1215d618e1a75b1cb96cd46d8e877a`
@@ -110,18 +116,21 @@ recorded no failures. Peak working set, binary hashes and exact toolchain versio
 are in each environment/CSV. No processes were left running.
 
 Performance regressions are material. Silver empty proof median rose
-16.019→1182.805ms(73.84×), excluded15.295→1053.842ms(68.90×), and required
-16.071→53.250ms(3.31×), alongside the corrected larger 14.80/14.70 maxima.
-Silver alternative collection rose2.621→8.367ms(empty),2.192→6.523ms(excluded)
-and2.517→4.984ms(required). This experiment does not isolate causes between
-the policy/model/assessment changes. Other proof ratios ranged 0.98–1.38×;
-Masters empty proof 41.473→55.105ms and alternatives 13.372→21.647ms.
+16.019→1195.972 ms (74.66×), excluded 15.295→1059.006 ms (69.24×), and required
+16.071→53.882 ms (3.35×), alongside the corrected larger 14.80/14.70 maxima.
+Silver alternative collection rose 2.621→8.287 ms (empty), 2.192→6.814 ms (excluded)
+and 2.517→5.227 ms (required). This experiment does not isolate causes between
+the policy/model/assessment changes. Inspection of `value_upper_bound` shows an
+optional ChSp is added independently while regular-spin slots are reserved only
+for required ChSp, leaving a loose Silver upper bound. That is a potential
+contributor, not a measured causal attribution. Other proof ratios ranged 0.99–1.40×;
+Masters empty proof 41.473→54.276 ms and alternatives 13.372→23.078 ms.
 The deterministic Masters collection regression budget also changed from 14,000
 to 20,000 polls in #136; it remains a caller-controlled cancellation test,
-not an optimization SLA. Bronze empty alternatives 1.134→2.492ms now include
+not an optimization SLA. Bronze empty alternatives 1.134→2.241 ms now include
 neutral W augmentation; the required case changes four Exhausted into five LimitReached.
 The full comparison reports every primary case separately. Cancellation response
-over all 144 requests was at most 8.682ms; this is an observation, not a guarantee.
+over all 144 requests was at most 8.459 ms; this is an observation, not a guarantee.
 
 Two setup failures preceded measurement: an incorrect ExpectedRevision argument
 was rejected before setup, and sandbox CIM hardware access failed before any
@@ -131,6 +140,16 @@ five-alternative assumption was obsolete. The independent four-multiset regressi
 now proves that baseline result; versioned expectations preserve all other checks.
 All failure logs are retained. The earlier sibling native archive access-denied
 failure was avoided by the fresh escalated two-job comparison build.
+
+Review fixed loss of already confirmed alternatives when ignored Waltz augmentation
+was cancelled and restored required-occurrence IDs. The new public-seam regression
+retains both collected maxima, exact required Waltzes/provenance, fresh compliant
+manual assessments and `Cancelled` alternative status. An obsolete fixture that
+expected five alternatives despite cancellation now expects the already confirmed
+one. Its failed focused run and corrected pass are both retained in the review
+logs. The shared internal mechanism predicate was also consolidated. Final Clippy
+exited 0 under `-D warnings`; its log includes environmental incremental-cache
+hard-link failures with successful file-copy fallback, rather than code lint findings.
 
 The backend satisfies the four planning workflows within the documented
 construction scope. Native performance regressions remain visible; this acceptance
