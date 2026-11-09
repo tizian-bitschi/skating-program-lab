@@ -182,7 +182,7 @@ mod automatic {
     }
 
     #[test]
-    fn silver_proves_1430_in_both_modes_and_preserves_required_conflicts() {
+    fn silver_proves_1480_in_both_modes_and_preserves_required_conflicts() {
         let registry = ProfileRegistry::adult();
         for preference in [
             RotationPreference::default(),
@@ -194,7 +194,7 @@ mod automatic {
             else {
                 panic!("expected maximum")
             };
-            assert_eq!(result.maximum_base_hundredths, 1430);
+            assert_eq!(result.maximum_base_hundredths, 1480);
             assert_eq!(result.alternatives.len(), 5);
             for candidate in result.alternatives {
                 let assessment = assess_manual_bv(
@@ -210,7 +210,7 @@ mod automatic {
                 )
                 .unwrap();
                 assert!(assessment.rotation_conflicts.is_empty());
-                assert_eq!(assessment.total.exact_hundredths, Some(1430));
+                assert_eq!(assessment.total.exact_hundredths, Some(1480));
             }
         }
         let mut r = request(RotationPreference::default());

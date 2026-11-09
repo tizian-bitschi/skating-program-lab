@@ -188,6 +188,7 @@ struct Validator<'a> {
     policy: &'a crate::JumpPolicy,
     findings: Vec<Finding>,
     occurrences: Vec<(JumpKind, u8)>,
+    occurrence_locations: Vec<(usize, Option<usize>)>,
     compounds: Vec<Compound>,
     jump_count: usize,
     eulers: usize,
@@ -211,6 +212,7 @@ impl<'a> Validator<'a> {
             policy: &profile.jumps,
             findings: vec![],
             occurrences: vec![],
+            occurrence_locations: vec![],
             compounds: vec![],
             jump_count: 0,
             eulers: 0,
@@ -365,6 +367,7 @@ impl<'a> Validator<'a> {
         }
         if let (Some(kind), Some(rotations @ 1..)) = (jump.kind, jump.rotations) {
             self.occurrences.push((kind, rotations));
+            self.occurrence_locations.push((index, component));
             if (!crate::senior::selected(self.profile, Rule::Repetition) || rotations >= 2)
                 && self
                     .occurrences
@@ -585,11 +588,13 @@ impl<'a> Validator<'a> {
         }
     }
     fn program_checks(&mut self) {
-        if crate::senior::selected(self.profile, Rule::Repetition) {
-            if crate::senior::advanced_repeat_limit_exceeded(&self.occurrences) {
-                self.add(FindingKind::Violation, Rule::Repetition, None, None,
-                    "Only two triple/quad/quint types may repeat, including at most one quad or quint type.");
-            }
+        if crate::senior::selected(self.profile, Rule::Repetition)
+            && crate::senior::advanced_repeat_limit_exceeded(&self.occurrences)
+        {
+            self.add(FindingKind::Violation, Rule::Repetition, None, None,
+                "Only two triple/quad/quint types may repeat, including at most one quad or quint type.");
+        }
+        {
             for kind in [
                 JumpKind::ToeLoop,
                 JumpKind::Salchow,
@@ -599,13 +604,41 @@ impl<'a> Validator<'a> {
                 JumpKind::Axel,
             ] {
                 if crate::senior::kind_occurrences_exceeded(&self.occurrences, &kind) {
-                    self.add(
-                        FindingKind::Violation,
-                        Rule::Repetition,
-                        None,
-                        None,
-                        "A jump kind across all rotation counts may occur at most three times.",
-                    );
+                    let (index, component) = self
+                        .occurrences
+                        .iter()
+                        .enumerate()
+                        .filter(|(_, jump)| jump.0 == kind)
+                        .nth(3)
+                        .map(|(i, _)| self.occurrence_locations[i])
+                        .expect("four occurrences");
+                    let binding = self.profile.binding(Rule::Repetition);
+                    let source = if self.profile.provenance == crate::ProfileProvenance::Synthetic
+                        || self
+                            .profile
+                            .overrides
+                            .iter()
+                            .any(|o| o.replacement.rule == Rule::Repetition)
+                    {
+                        binding.source.clone()
+                    } else {
+                        SourceReference { document: "ISU Sports Rules - Figure Skating".into(), version: "2026-06-12".into(), location: "Rule 612, General remarks for all singles Free Programs, pp. 70-71; same-kind limit".into() }
+                    };
+                    let id = if crate::senior::selected(self.profile, Rule::Repetition) {
+                        binding.id
+                    } else {
+                        "isu-sports-2026-all-singles-kind-repetition"
+                    };
+                    record_rule(&mut self.applied_rules, id, Some(index), component, &source);
+                    self.findings.push(Finding {
+                        kind: FindingKind::Violation,
+                        rule_id: id,
+                        element_index: Some(index),
+                        component_index: component,
+                        explanation:
+                            "A jump kind across all rotation counts may occur at most three times.",
+                        source,
+                    });
                 }
             }
         }

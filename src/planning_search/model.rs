@@ -221,7 +221,7 @@ fn atom_upper(atom: &Atom, profile: &RuleProfile, required: &[&Atom]) -> usize {
             } / atom.jumps.iter().filter(|j| *j == jump).count(),
         );
     }
-    if senior {
+    {
         for jump in &atom.jumps {
             let same_kind = atom.jumps.iter().filter(|j| j.kind == jump.kind).count();
             upper = upper.min(crate::senior::DEFINITION.max_kind_occurrences / same_kind);
@@ -429,7 +429,7 @@ pub(super) fn search(
     );
     constrain(&|a| a.eulers as i32, 0, profile.jumps.max_eulers as i32);
     for permission in &profile.jumps.allowed {
-        if senior {
+        {
             constrain(
                 &|a| {
                     a.jumps
@@ -968,7 +968,8 @@ fn reconstruct(
         &manual(request, elements.clone(), SubmissionState::Complete),
     )
     .map_err(PlanningSearchError::Profile)?;
-    if assessment.total.exact_hundredths != Some(i64::from(maximum))
+    if assessment.planning_compliance() != Ok(PlanningCompliance::Compliant)
+        || assessment.total.exact_hundredths != Some(i64::from(maximum))
         || !assessment
             .legality
             .validation

@@ -86,6 +86,10 @@ fn selected_codes_form_category_programs_without_performance_evidence() {
         }
         let assessed = assess_manual_bv(registry, &request(profile.id.clone(), codes)).unwrap();
         assert_eq!(
+            assessed.planning_compliance(),
+            Ok(PlanningCompliance::Compliant)
+        );
+        assert_eq!(
             assessed.total.exact_hundredths,
             Some(*total),
             "{:?}",

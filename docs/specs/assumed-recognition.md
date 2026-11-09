@@ -131,3 +131,8 @@ a repeated-spin prohibition. This selection infers neither execution errors
 nor a level downgrade. Other execution-related V forms remain outside the
 planned selection domain. Detailed evidence-based assessment is unchanged.
 
+
+Complete category construction verdicts are available through
+`ManualBvAssessment::planning_compliance()`; see the
+[positive planning-rule inventory](planning-compliance.md). Exact-code recognition
+intentions include category-specific movement and revolution prerequisites.

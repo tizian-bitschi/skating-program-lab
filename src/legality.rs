@@ -154,7 +154,7 @@ pub(crate) fn report_program_legality(
                 && !program
                     .elements
                     .iter()
-                    .any(|e| matches!(e, PlannedElement::Jump(_))))
+                    .any(|e| matches!(e, PlannedElement::Jump(_)) && !matches!(e, PlannedElement::Jump(JumpElement::Solo(j)) if j.kind == Some(JumpKind::Waltz) && profile.waltz_policy() == Some(WaltzPolicy::Ignored))))
             || (matches!(rule, ProfileRule::Transition | ProfileRule::Structure)
                 && !program.elements.iter().any(|e| {
                     matches!(
