@@ -733,6 +733,7 @@ pub(super) fn search(
             solver,
             brancher,
             resolver,
+            objective,
             counts,
             atoms: atoms.to_vec(),
             pending: Some(selected.clone()),
@@ -971,6 +972,7 @@ pub(super) struct Prepared {
     brancher: CountBrancher,
     resolver: ResolutionResolver,
     counts: Vec<DomainId>,
+    objective: DomainId,
     pub(super) atoms: Vec<Atom>,
     pub(super) pending: Option<Vec<i32>>,
     pub(super) delivered: Vec<Vec<i32>>,
@@ -1012,12 +1014,17 @@ impl Prepared {
                 .solver
                 .satisfy(&mut self.brancher, &mut termination, &mut self.resolver)
             {
-                SatisfactionResult::Satisfiable(s) => Some(
-                    self.counts
-                        .iter()
-                        .map(|&v| s.solution().get_integer_value(v))
-                        .collect(),
-                ),
+                SatisfactionResult::Satisfiable(s) => {
+                    if s.solution().get_integer_value(self.objective) != maximum as i32 {
+                        return Err(PlanningSearchError::InconsistentAssessment);
+                    }
+                    Some(
+                        self.counts
+                            .iter()
+                            .map(|&v| s.solution().get_integer_value(v))
+                            .collect(),
+                    )
+                }
                 SatisfactionResult::Unsatisfiable(..) | SatisfactionResult::Unknown(..) => None,
             },
         )
