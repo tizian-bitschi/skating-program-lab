@@ -1,19 +1,19 @@
-# Browser/service contract proposal
+# Accepted browser/service planning contract
 
-**Status: DRAFT for live user review. Planning only. No implementation or public API approval is claimed.**
+**Status: accepted for planning/specification on 2026-11-09. The user explicitly confirmed Q1–Q4 with “vier mal ja”. No production implementation or deployment is included.**
 
-Decision ticket: [Choose the browser runtime and integration contract](https://github.com/tizian-bitschi/skating-program-lab/issues/151). This proposal preserves the [confirmed local-workspace/recovery behavior](https://github.com/tizian-bitschi/skating-program-lab/issues/149#issuecomment-6750385948) and uses the [bounded native-service feasibility evidence](../../experiments/service-proof/README.md). It does not promote the experiment's handwritten HTTP transport or convenience defaults.
+Decision ticket: [Choose the browser runtime and integration contract](https://github.com/tizian-bitschi/skating-program-lab/issues/151). This contract preserves the [confirmed local-workspace/recovery behavior](https://github.com/tizian-bitschi/skating-program-lab/issues/149#issuecomment-6750385948) and uses the [bounded native-service feasibility evidence](../../experiments/service-proof/README.md). It does not promote the experiment's handwritten HTTP transport or convenience defaults.
 
-## 1. Proposed application boundary
+## 1. Accepted application boundary
 
 - One C2 browser application: Vue 3, TypeScript and Vite, delivered as static assets.
 - One native Rust HTTP service: Axum and Tokio around the existing library. No skating/scoring rules are duplicated in TypeScript.
 - UI and `/api/v1/` share one HTTPS origin in deployment. No hosting provider is selected here.
 - HTTP/JSON with polling initially; no WebSocket or event-stream dependency is needed for this contract.
 - First deployment uses one service instance and a bounded set of native search owners. The solver and its borrowed registry stay on their owner thread. HTTP state contains handles/control flags and DTOs only; CPU-heavy stateless work also stays off asynchronous request executors.
-- Technical compatibility is documented in the [primary-source fact check](service-contract-technical-notes.md). The framework choice is a proposal, not a measured performance claim or a dependency lock.
+- Technical compatibility is documented in the [primary-source fact check](service-contract-technical-notes.md). The framework basis is selected; package versions and measured performance are not established by this document.
 
-The architecture direction and versioned API below require user acceptance. Production code starts only after the planning/specification steps.
+The user accepted the architecture and contract direction below. Production code starts only after the planning/specification steps.
 
 ## 2. One shared planning context
 
@@ -48,9 +48,9 @@ The saved program contains all current entries plus their retained/replaceable s
 - Existing excluded connections remain available for restoration and are clearly flagged. Excluding a two-jump whole does not silently exclude every longer connection sharing its prefix. Other repertoire restrictions still apply.
 - Selection includes permitted zero-value and ignored intentions according to the core model. The client deduplicates retransmission by result ID, not by inventing its own composition identity.
 
-## 4. Proposed operations
+## 4. Service operations
 
-Paths and DTO meaning are proposed public boundaries, not endpoints implemented by this document.
+Paths and DTO meaning are accepted planning boundaries, not endpoints implemented by this document.
 
 | Operation | Purpose |
 | --- | --- |
@@ -90,7 +90,7 @@ Status includes proof certainty, maximum BV in integer hundredths when proved, c
 
 Results have stable per-search IDs, exact whole-element content, required-occurrence provenance, per-element/total credited BV and shared construction assessment. They are immutable confirmed deliveries. Cursor retries return the same identities and the browser deduplicates only repeated IDs. Already delivered data stays visible while collection continues or pauses.
 
-The proposed service policy is automatic collection in internal chunks after maximum proof, until pause, cancellation or exhaustion (user question Q3 below). The browser polls for confirmed deltas; reads do not start more computation. A temporary disconnection does not itself cancel the search: its lease still governs availability. Payload pagination bounds transfer size, not computation or memory. There is no protocol-level total count cap. If the user chooses manual collection instead, revise the operation set before approval.
+The service automatically collects in internal chunks after maximum proof, until pause, cancellation or exhaustion (confirmed Q3). The browser polls for confirmed deltas; reads do not start more computation. A temporary disconnection does not itself cancel the search: its lease still governs availability. Payload pagination bounds transfer size, not computation or memory. There is no protocol-level total count cap.
 
 Delivery pagination does not make core memory usage constant. Live-owner capacity counts workers until they actually exit, including after cancellation/disposal. Resource failure is reported honestly with confirmed data retained where possible; it must never silently truncate results or claim `completed`. Numeric capacity/memory budgets belong to measured acceptance/deployment planning.
 
@@ -100,7 +100,7 @@ The request carries the same context/limits and all current ordered program entr
 
 Unknown/missing planning inputs or unsupported mechanisms are input/capability errors, not a fabricated compliance result. Draft handling never labels an incomplete assessment compliant. Personal conflicts are separate from category violations and do not change catalog values. Duration, actual execution, GOE and PCS remain outside this planning verdict/objective.
 
-The proposed trigger is automatic assessment after a committed edit or restored workspace, with a short debounce where useful. Drag preview does not send an assessment on every pointer movement. Optimization still starts only on the explicit calculation action. This distinction requires user approval in Q2; the endpoint itself is independent of trigger policy.
+Assessment refreshes automatically after a committed edit or restored workspace, with a short debounce where useful (confirmed Q2). Drag preview does not send an assessment on every pointer movement. Optimization still starts only on the explicit calculation action. This ordinary assessment remains distinct from starting an optimization.
 
 ## 7. Error contract
 
@@ -124,27 +124,27 @@ The status choices follow the [HTTP fact check](service-contract-technical-notes
 
 One small, versioned workspace snapshot is stored automatically in localStorage: context references, program entries/retention flags, repertoire limits, excluded connections and locale. The last adopted alternative is saved as program content. Neither the running search/token nor its potentially huge result history is durably stored. Storage parsing/version/quota/access failures must be handled without falsely claiming a successful save or silently destroying the original snapshot.
 
-Reload restores the workspace and does not reattach/restart the old optimization. The user can start a fresh one. If Q2 is approved, the restored program's ordinary assessment refreshes automatically; that is distinct from optimization.
+Reload restores the workspace and does not reattach/restart the old optimization. The user can start a fresh one. The restored program's ordinary assessment refreshes automatically; optimization still requires the explicit calculation action.
 
 Changed calculation constraints cancel the old search, mark already shown results out of date and require an explicit new optimization. Language/layout and whole-entry reordering alone do not invalidate a freely placed composition search.
 
 With the page still open, a short connection loss retains the in-memory search identity, token, last cursor and shown results. Reconnect to that same session if available, replay only idempotent commands as needed, and never duplicate results. Previously paused work stays paused. If the session is gone, keep already shown data and offer a new search; do not silently recompute.
 
-## 9. Proposed session lease (user question Q4)
+## 9. Confirmed session lease
 
-Proposed initial policy: expire after **15 minutes without valid browser contact**, measured by the service. Active polling and a lightweight heartbeat while paused renew the lease. This is not a 15-minute maximum computation time. A suspended phone/browser might stop making contact; if the lease expires, the approved unavailable-session recovery applies.
+Expire after **15 minutes without valid browser contact**, measured by the service. Active polling and a lightweight heartbeat while paused renew the lease. This is not a 15-minute maximum computation time. A suspended phone/browser might stop making contact; if the lease expires, the approved unavailable-session recovery applies.
 
 Lease monitoring must reach busy owners independently of their command loop, and live capacity is released only when the owner has actually stopped. A lost response or failed close/unload request cannot leave permanent orphan work. Terminal solver resources should be released promptly; confirmed delivery data remains available under the lease/disposal contract until the client has reconciled it. After receiving an exhausted result set completely, the client may release the server session while keeping the displayed results in page memory.
 
 The experiment's four-second test expiry and 120-second default are not proposed product policy.
 
-## 10. Human review frontier
+## 10. Acceptance record and remaining scope
 
-All statements above are proposal details except the explicitly linked previously confirmed behavior. No production code is authorized by the existence of this draft.
+The user explicitly confirmed all four proposals on 2026-11-09:
 
-- **Q1 — overall architecture/contract direction:** confirm the proposed single-origin browser application + native Rust service, Vue/TypeScript/Vite and Axum/Tokio basis, versioned HTTP/JSON operations, polling and shared-domain boundaries. No public API was implemented by this draft.
-- **Q2 — ordinary assessment:** automatically update BV/rule assessment after committed edits and restore, while optimization remains an explicit action? Recommended yes.
-- **Q3 — alternatives:** have the service automatically collect alternatives and the browser append confirmed deltas until pause/cancel/exhaustion, without a total cap? Recommended yes.
-- **Q4 — lease:** use 15 minutes without valid browser contact, renewed while the open page maintains contact? Recommended yes.
+1. One same-origin Vue/TypeScript/Vite browser application and Axum/Tokio Rust service, with versioned HTTP/JSON, polling and the shared domain boundary.
+2. Automatic ordinary BV/rule assessment after committed edits and restore; optimization only on explicit action.
+3. Automatic service-side collection and incremental browser delivery of all equal optima, without a total cap, until pause/cancel/exhaustion.
+4. A 15-minute lease without valid browser contact, renewed while contact continues, including during pause.
 
-If an answer changes a dependent policy, revise this draft before recording the runtime/integration decision. Device/performance acceptance and final language content remain their own map topics; no new layout exploration is proposed here.
+This records an accepted planning decision. It does not implement or deploy the product, certify performance or select package versions. Final language content and measurable device/performance acceptance remain their separate map topics before synthesis of the implementation specification. Do not reopen the accepted C2 layout, storage location or four policies without new evidence or user direction.
