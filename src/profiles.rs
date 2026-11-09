@@ -297,6 +297,7 @@ impl RuleProfile {
 #[derive(Debug, Clone, Default)]
 pub struct ProfileRegistry {
     profiles: Vec<RuleProfile>,
+    program_policies: Vec<ProgramPolicy>,
 }
 fn citation_valid(source: &SourceReference) -> bool {
     [&source.document, &source.version, &source.location]
@@ -304,6 +305,81 @@ fn citation_valid(source: &SourceReference) -> bool {
         .all(|s| !s.trim().is_empty())
 }
 impl ProfileRegistry {
+    /// Register an immutable category with explicit existing program mechanisms.
+    /// Registration validates both policies before publishing either one.
+    pub fn register_with_program_policy(
+        &mut self,
+        profile: RuleProfile,
+        policy: ProgramPolicy,
+    ) -> Result<(), ProfileSelectionError> {
+        if (policy.spins.max_spins > 0 && policy.spins.allowed.is_empty())
+            || policy.spins.required.iter().any(Vec::is_empty)
+            || (!policy.spins.required.is_empty() && policy.spins.max_spins == 0)
+            || (policy.require_choreographic_spin
+                && (policy.max_choreographic_spins == 0 || policy.spins.max_spins == 0))
+        {
+            return Err(profile.error(
+                ProfileErrorKind::Invalid,
+                "program policy has impossible spin requirements",
+            ));
+        }
+        let mut candidate = self.clone();
+        candidate.register(profile.clone())?;
+        crate::program_validation::validate_program_scope_with_credit(
+            &candidate,
+            &ProfileProgram {
+                profile: profile.id.clone(),
+                scoring_table: profile.scoring_table,
+                elements: vec![],
+            },
+            &[],
+            &policy,
+            crate::program_validation::EvaluationScope::AssumedRecognition,
+        )?;
+        let sources = [
+            &policy.spins.source,
+            &policy.step_source,
+            &policy.choreography_source,
+            &policy.feature_source,
+        ]
+        .into_iter()
+        .chain(policy.spins.positions.as_ref().map(|p| &p.source))
+        .chain(policy.spins.per_foot.as_ref().map(|p| &p.source));
+        if sources.into_iter().any(|s| !profile.sources.contains(s)) {
+            return Err(profile.error(
+                ProfileErrorKind::Invalid,
+                "program policy sources must belong to the selected profile edition",
+            ));
+        }
+        candidate.program_policies.push(policy);
+        *self = candidate;
+        Ok(())
+    }
+
+    pub(crate) fn program_policy(
+        &self,
+        profile: &RuleProfile,
+        supplied: Option<&ProgramPolicy>,
+    ) -> Result<Option<ProgramPolicy>, ProfileSelectionError> {
+        let expected = self
+            .program_policies
+            .iter()
+            .find(|p| p.spins.profile == profile.id)
+            .cloned()
+            .or_else(|| built_in_program_policy(profile));
+        check_builtin_override(profile, expected.as_ref(), supplied)?;
+        Ok(supplied.cloned().or(expected))
+    }
+
+    pub(crate) fn spin_policy(
+        &self,
+        profile: &RuleProfile,
+        supplied: Option<&RegularSpinPolicy>,
+    ) -> Result<Option<RegularSpinPolicy>, ProfileSelectionError> {
+        let expected = self.program_policy(profile, None)?.map(|p| p.spins);
+        check_builtin_override(profile, expected.as_ref(), supplied)?;
+        Ok(supplied.cloned().or(expected))
+    }
     pub fn senior() -> Self {
         let mut registry = Self::default();
         for category in [SeniorCategory::Women, SeniorCategory::Men] {
@@ -1056,22 +1132,4 @@ fn check_builtin_override<T: PartialEq>(
         ));
     }
     Ok(())
-}
-
-pub(crate) fn resolve_program_policy(
-    profile: &RuleProfile,
-    supplied: Option<&ProgramPolicy>,
-) -> Result<Option<ProgramPolicy>, ProfileSelectionError> {
-    let expected = built_in_program_policy(profile);
-    check_builtin_override(profile, expected.as_ref(), supplied)?;
-    Ok(supplied.cloned().or(expected))
-}
-
-pub(crate) fn resolve_spin_policy(
-    profile: &RuleProfile,
-    supplied: Option<&RegularSpinPolicy>,
-) -> Result<Option<RegularSpinPolicy>, ProfileSelectionError> {
-    let expected = built_in_program_policy(profile).map(|p| p.spins);
-    check_builtin_override(profile, expected.as_ref(), supplied)?;
-    Ok(supplied.cloned().or(expected))
 }

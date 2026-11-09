@@ -266,26 +266,50 @@ pub fn search_maximum_bv(
     let profile = registry
         .resolve(&request.profile, request.scoring_table)
         .map_err(PlanningSearchError::Profile)?;
-    if ![
-        AdultCategory::Bronze,
-        AdultCategory::Silver,
-        AdultCategory::Gold,
-        AdultCategory::Masters,
+    let senior = crate::senior::selected(profile, ProfileRule::Repetition);
+    if ProfileRule::ALL.iter().any(|rule| {
+        profile.binding(*rule).mechanism
+            != match (*rule, senior) {
+                (ProfileRule::Scoring, true) => RuleMechanism::SeniorScoringV1,
+                (ProfileRule::Scoring, false) => RuleMechanism::AdultScoringV1,
+                (_, true) => RuleMechanism::SeniorJumpPlanV1,
+                (_, false) => RuleMechanism::JumpPlanV1,
+            }
+    }) {
+        return Err(PlanningSearchError::UnsupportedCoverage {
+            profile: request.profile.clone(),
+            reason: "Complete planning search requires consistent supported jump and scoring mechanisms.",
+        });
+    }
+    let policy = registry
+        .program_policy(profile, None)
+        .map_err(PlanningSearchError::Profile)?
+        .ok_or(PlanningSearchError::UnsupportedCoverage {
+            profile: request.profile.clone(),
+            reason: "Complete planning search requires an explicit supported program policy.",
+        })?;
+    // Keep registered policies within the audited arithmetic and search envelope.
+    if [
+        profile.jumps.max_jumps,
+        profile.jumps.max_compounds,
+        profile.jumps.max_combinations,
+        profile.jumps.max_sequences,
+        profile.jumps.max_three_jump_compounds,
+        profile.jumps.max_eulers,
+        profile.jumps.max_repetitions,
+        policy.spins.max_spins,
+        policy.max_steps,
+        policy.max_choreographic_sequences,
+        policy.max_choreographic_spins,
     ]
-    .iter()
-    .any(|c| adult_profile(*c) == *profile)
-        && ![SeniorCategory::Women, SeniorCategory::Men]
-            .iter()
-            .any(|c| senior_profile(*c) == *profile)
+    .into_iter()
+    .any(|n| n > 11)
     {
         return Err(PlanningSearchError::UnsupportedCoverage {
             profile: request.profile.clone(),
-            reason: "Complete planning search supports the built-in Adult and Senior profiles.",
+            reason: "Planning policy exceeds the audited eleven-occurrence bounds.",
         });
     }
-    let policy = crate::profiles::resolve_program_policy(profile, None)
-        .map_err(PlanningSearchError::Profile)?
-        .ok_or(PlanningSearchError::InconsistentAssessment)?;
     let mut ids = std::collections::BTreeSet::new();
     for (i, required) in request.required.iter().enumerate() {
         if required.id.trim().is_empty() || !ids.insert(&required.id) {

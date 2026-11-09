@@ -141,7 +141,8 @@ impl<'a> Selection<'a> {
         table: ScoringTableId,
     ) -> Result<Self, ProfileSelectionError> {
         let profile = registry.resolve(id, table)?;
-        let policy = crate::profiles::resolve_program_policy(profile, None)?
+        let policy = registry
+            .program_policy(profile, None)?
             .ok_or_else(|| unsupported_profile(profile))?;
         Self::for_policy(registry, profile, table, &policy)
     }
@@ -164,7 +165,7 @@ impl<'a> Selection<'a> {
                 reason: "Selection requires a program policy bound to the selected profile.".into(),
             });
         }
-        crate::profiles::resolve_program_policy(profile, Some(policy))?;
+        registry.program_policy(profile, Some(policy))?;
         Ok(Self {
             registry,
             profile,
