@@ -54,6 +54,27 @@ pub fn assess_manual_bv(
     assess_selections(registry, profile, request).map(|(assessment, _, _)| assessment)
 }
 
+/// Assess a plan with an additional personal step-sequence maximum.
+/// The maximum affects personal conflicts only, preserving credit and category findings.
+pub fn assess_manual_bv_with_step_limit(
+    registry: &ProfileRegistry,
+    request: &ManualBvRequest,
+    maximum: Option<Level>,
+) -> Result<ManualBvAssessment, ProfileSelectionError> {
+    let profile = registry.resolve(&request.profile, request.scoring_table)?;
+    let (mut assessment, _, evidence) = assess_selections(registry, profile, request)?;
+    assessment.personal_conflicts.extend(
+        evidence
+            .iter()
+            .enumerate()
+            .filter_map(|(i, e)| crate::personal_limits::step_limit_conflict(e, maximum, i)),
+    );
+    assessment
+        .personal_conflicts
+        .sort_by_key(|c| c.element_index);
+    Ok(assessment)
+}
+
 pub(crate) fn assess_selections(
     registry: &ProfileRegistry,
     profile: &RuleProfile,

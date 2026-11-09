@@ -28,6 +28,9 @@ Selection, generation, optimization and immutable completion share these limits;
 manual assessment reports personal conflicts separately from BV and competition
 legality. Empty limits preserve existing behavior. See the
 [personal limits contract](docs/specs/personal-limits.md).
+`selectable_elements_with_step_limit`, `search_maximum_bv_with_step_limit` and
+`assess_manual_bv_with_step_limit` add an optional Basic–4 step-sequence ceiling
+while preserving existing request layouts and category-rule findings.
 The [manual category workflow](docs/manual-category-planning.md) explains selection,
 credited values and the distinction between drafts, violations and unsupported choices.
 Prepare a `GoeScenarioPlan` from the selected codes to run

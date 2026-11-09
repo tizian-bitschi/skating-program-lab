@@ -166,6 +166,7 @@ fn domain(
     registry: &ProfileRegistry,
     request: &PlanningSearchRequest,
     profile: &RuleProfile,
+    maximum: Option<Level>,
     control: &impl PlanningSearchControl,
 ) -> Result<Option<Vec<Atom>>, PlanningSearchError> {
     let Some(mut assumptions) = crate::selection::planned_jump_elements(
@@ -181,11 +182,12 @@ fn domain(
         return Ok(None);
     };
     assumptions.extend(
-        selectable_elements_with_limits(
+        selectable_elements_with_step_limit(
             registry,
             &request.profile,
             request.scoring_table,
             &request.personal_limits,
+            maximum,
         )
         .map_err(PlanningSearchError::Profile)?
         .into_iter()
@@ -263,6 +265,17 @@ pub fn search_maximum_bv(
     request: &PlanningSearchRequest,
     control: &impl PlanningSearchControl,
 ) -> Result<PlanningSearchOutcome, PlanningSearchError> {
+    search_maximum_bv_with_step_limit(registry, request, None, control)
+}
+
+/// Prove a maximum with an additional personal step-sequence level ceiling.
+/// `None` preserves the original search contract and request layout.
+pub fn search_maximum_bv_with_step_limit(
+    registry: &ProfileRegistry,
+    request: &PlanningSearchRequest,
+    maximum: Option<Level>,
+    control: &impl PlanningSearchControl,
+) -> Result<PlanningSearchOutcome, PlanningSearchError> {
     let profile = registry
         .resolve(&request.profile, request.scoring_table)
         .map_err(PlanningSearchError::Profile)?;
@@ -297,9 +310,10 @@ pub fn search_maximum_bv(
     }
     if request.exclusions.iter().any(|e| matches!(e,PlanningExclusion::ExactJump(j) if j.kind.is_none() || j.rotations.is_none_or(|r| r==0))) { return Err(invalid("Exact jump exclusions require a kind and positive rotation count.", vec![])); }
     let required_inputs = request.required.iter().map(|r| r.element.clone()).collect();
-    let required_assessment = assess_manual_bv(
+    let required_assessment = assess_manual_bv_with_step_limit(
         registry,
         &manual(request, required_inputs, SubmissionState::Draft),
+        maximum,
     )
     .map_err(PlanningSearchError::Profile)?;
     if !required_assessment.personal_conflicts.is_empty() {
@@ -312,7 +326,7 @@ pub fn search_maximum_bv(
             required_assessment.rotation_conflicts,
         ));
     }
-    let Some(mut atoms) = domain(registry, request, profile, control)? else {
+    let Some(mut atoms) = domain(registry, request, profile, maximum, control)? else {
         return Ok(PlanningSearchOutcome::Cancelled);
     };
     for (i, required) in request.required.iter().enumerate() {
@@ -394,5 +408,26 @@ pub fn search_maximum_bv(
             }],
         });
     }
-    model::search(registry, request, profile, &policy, &atoms, control)
+    let mut outcome = model::search(registry, request, profile, &policy, &atoms, control)?;
+    if maximum.is_some() {
+        if let PlanningSearchOutcome::ProvenMaximum(result) = &mut outcome {
+            for alternative in &mut result.alternatives {
+                let assessment = assess_manual_bv_with_step_limit(
+                    registry,
+                    &manual(
+                        request,
+                        alternative.elements.clone(),
+                        SubmissionState::Complete,
+                    ),
+                    maximum,
+                )
+                .map_err(PlanningSearchError::Profile)?;
+                if !assessment.personal_conflicts.is_empty() {
+                    return Err(PlanningSearchError::InconsistentAssessment);
+                }
+                alternative.assessment = assessment;
+            }
+        }
+    }
+    Ok(outcome)
 }
