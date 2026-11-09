@@ -143,3 +143,10 @@ StepLevel, Waltz and AdultWaltzPlanV1. External exhaustive Rust matches need
 updating. Technical acceptance and approval of this source compatibility change
 are separate gates; repository-required approval remains with the parent task.
 
+
+## Pending compatibility approval
+
+The [compatibility proposal](specs/issue-132-compatibility-proposal.md) records
+four public enum additions and a narrowly scoped exception to ADR 0002's profile
+version rule for corrections under unchanged authoritative editions. Both need
+explicit user approval. Passing acceptance checks does not close these gates.

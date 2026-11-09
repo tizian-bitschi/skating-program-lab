@@ -277,21 +277,7 @@ pub fn search_maximum_bv_with_step_limit(
     let profile = registry
         .resolve(&request.profile, request.scoring_table)
         .map_err(PlanningSearchError::Profile)?;
-    let senior = crate::senior::selected(profile, ProfileRule::Repetition);
-    if ProfileRule::ALL.iter().any(|rule| {
-        !(*rule == ProfileRule::Eligibility
-            && matches!(
-                profile.binding(*rule).mechanism,
-                RuleMechanism::AdultWaltzPlanV1(_)
-            ))
-            && profile.binding(*rule).mechanism
-                != match (*rule, senior) {
-                    (ProfileRule::Scoring, true) => RuleMechanism::SeniorScoringV1,
-                    (ProfileRule::Scoring, false) => RuleMechanism::AdultScoringV1,
-                    (_, true) => RuleMechanism::SeniorJumpPlanV1,
-                    (_, false) => RuleMechanism::JumpPlanV1,
-                }
-    }) {
+    if !crate::profiles::planning_mechanisms_supported(profile) {
         return Err(PlanningSearchError::UnsupportedCoverage {
             profile: request.profile.clone(),
             reason: "Complete planning search requires consistent supported jump and scoring mechanisms.",
@@ -465,17 +451,36 @@ pub fn search_maximum_bv_with_step_limit(
     let mut outcome = model::search(registry, request, profile, &policy, &atoms, control)?;
     if neutral_waltz {
         if let PlanningSearchOutcome::ProvenMaximum(result) = &mut outcome {
-            let cancelled = result.alternative_status == PlanningAlternativeStatus::Cancelled;
-            let base = result.alternatives[0].clone();
-            result.alternatives.clear();
-            for extra in 0..5 {
-                if extra > 0
-                    && (cancelled || control.is_cancelled(PlanningSearchPhase::Alternatives))
+            let maximum_base_hundredths = result.maximum_base_hundredths;
+            let reassess = |candidate: &mut PlanningProgram| -> Result<(), PlanningSearchError> {
+                let (assessment, program, _) = crate::manual_bv::assess_selections(
+                    registry,
+                    profile,
+                    &manual(
+                        request,
+                        candidate.elements.clone(),
+                        SubmissionState::Complete,
+                    ),
+                )
+                .map_err(PlanningSearchError::Profile)?;
+                if assessment.planning_compliance() != Ok(PlanningCompliance::Compliant)
+                    || assessment.total.exact_hundredths != Some(i64::from(maximum_base_hundredths))
+                    || !assessment
+                        .legality
+                        .validation
+                        .validation
+                        .findings
+                        .is_empty()
                 {
-                    result.alternative_status = PlanningAlternativeStatus::Cancelled;
-                    break;
+                    return Err(PlanningSearchError::InconsistentAssessment);
                 }
-                let mut candidate = base.clone();
+                candidate.program = program;
+                candidate.assessment = assessment;
+                Ok(())
+            };
+            // Restore ignored required occurrences in every confirmed composition,
+            // even when collection has already been cancelled.
+            for candidate in &mut result.alternatives {
                 for (input_index, required) in request
                     .required
                     .iter()
@@ -488,35 +493,29 @@ pub fn search_maximum_bv_with_step_limit(
                         input_index,
                     });
                 }
+                reassess(candidate)?;
+            }
+            let base = result.alternatives[0].clone();
+            let mut extra = 1;
+            while result.alternatives.len() < 5 {
+                if result.alternative_status == PlanningAlternativeStatus::Cancelled
+                    || control.is_cancelled(PlanningSearchPhase::Alternatives)
+                {
+                    result.alternative_status = PlanningAlternativeStatus::Cancelled;
+                    break;
+                }
+                let mut candidate = base.clone();
                 for _ in 0..extra {
                     candidate.elements.push(AssumedRecognition::new("W"));
                     candidate.provenance.push(PlanningProvenance::Added);
                 }
-                let (assessment, program, _) = crate::manual_bv::assess_selections(
-                    registry,
-                    profile,
-                    &manual(
-                        request,
-                        candidate.elements.clone(),
-                        SubmissionState::Complete,
-                    ),
-                )
-                .map_err(PlanningSearchError::Profile)?;
-                if assessment.planning_compliance() != Ok(PlanningCompliance::Compliant)
-                    || assessment.total.exact_hundredths
-                        != Some(i64::from(result.maximum_base_hundredths))
-                    || !assessment
-                        .legality
-                        .validation
-                        .validation
-                        .findings
-                        .is_empty()
-                {
-                    return Err(PlanningSearchError::InconsistentAssessment);
-                }
-                candidate.program = program;
-                candidate.assessment = assessment;
+                reassess(&mut candidate)?;
                 result.alternatives.push(candidate);
+                extra += 1;
+            }
+            if result.alternatives.len() == 5
+                && result.alternative_status != PlanningAlternativeStatus::Cancelled
+            {
                 result.alternative_status = PlanningAlternativeStatus::LimitReached;
             }
         }

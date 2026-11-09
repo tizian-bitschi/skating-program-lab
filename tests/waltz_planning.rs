@@ -88,9 +88,25 @@ fn ignored_waltz_has_unbounded_optimal_multiplicity_and_exact_required_identity(
         PlanningAlternativeStatus::LimitReached
     );
     assert_eq!(result.alternatives.len(), 5);
-    let mut counts = std::collections::BTreeSet::new();
+    let mut identities = std::collections::BTreeSet::new();
     for program in result.alternatives {
-        counts.insert(program.elements.iter().filter(|e| e.code == "W").count());
+        assert!(program.elements.iter().filter(|e| e.code == "W").count() >= 7);
+        let mut identity: Vec<_> = program.elements.iter().map(|e| e.code.clone()).collect();
+        identity.sort();
+        assert!(identities.insert(identity));
+        for (input_index, required) in request.required.iter().enumerate() {
+            let index = program
+                .provenance
+                .iter()
+                .position(|p| {
+                    *p == PlanningProvenance::Required {
+                        id: required.id.clone(),
+                        input_index,
+                    }
+                })
+                .unwrap();
+            assert_eq!(program.elements[index], required.element);
+        }
         assert_eq!(
             program
                 .provenance
@@ -101,7 +117,7 @@ fn ignored_waltz_has_unbounded_optimal_multiplicity_and_exact_required_identity(
         );
         assert_eq!(program.assessment.total.exact_hundredths, Some(1100));
     }
-    assert_eq!(counts.len(), 5);
+    assert_eq!(identities.len(), 5);
 }
 #[test]
 fn declared_called_waltz_compounds_have_zero_component_value_and_axel_semantics() {
@@ -202,6 +218,44 @@ fn ignored_waltz_keeps_zero_optima_nonempty_and_infinite() {
         maximum.alternative_status,
         PlanningAlternativeStatus::LimitReached
     );
+    struct CancelAugmentation(std::cell::Cell<usize>);
+    impl PlanningSearchControl for CancelAugmentation {
+        fn is_cancelled(&self, phase: PlanningSearchPhase) -> bool {
+            if phase == PlanningSearchPhase::Alternatives {
+                self.0.set(self.0.get() + 1);
+            }
+            self.0.get() >= 4
+        }
+    }
+    let PlanningSearchOutcome::ProvenMaximum(cancelled) = search_maximum_bv(
+        &registry,
+        &request,
+        &CancelAugmentation(std::cell::Cell::new(0)),
+    )
+    .unwrap() else {
+        panic!("zero maximum survives augmentation cancellation")
+    };
+    assert_eq!(cancelled.maximum_base_hundredths, 0);
+    assert_eq!(
+        cancelled.alternative_status,
+        PlanningAlternativeStatus::Cancelled
+    );
+    assert_eq!(cancelled.alternatives.len(), 2);
+    assert_eq!(
+        cancelled
+            .alternatives
+            .iter()
+            .map(|p| p.elements.len())
+            .collect::<Vec<_>>(),
+        [0, 1]
+    );
+    for candidate in cancelled.alternatives {
+        assert_eq!(candidate.assessment.total.exact_hundredths, Some(0));
+        assert_eq!(
+            candidate.assessment.planning_compliance(),
+            Ok(PlanningCompliance::Compliant)
+        );
+    }
 }
 #[cfg(feature = "optimizer")]
 #[test]

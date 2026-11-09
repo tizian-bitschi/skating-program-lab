@@ -1179,3 +1179,20 @@ impl RuleProfile {
         })
     }
 }
+
+/// Admit the named mechanisms shared by manual planning and complete search.
+pub(crate) fn planning_mechanisms_supported(profile: &RuleProfile) -> bool {
+    let senior = crate::senior::selected(profile, ProfileRule::Repetition);
+    ProfileRule::ALL.iter().all(|rule| {
+        let mechanism = &profile.binding(*rule).mechanism;
+        (*rule == ProfileRule::Eligibility
+            && matches!(mechanism, RuleMechanism::AdultWaltzPlanV1(_)))
+            || *mechanism
+                == match (*rule, senior) {
+                    (ProfileRule::Scoring, true) => RuleMechanism::SeniorScoringV1,
+                    (ProfileRule::Scoring, false) => RuleMechanism::AdultScoringV1,
+                    (_, true) => RuleMechanism::SeniorJumpPlanV1,
+                    (_, false) => RuleMechanism::JumpPlanV1,
+                }
+    })
+}

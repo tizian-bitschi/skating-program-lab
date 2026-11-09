@@ -182,20 +182,8 @@ pub(crate) fn assess_selections(
     )?;
     // Capability admission is explicit and independent of whether this plan
     // happens to exercise a rule. No empty finding list establishes coverage.
-    let senior = crate::senior::selected(profile, ProfileRule::Repetition);
     let supported = profile.unsupported_policies.is_empty()
-        && ProfileRule::ALL.iter().all(|rule| {
-            let mechanism = &profile.binding(*rule).mechanism;
-            (*rule == ProfileRule::Eligibility
-                && matches!(mechanism, RuleMechanism::AdultWaltzPlanV1(_)))
-                || *mechanism
-                    == match (*rule, senior) {
-                        (ProfileRule::Scoring, true) => RuleMechanism::SeniorScoringV1,
-                        (ProfileRule::Scoring, false) => RuleMechanism::AdultScoringV1,
-                        (_, true) => RuleMechanism::SeniorJumpPlanV1,
-                        (_, false) => RuleMechanism::JumpPlanV1,
-                    }
-        });
+        && crate::profiles::planning_mechanisms_supported(profile);
     for (id, source) in [
         (
             PLANNING_INVENTORY[0],
