@@ -87,11 +87,21 @@ fn registered_category_supports_all_four_planning_workflows() {
                 alternative.assessment.total.exact_hundredths,
                 Some(i64::from(result.maximum_base_hundredths))
             );
+            assert_eq!(
+                alternative.assessment.planning_compliance(),
+                Ok(PlanningCompliance::Compliant)
+            );
+            assert_eq!(alternative.assessment.planning_rule_inventory().count(), 8);
         }
         result
     };
     // Two Lutz solos (120), one level-1 spin (240), ChSq1 (350).
     assert_eq!(prove(&request).maximum_base_hundredths, 710);
+    request
+        .exclusions
+        .push(PlanningExclusion::JumpKind(JumpKind::Lutz));
+    assert_eq!(prove(&request).maximum_base_hundredths, 670);
+    request.exclusions.clear();
     request.required.push(RequiredPlanningElement {
         id: "toe".into(),
         element: AssumedRecognition::new("1T"),
@@ -107,7 +117,7 @@ fn registered_category_supports_all_four_planning_workflows() {
         &ManualBvRequest {
             personal_limits: request.personal_limits,
             rotation_preference: request.rotation_preference,
-            profile: request.profile,
+            profile: request.profile.clone(),
             scoring_table: request.scoring_table,
             submission: SubmissionState::Complete,
             elements: restricted.alternatives[0].elements.clone(),
@@ -115,6 +125,30 @@ fn registered_category_supports_all_four_planning_workflows() {
     )
     .unwrap();
     assert_eq!(assessed.total.exact_hundredths, Some(670));
+    assert_eq!(
+        assessed.planning_compliance(),
+        Ok(PlanningCompliance::Compliant)
+    );
+    // Independent manual input, not a solver reconstruction.
+    let manual = assess_manual_bv(
+        &registry,
+        &ManualBvRequest {
+            profile: request.profile.clone(),
+            scoring_table: request.scoring_table,
+            personal_limits: PersonalLimits::default(),
+            rotation_preference: RotationPreference::default(),
+            submission: SubmissionState::Complete,
+            elements: ["1T", "1T", "CLSp1", "ChSq1"]
+                .map(AssumedRecognition::new)
+                .to_vec(),
+        },
+    )
+    .unwrap();
+    assert_eq!(manual.total.exact_hundredths, Some(670));
+    assert_eq!(
+        manual.planning_compliance(),
+        Ok(PlanningCompliance::Compliant)
+    );
 }
 
 #[test]
@@ -149,6 +183,47 @@ fn invalid_registered_policy_does_not_publish_profile() {
         registry.get(&profile.id).unwrap_err().kind,
         ProfileErrorKind::Unknown
     );
+}
+
+#[test]
+fn unsupported_registered_mechanism_never_becomes_infeasibility_or_compliance() {
+    let mut profile = adult_profile(AdultCategory::Bronze);
+    profile.id.name = "unsupported-construction-mechanism".into();
+    profile.bindings[0].mechanism = RuleMechanism::Unsupported("future".into());
+    let mut registry = ProfileRegistry::adult();
+    registry.register(profile.clone()).unwrap();
+    let search = PlanningSearchRequest {
+        profile: profile.id.clone(),
+        scoring_table: profile.scoring_table,
+        personal_limits: PersonalLimits::default(),
+        rotation_preference: RotationPreference::default(),
+        required: vec![],
+        exclusions: vec![],
+    };
+    assert!(matches!(
+        search_maximum_bv(&registry, &search, &Continue),
+        Err(PlanningSearchError::Profile(ProfileSelectionError {
+            kind: ProfileErrorKind::Unsupported,
+            ..
+        }))
+    ));
+    assert!(matches!(
+        assess_manual_bv(
+            &registry,
+            &ManualBvRequest {
+                profile: profile.id,
+                scoring_table: profile.scoring_table,
+                personal_limits: PersonalLimits::default(),
+                rotation_preference: RotationPreference::default(),
+                submission: SubmissionState::Complete,
+                elements: vec![AssumedRecognition::new("1Lz")],
+            }
+        ),
+        Err(ProfileSelectionError {
+            kind: ProfileErrorKind::Unsupported,
+            ..
+        })
+    ));
 }
 
 #[test]

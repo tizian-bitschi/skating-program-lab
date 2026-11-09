@@ -87,6 +87,44 @@ fn exactly_five_atomic_partitions_are_retained_without_requiring_four_jump_entri
 }
 
 #[test]
+fn bronze_required_flip_has_four_positive_partitions_and_unbounded_neutral_waltzes() {
+    // Announcement p11 and SOV: jump bound270 requires twoLz plus threeF/Lo.
+    // A required solo F leaves precisely these four sorted whole-element multisets.
+    let mut request = restricted(&[JumpKind::Lutz, JumpKind::Flip, JumpKind::Loop]);
+    request.rotation_preference = RotationPreference::default();
+    request.required.push(RequiredPlanningElement {
+        id: "flip".into(),
+        element: AssumedRecognition::new("1F"),
+    });
+    let result = proved(&request, &Continue);
+    let expected = [
+        vec!["1F", "1F", "1Lz", "1Lz+1Lo"],
+        vec!["1F", "1F+1Lo", "1Lz", "1Lz"],
+        vec!["1F", "1Lo", "1Lz", "1Lz+1Lo"],
+        vec!["1F", "1Lo+1Lo", "1Lz", "1Lz"],
+    ]
+    .map(|v| v.into_iter().map(String::from).collect())
+    .into_iter()
+    .collect();
+    assert_eq!(result.maximum_base_hundredths, 1100);
+    assert_eq!(jump_codes(&result), expected);
+    assert_eq!(
+        result.alternative_status,
+        PlanningAlternativeStatus::Exhausted
+    );
+    request
+        .exclusions
+        .retain(|e| *e != PlanningExclusion::JumpKind(JumpKind::Waltz));
+    let neutral = proved(&request, &Continue);
+    assert_eq!(neutral.maximum_base_hundredths, 1100);
+    assert_eq!(neutral.alternatives.len(), 5);
+    assert_eq!(
+        neutral.alternative_status,
+        PlanningAlternativeStatus::LimitReached
+    );
+}
+
+#[test]
 fn two_partitions_exhaust_and_duplicate_required_solos_leave_one() {
     let mut request = restricted(&[JumpKind::ToeLoop]);
     let result = proved(&request, &Continue);

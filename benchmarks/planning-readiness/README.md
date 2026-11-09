@@ -40,7 +40,7 @@ PostproofReconstruction waits until MaximumProved, then cancels reconstruction
 of an additional alternative. `cancel_response_us` measures trigger to return.
 Before proof the example requires Cancelled with no result; after proof it
 requires the known source-derived maximum and Cancelled alternative status.
-The example checks the empty maxima against independent literals 1100, 1430,
+The example checks the empty maxima against independent literals 1100, 1480,
 2420, 3340, 13310 and 13310, and confirms every returned alternative's validation
 and credited total. Other correctness evidence lives in the public integration
 tests and source fixtures; assessment consistency alone is not an optimum oracle.
@@ -57,3 +57,11 @@ WASM, UI or latency guarantee.
 `summarize.py` checks the exact 216-row matrix, every manifest hash, independent
 literal expected values, proof/alternative status and cancellation outcomes before
 writing the summary. Its worked value bounds are recorded in the [readiness report](../../docs/milestone-117.md).
+
+For the pre-#132 baseline at `caa4127`, pass `baseline-caa4127` as the second
+summary argument. The default `issue-132` expectation edition retains the new
+Silver 14.80/14.70 maxima. The baseline keeps 14.30/14.20 and its four exhausted
+Bronze required-1F alternatives. `bronze_required_flip_has_four_positive_partitions_and_unbounded_neutral_waltzes`
+independently enumerates those four positive partitions; current ignored Waltz
+augmentation has unbounded optimal multiplicity and returns five with LimitReached.
+This versioning changes no baseline rows and retains all matrix/hash/status checks.
