@@ -441,8 +441,8 @@ pub fn search_maximum_bv_with_step_limit(
             }],
         });
     }
-    // Ignored movements have no finite multiplicity bound. Prove the objective
-    // without them, then construct distinct neutral extensions of a proved plan.
+    // Optional ignored movements do not distinguish compositions. Restore only
+    // exact required occurrences after proving the counted-element objective.
     let neutral_waltz = profile.waltz_policy() == Some(WaltzPolicy::Ignored)
         && atoms.iter().any(|a| a.assumption.code == "W");
     if neutral_waltz {
@@ -494,29 +494,6 @@ pub fn search_maximum_bv_with_step_limit(
                     });
                 }
                 reassess(candidate)?;
-            }
-            let base = result.alternatives[0].clone();
-            let mut extra = 1;
-            while result.alternatives.len() < 5 {
-                if result.alternative_status == PlanningAlternativeStatus::Cancelled
-                    || control.is_cancelled(PlanningSearchPhase::Alternatives)
-                {
-                    result.alternative_status = PlanningAlternativeStatus::Cancelled;
-                    break;
-                }
-                let mut candidate = base.clone();
-                for _ in 0..extra {
-                    candidate.elements.push(AssumedRecognition::new("W"));
-                    candidate.provenance.push(PlanningProvenance::Added);
-                }
-                reassess(&mut candidate)?;
-                result.alternatives.push(candidate);
-                extra += 1;
-            }
-            if result.alternatives.len() == 5
-                && result.alternative_status != PlanningAlternativeStatus::Cancelled
-            {
-                result.alternative_status = PlanningAlternativeStatus::LimitReached;
             }
         }
     }
