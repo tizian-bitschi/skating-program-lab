@@ -1,4 +1,4 @@
-revision=79229adc2efd8b1cce6f4877f11993b6dc92d4aa
+revision=d298c274ace7d97beaff599bda7675a6b34afd0c
 runs=3
 external_watchdog_seconds=120
 No API time/node budget; no repertoire reduction; serial fresh process per run; no excluded warmup.
@@ -14,7 +14,7 @@ host: x86_64-pc-windows-msvc
 release: 1.99.1
 LLVM version: 23.1.1
 cargo 1.99.1 (5f94df478 2026-08-27)
-binary_sha256=1DE70FF375E0662A1C9B539093D3F7B7AABFEAFDC4306016E80A5F2DB253DB16
+binary_sha256=0812A9525F1527733053BA4153D01A7DF1732B952CD5A12039723275E9859907
 cargo_lock_sha256=4687DFF3C4302E35738ED1B09FDC9DD9DF47C6B076A3B42AB573099B5570F9E8
 Pumpkin=0.5.0; native Release; compilation excluded; host thermal/background load uncontrolled.
 Memory=Windows Process.PeakWorkingSet64 sampled after API return while child waits for stdin ACK; includes process/runtime/domain/model. ACK is outside total_us.
