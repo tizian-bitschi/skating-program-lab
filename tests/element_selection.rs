@@ -21,7 +21,7 @@ fn six_profile_source_snapshots() {
             2,
             0,
             true,
-            false,
+            true,
         ),
         (
             &adults,
@@ -242,7 +242,7 @@ fn full_selection_matrix_matches_independent_category_and_catalog_fixtures() {
             silver_spins,
             "B12",
             "1A",
-            "ChSq1",
+            "ChSq1 ChSp1",
         ),
         (
             &adult,

@@ -221,7 +221,7 @@ fn atom_upper(atom: &Atom, profile: &RuleProfile, required: &[&Atom]) -> usize {
             } / atom.jumps.iter().filter(|j| *j == jump).count(),
         );
     }
-    if senior {
+    {
         for jump in &atom.jumps {
             let same_kind = atom.jumps.iter().filter(|j| j.kind == jump.kind).count();
             upper = upper.min(crate::senior::DEFINITION.max_kind_occurrences / same_kind);
@@ -274,7 +274,8 @@ pub(super) fn search(
     let senior = match &profile.binding(ProfileRule::Repetition).mechanism {
         RuleMechanism::JumpPlanV1 => false,
         RuleMechanism::SeniorJumpPlanV1 => true,
-        RuleMechanism::AdultScoringV1
+        RuleMechanism::AdultWaltzPlanV1(_)
+        | RuleMechanism::AdultScoringV1
         | RuleMechanism::SeniorScoringV1
         | RuleMechanism::Unsupported(_) => {
             return Err(PlanningSearchError::UnsupportedCoverage {
@@ -428,7 +429,7 @@ pub(super) fn search(
     );
     constrain(&|a| a.eulers as i32, 0, profile.jumps.max_eulers as i32);
     for permission in &profile.jumps.allowed {
-        if senior {
+        {
             constrain(
                 &|a| {
                     a.jumps
@@ -589,6 +590,7 @@ pub(super) fn search(
                     a.spin.is_some()
                 }
             })
+            .filter(|(a, _)| a.value != 0)
             .map(|(a, v)| v.scaled(a.value))
             .collect();
         if jumps {
@@ -625,6 +627,7 @@ pub(super) fn search(
         .iter()
         .zip(&counts)
         .filter(|(a, _)| a.jumps.is_empty() && a.spin.is_none())
+        .filter(|(a, _)| a.value != 0)
         .map(|(a, v)| v.scaled(a.value))
         .collect();
     terms.extend([
@@ -965,7 +968,8 @@ fn reconstruct(
         &manual(request, elements.clone(), SubmissionState::Complete),
     )
     .map_err(PlanningSearchError::Profile)?;
-    if assessment.total.exact_hundredths != Some(i64::from(maximum))
+    if assessment.planning_compliance() != Ok(PlanningCompliance::Compliant)
+        || assessment.total.exact_hundredths != Some(i64::from(maximum))
         || !assessment
             .legality
             .validation

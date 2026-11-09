@@ -154,7 +154,7 @@ pub(crate) fn report_program_legality(
                 && !program
                     .elements
                     .iter()
-                    .any(|e| matches!(e, PlannedElement::Jump(_))))
+                    .any(|e| matches!(e, PlannedElement::Jump(_)) && !matches!(e, PlannedElement::Jump(JumpElement::Solo(j)) if j.kind == Some(JumpKind::Waltz) && profile.waltz_policy() == Some(WaltzPolicy::Ignored))))
             || (matches!(rule, ProfileRule::Transition | ProfileRule::Structure)
                 && !program.elements.iter().any(|e| {
                     matches!(
@@ -324,8 +324,8 @@ pub(crate) fn report_program_legality(
         ] {
             inventory(&mut rules, id, source, None, state, reason);
         }
-        if adult {
-            inventory(&mut rules, "program-waltz-recognition", &profile.binding(ProfileRule::Eligibility).source, None, RuleCoverageState::Unsupported, "The planned listed-jump model cannot represent a Waltz jump and its category-specific counting consequences.");
+        if profile.waltz_policy().is_some() {
+            inventory(&mut rules, "program-waltz-recognition", &profile.binding(ProfileRule::Eligibility).source, None, RuleCoverageState::Evaluated, "Explicit Waltz intentions use the selected category counting and valuation policy; actual preparation-only recognition remains unevaluated.");
         }
         for index in spins
             .into_iter()

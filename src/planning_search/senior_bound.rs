@@ -49,7 +49,7 @@ fn upper_bound(
     // components, quints, repeated advanced types, repeated high types, Axel.
     let mut dp = BTreeMap::from([((0usize, 0usize, 0usize, 0usize, false), 0i32)]);
     for permission in &profile.jumps.allowed {
-        let solos: Vec<_> = atoms
+        let mut solos: Vec<_> = atoms
             .iter()
             .filter(|a| {
                 !a.combination()
@@ -58,6 +58,15 @@ fn upper_bound(
                     && a.jumps[0].kind == Some(permission.kind)
             })
             .collect();
+        // Distinct planned intentions can share listed repetition stock (W and
+        // 1A). Relax them to their highest credit once, never require both.
+        solos.sort_by(|a, b| {
+            a.jumps[0]
+                .rotations
+                .cmp(&b.jumps[0].rotations)
+                .then(b.value.cmp(&a.value))
+        });
+        solos.dedup_by(|a, b| a.jumps[0] == b.jumps[0]);
         let mut options = Vec::new();
         fn vectors(
             solos: &[&Atom],

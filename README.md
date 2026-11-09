@@ -11,9 +11,15 @@ exact required occurrences and semantic exclusions. It runs until proof or
 cooperative cancellation. It returns up to five equally optimal whole-element compositions, with
 separate maximum-proof and alternative-exhaustion status. See the [planning-search contract](docs/specs/planning-search.md).
 
+Complete category construction verdicts are available through
+`ManualBvAssessment::planning_compliance()` with a
+[positive source inventory](docs/specs/planning-compliance.md).
+
 For theoretical program construction, use `assess_manual_bv` to calculate
 base value from ordered SOV codes and check composition without supplying
 spin or step feature evidence. See the [assumed-recognition API](docs/specs/assumed-recognition.md).
+Planned Adult Waltz intentions, source-specific counting and zero-value alternatives are
+documented in the [Waltz contract](docs/specs/waltz-planning.md).
 `selectable_jump_elements` lists profile- and preference-permitted atomic jump
 code intentions, including sequences and Euler connections, with no
 1,000-variant cap. `RotationPreference::default()` restricts each compound to
@@ -28,6 +34,9 @@ Selection, generation, optimization and immutable completion share these limits;
 manual assessment reports personal conflicts separately from BV and competition
 legality. Empty limits preserve existing behavior. See the
 [personal limits contract](docs/specs/personal-limits.md).
+`selectable_elements_with_step_limit`, `search_maximum_bv_with_step_limit` and
+`assess_manual_bv_with_step_limit` add an optional Basic–4 step-sequence ceiling
+while preserving existing request layouts and category-rule findings.
 The [manual category workflow](docs/manual-category-planning.md) explains selection,
 credited values and the distinction between drafts, violations and unsupported choices.
 Prepare a `GoeScenarioPlan` from the selected codes to run
@@ -70,6 +79,9 @@ printed official credit from timing verification and legacy hypothetical GOE.
 **Current limits:** Difficult-variation categories, some feature prerequisites, Euler consequences and full execution/panel recognition remain unmodeled. The mixed-program optimizer rejects unsupported variants and retains explicit proof limits. Optimization results are maxima only within their stated candidate domains, **not** official or global program maxima. For planned regular-spin checks, see the [supported-case matrix](docs/specs/regular-spin-validation.md). For exact coverage and limitations, see [implementation status](docs/implementation-status.md).
 
 ## Documentation
+
+- Current complete backend planning acceptance and native baseline comparison:
+  [#132/#138 readiness report](docs/milestone-132.md).
 
 - Complete six-profile theoretical planning acceptance and repeated native Release
   evidence: [#117/#125 readiness report](docs/milestone-117.md).

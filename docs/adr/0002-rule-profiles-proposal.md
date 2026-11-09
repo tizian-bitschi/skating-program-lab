@@ -171,3 +171,14 @@ ignored. Source inventories and optimizer provenance have distinct granularity:
 optimizer results deduplicate exact references in stable order, retaining
 separate SOV row locations. One `ProfileRule` enum and its canonical rule list
 serve registration, Adult binding construction and validation.
+
+## Approved correction exception (#132)
+
+On 2026-11-09 the user approved retaining the existing Adult source-edition
+profile IDs for the #132 implementation corrections: Silver's permitted optional
+ChSp, explicit Adult Waltz treatment and the inherited jump-kind cap. The selected
+authoritative editions remain unchanged; prior buggy calculated results require
+recomputation. This exception covers only the corrections listed in the
+[accepted compatibility decisions](../specs/issue-132-compatibility-proposal.md);
+future policy, interpretation-scope or source-edition changes still require a new
+profile version.

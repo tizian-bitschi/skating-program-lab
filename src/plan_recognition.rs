@@ -4,6 +4,7 @@ use crate::*;
 
 pub(crate) fn jump_component(jump: &ListedJump) -> Option<ComponentCode> {
     let suffix = match jump.kind? {
+        JumpKind::Waltz => return ComponentCode::try_from("1A").ok(),
         JumpKind::ToeLoop => "T",
         JumpKind::Salchow => "S",
         JumpKind::Loop => "Lo",
@@ -22,7 +23,15 @@ pub(crate) fn intended_details(
     let mut calls = vec![];
     let codes = match (planned, evidence) {
         (PlannedElement::Jump(jump), ElementPlanEvidence::Jump { .. }) => match jump {
-            JumpElement::Solo(j) => vec![jump_component(j)?],
+            JumpElement::Solo(j) => {
+                if j.kind == Some(JumpKind::Waltz) {
+                    calls.push(RecordedCall {
+                        target: CallTarget::Component(0),
+                        call: PanelCall::Downgraded,
+                    });
+                }
+                vec![jump_component(j)?]
+            }
             JumpElement::Combination(parts) | JumpElement::Sequence(parts) => {
                 let codes: Option<Vec<_>> = parts
                     .iter()
@@ -33,6 +42,14 @@ pub(crate) fn intended_details(
                     })
                     .collect();
                 let codes = codes?;
+                for (index, part) in parts.iter().enumerate() {
+                    if matches!(part, JumpPart::Jump(j) if j.kind == Some(JumpKind::Waltz)) {
+                        calls.push(RecordedCall {
+                            target: CallTarget::Component(index),
+                            call: PanelCall::Downgraded,
+                        });
+                    }
+                }
                 if matches!(jump, JumpElement::Sequence(_)) {
                     calls.push(RecordedCall {
                         target: CallTarget::BetweenComponents(codes.len()),

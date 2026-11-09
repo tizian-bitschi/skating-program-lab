@@ -479,3 +479,226 @@ fn manual_entry_points_agree_on_clean_senior_repetition() {
     );
     assert!(strict.hypothetical_total.is_none());
 }
+
+#[test]
+fn adult_inherits_all_singles_kind_cap() {
+    // Sports Rules June12, Rule612 General remarks pp70–71 applies to all singles.
+    for category in [AdultCategory::Gold, AdultCategory::Masters] {
+        let assessment = assess_manual_bv(
+            &ProfileRegistry::adult(),
+            &request(
+                adult_profile(category).id,
+                SubmissionState::Complete,
+                &["1T", "1T", "2T", "2T"],
+            ),
+        )
+        .unwrap();
+        let finding = assessment
+            .legality
+            .validation
+            .validation
+            .findings
+            .iter()
+            .find(|f| f.rule_id == "isu-sports-2026-all-singles-kind-repetition")
+            .unwrap();
+        assert_eq!(finding.kind, FindingKind::Violation);
+        assert_eq!(finding.element_index, Some(3));
+        assert_eq!(finding.source.version, "2026-06-12");
+        assert!(finding.source.location.contains("70-71"));
+    }
+}
+
+#[test]
+fn complete_planning_verdict_checks_input_before_category_rules() {
+    let registry = ProfileRegistry::adult();
+    let profile = adult_profile(AdultCategory::Silver).id;
+    for (codes, expected) in [
+        (
+            vec!["1A", "CLSp2", "ChSp1", "ChSq1"],
+            PlanningCompliance::Compliant,
+        ),
+        (
+            vec!["2T", "CLSp2", "ChSp1", "ChSq1"],
+            PlanningCompliance::Noncompliant,
+        ),
+        (
+            vec!["1A", "CLSp3", "ChSp1", "ChSq1"],
+            PlanningCompliance::Noncompliant,
+        ),
+        (vec!["1A"], PlanningCompliance::Noncompliant),
+    ] {
+        let a = assess_manual_bv(
+            &registry,
+            &request(profile.clone(), SubmissionState::Complete, &codes),
+        )
+        .unwrap();
+        assert_eq!(a.planning_compliance(), Ok(expected), "{codes:?}");
+    }
+    for code in ["unknown", "1Lz+1A+SEQ"] {
+        let a = assess_manual_bv(
+            &registry,
+            &request(profile.clone(), SubmissionState::Complete, &[code]),
+        )
+        .unwrap();
+        assert!(a.planning_compliance().is_err());
+    }
+}
+
+#[test]
+fn binary_construction_covers_source_rule_families_for_all_six_profiles() {
+    // A: Adult announcement July16 pp8–11; R: Sports Rules June12 Rule612 pp70–72.
+    // H: Singles TP Handbook July15 pp14–25,27–33; C: Communication2788 May19 pp2–6.
+    for (registry, profile, base) in [
+        (
+            ProfileRegistry::adult(),
+            adult_profile(AdultCategory::Bronze),
+            vec!["1Lz", "SSp1", "ChSq1"],
+        ),
+        (
+            ProfileRegistry::adult(),
+            adult_profile(AdultCategory::Silver),
+            vec!["1A", "CLSp2", "ChSp1", "ChSq1"],
+        ),
+        (
+            ProfileRegistry::adult(),
+            adult_profile(AdultCategory::Gold),
+            vec!["1A", "CCoSp3", "FSSp3", "ChSp1", "StSq2"],
+        ),
+        (
+            ProfileRegistry::adult(),
+            adult_profile(AdultCategory::Masters),
+            vec!["1A", "CoSp4", "FSSp4", "ChSp1", "StSq4"],
+        ),
+        (
+            ProfileRegistry::senior(),
+            senior_profile(SeniorCategory::Women),
+            vec!["1A", "CoSp4", "FSSp4", "ChSp1", "StSq4", "ChSq1"],
+        ),
+        (
+            ProfileRegistry::senior(),
+            senior_profile(SeniorCategory::Men),
+            vec!["1A", "CoSp4", "FSSp4", "ChSp1", "StSq4", "ChSq1"],
+        ),
+    ] {
+        let assess = |codes: &[&str]| {
+            assess_manual_bv(
+                &registry,
+                &request(profile.id.clone(), SubmissionState::Complete, codes),
+            )
+            .unwrap()
+        };
+        assert_eq!(
+            assess(&base).planning_compliance(),
+            Ok(PlanningCompliance::Compliant)
+        );
+        let mut cases = vec![];
+        // Family cap, exact abbreviation repetition, jump count, exact repetition, eligibility.
+        let mut family = base.clone();
+        family.extend(["ChSp1", "ChSp1", "ChSp1"]);
+        cases.push(family);
+        let spin = *base.iter().find(|c| c.contains("Sp")).unwrap();
+        let mut repeated_spin = base.clone();
+        repeated_spin.push(spin);
+        cases.push(repeated_spin);
+        let mut jumps = base.clone();
+        jumps.extend(std::iter::repeat_n("1T", profile.jumps.max_jumps + 1));
+        cases.push(jumps);
+        let mut repeated = base.clone();
+        repeated.extend(["2T", "2T", "2T"]);
+        cases.push(repeated);
+        let mut compound = base.clone();
+        compound.push("1Lz+1Lo+1Lo+1Lo");
+        cases.push(compound);
+        let mut level = base.clone();
+        level.push("SSp4");
+        if profile.scoring.recognition_ruleset == RulesetId::IsuAdult2026_27July16
+            && profile.jumps.max_jumps < 5
+        {
+            cases.push(level);
+        }
+        for codes in cases {
+            let result = assess(&codes);
+            assert_eq!(
+                result.planning_compliance(),
+                Ok(PlanningCompliance::Noncompliant),
+                "{}: {codes:?}",
+                profile.id.name
+            );
+            assert!(result
+                .legality
+                .validation
+                .validation
+                .findings
+                .iter()
+                .any(|f| f.kind == FindingKind::Violation
+                    && !f.rule_id.is_empty()
+                    && !f.source.version.is_empty()
+                    && !f.source.location.is_empty()));
+        }
+        if profile.jumps.require_axel {
+            let codes: Vec<_> = base.iter().copied().filter(|c| *c != "1A").collect();
+            assert_eq!(
+                assess(&codes).planning_compliance(),
+                Ok(PlanningCompliance::Noncompliant)
+            );
+        }
+        let codes: Vec<_> = base.iter().copied().filter(|c| !c.contains("Sp")).collect();
+        if profile.category != adult_profile(AdultCategory::Bronze).category {
+            assert_eq!(
+                assess(&codes).planning_compliance(),
+                Ok(PlanningCompliance::Noncompliant)
+            );
+        }
+    }
+}
+
+#[test]
+fn understood_invalid_shapes_are_noncompliant_and_missing_intentions_are_errors() {
+    let registry = ProfileRegistry::adult();
+    let profile = adult_profile(AdultCategory::Silver).id;
+    for code in ["1Lz+1Lo+1Lo+1Lo", "1F+1Lo+SEQ"] {
+        let mut input = request(profile.clone(), SubmissionState::Complete, &[code, "CLSp2"]);
+        input.elements[0].direct_transitions_assumed = code.ends_with("+SEQ");
+        let assessed = assess_manual_bv(&registry, &input).unwrap();
+        assert_eq!(
+            assessed.planning_compliance(),
+            Ok(PlanningCompliance::Noncompliant),
+            "{code}"
+        );
+    }
+    for (code, direct) in [
+        ("1A", true),
+        ("1F+1A+SEQ", false),
+        ("1Lz++1Lo", false),
+        ("1A+SEQ", true),
+    ] {
+        let mut input = request(profile.clone(), SubmissionState::Complete, &[code, "CLSp2"]);
+        input.elements[0].direct_transitions_assumed = direct;
+        assert!(
+            assess_manual_bv(&registry, &input)
+                .unwrap()
+                .planning_compliance()
+                .is_err(),
+            "{code}"
+        );
+    }
+    let mut input = request(
+        profile,
+        SubmissionState::Complete,
+        &["1A", "CLSp2", "ChSp1"],
+    );
+    input.personal_limits.spin_levels.push(SpinLevelLimit {
+        abbreviation: SpinAbbreviation {
+            kind: RegularSpinKind::Layback,
+            entry: SpinEntry::NonFlying,
+            change_foot: true,
+        },
+        maximum: Level::Basic,
+    });
+    let assessed = assess_manual_bv(&registry, &input).unwrap();
+    assert!(!assessed.personal_conflicts.is_empty());
+    assert_eq!(
+        assessed.planning_compliance(),
+        Ok(PlanningCompliance::Compliant)
+    );
+}

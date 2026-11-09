@@ -4,6 +4,142 @@ use crate::program_validation::{
 };
 use crate::*;
 
+/// Personal exclusions of whole codes or semantic jump/spin content.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum PlanningExclusion {
+    /// Excludes this whole intended code, independently of transition evidence.
+    ExactElement(String),
+    JumpKind(JumpKind),
+    ExactJump(ListedJump),
+    SpinKind(RegularSpinKind),
+}
+
+impl PlanningExclusion {
+    pub(crate) fn valid(&self, selection: &Selection<'_>, table: ScoringTableId) -> bool {
+        let Self::ExactElement(code) = self else {
+            return true;
+        };
+        if matches!(code.as_str(), "W" | "W(1A<<)") {
+            return true;
+        }
+        let assumption = AssumedRecognition {
+            code: code.clone(),
+            direct_transitions_assumed: code.ends_with("+SEQ"),
+        };
+        // Check notation and published value independently of category admission.
+        crate::manual_bv::resolve_selection(
+            selection,
+            table,
+            RulesetId::IsuSenior2026_27June12,
+            &assumption,
+        )
+        .2
+        .is_some()
+    }
+
+    pub(crate) fn excludes_in_profile(&self, code: &str, profile: &RuleProfile) -> bool {
+        self.excludes(code)
+            || (profile.waltz_policy() == Some(WaltzPolicy::CalledAsDowngradedAxel)
+                && code.split('+').any(|c| matches!(c, "W" | "W(1A<<)"))
+                && matches!(
+                    self,
+                    Self::JumpKind(JumpKind::Axel)
+                        | Self::ExactJump(ListedJump {
+                            kind: Some(JumpKind::Axel),
+                            rotations: Some(1)
+                        })
+                ))
+    }
+
+    pub(crate) fn excludes(&self, code: &str) -> bool {
+        match self {
+            Self::ExactElement(excluded) => code == excluded,
+            Self::JumpKind(kind) => code.split('+').filter_map(clean_jump).any(|j| j.0 == *kind),
+            Self::ExactJump(jump) => {
+                code.split('+')
+                    .filter_map(clean_jump)
+                    .any(|(kind, rotations)| {
+                        jump.kind == Some(kind) && jump.rotations == Some(rotations)
+                    })
+            }
+            Self::SpinKind(kind) => crate::assumed_recognition::spin_abbreviation(code)
+                .is_some_and(|spin| spin.kind == *kind),
+        }
+    }
+}
+
+/// Individual choices intersected with personal maxima and planning exclusions.
+pub fn selectable_elements_with_exclusions(
+    registry: &ProfileRegistry,
+    profile: &ProfileId,
+    table: ScoringTableId,
+    limits: &PersonalLimits,
+    exclusions: &[PlanningExclusion],
+) -> Result<Vec<SelectableElement>, ProfileSelectionError> {
+    validate_exclusions(registry, profile, table, exclusions)?;
+    Ok(
+        selectable_elements_with_limits(registry, profile, table, limits)?
+            .into_iter()
+            .filter(|choice| {
+                !exclusions.iter().any(|e| {
+                    e.excludes_in_profile(
+                        choice.row.notation,
+                        registry.resolve(profile, table).expect("resolved profile"),
+                    )
+                })
+            })
+            .collect(),
+    )
+}
+
+/// Complete whole jump choices intersected with maxima, rotation and exclusions.
+pub fn selectable_jump_elements_with_exclusions(
+    registry: &ProfileRegistry,
+    profile: &ProfileId,
+    table: ScoringTableId,
+    rotation_preference: RotationPreference,
+    limits: &PersonalLimits,
+    exclusions: &[PlanningExclusion],
+) -> Result<Vec<AssumedRecognition>, ProfileSelectionError> {
+    validate_exclusions(registry, profile, table, exclusions)?;
+    Ok(
+        selectable_jump_elements_with_limits(
+            registry,
+            profile,
+            table,
+            rotation_preference,
+            limits,
+        )?
+        .into_iter()
+        .filter(|choice| {
+            !exclusions.iter().any(|e| {
+                e.excludes_in_profile(
+                    &choice.code,
+                    registry.resolve(profile, table).expect("resolved profile"),
+                )
+            })
+        })
+        .collect(),
+    )
+}
+
+fn validate_exclusions(
+    registry: &ProfileRegistry,
+    profile: &ProfileId,
+    table: ScoringTableId,
+    exclusions: &[PlanningExclusion],
+) -> Result<(), ProfileSelectionError> {
+    let selection = Selection::new(registry, profile, table)?;
+    if let Some(index) = exclusions.iter().position(|e| !e.valid(&selection, table)) {
+        return Err(ProfileSelectionError {
+            profile: profile.clone(),
+            kind: ProfileErrorKind::Invalid,
+            reason: format!("Malformed exact whole-element exclusion at index {index}."),
+        });
+    }
+    Ok(())
+}
+
 /// A published single-element choice. The catalog row identifies its edition,
 /// exact code, level (if numbered or Basic), value and source.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -95,9 +231,14 @@ pub fn check_selectable_element(
     table: ScoringTableId,
     code: &str,
 ) -> Result<SelectableElement, ElementSelectionError> {
-    Selection::new(registry, profile, table)
-        .map_err(ElementSelectionError::Profile)?
-        .check(code)
+    let selection =
+        Selection::new(registry, profile, table).map_err(ElementSelectionError::Profile)?;
+    if catalog_row(table, code).is_none() {
+        return Err(ElementSelectionError::UnknownCode {
+            source: table.source_reference(format!("Exact notation lookup: {code}")),
+        });
+    }
+    selection.check(code)
 }
 
 /// Check an exact choice using an explicit, profile-bound policy.
@@ -111,6 +252,11 @@ pub fn check_selectable_element_with_policy(
     let profile = registry
         .resolve(profile, table)
         .map_err(ElementSelectionError::Profile)?;
+    if catalog_row(table, code).is_none() {
+        return Err(ElementSelectionError::UnknownCode {
+            source: table.source_reference(format!("Exact notation lookup: {code}")),
+        });
+    }
     Selection::for_policy(registry, profile, table, policy)
         .map_err(ElementSelectionError::Profile)?
         .check(code)
@@ -141,7 +287,8 @@ impl<'a> Selection<'a> {
         table: ScoringTableId,
     ) -> Result<Self, ProfileSelectionError> {
         let profile = registry.resolve(id, table)?;
-        let policy = crate::profiles::resolve_program_policy(profile, None)?
+        let policy = registry
+            .program_policy(profile, None)?
             .ok_or_else(|| unsupported_profile(profile))?;
         Self::for_policy(registry, profile, table, &policy)
     }
@@ -164,7 +311,7 @@ impl<'a> Selection<'a> {
                 reason: "Selection requires a program policy bound to the selected profile.".into(),
             });
         }
-        crate::profiles::resolve_program_policy(profile, Some(policy))?;
+        registry.program_policy(profile, Some(policy))?;
         Ok(Self {
             registry,
             profile,
@@ -200,6 +347,10 @@ impl<'a> Selection<'a> {
         self.check(&assumption.code).map(|_| ())
     }
 
+    pub(crate) fn policy_waltz(&self) -> Option<WaltzPolicy> {
+        self.profile.waltz_policy()
+    }
+
     pub(crate) fn policy(&self) -> &ProgramPolicy {
         &self.policy
     }
@@ -208,7 +359,17 @@ impl<'a> Selection<'a> {
         if let Some(result) = self.checked.borrow().get(code) {
             return result.clone();
         }
-        let result = self.row(code).and_then(|row| self.check_row(row));
+        let result = if self.profile.waltz_code() == Some(code) {
+            Ok(SelectableElement {
+                row: catalog_row(self.table, "1A<<").expect("Waltz scoring row"),
+                kind: SelectableElementKind::SoloJump {
+                    kind: JumpKind::Waltz,
+                    rotations: 1,
+                },
+            })
+        } else {
+            self.row(code).and_then(|row| self.check_row(row))
+        };
         self.checked
             .borrow_mut()
             .insert(code.into(), result.clone());
@@ -321,6 +482,9 @@ fn unsupported_profile(profile: &RuleProfile) -> ProfileSelectionError {
 }
 
 pub(crate) fn clean_jump(code: &str) -> Option<(JumpKind, u8)> {
+    if matches!(code, "W" | "W(1A<<)") {
+        return Some((JumpKind::Waltz, 1));
+    }
     let (rotations, suffix) = code.split_at_checked(1)?;
     let kind = match suffix {
         "T" => JumpKind::ToeLoop,
@@ -376,6 +540,12 @@ pub(crate) fn planned_jump_elements(
             }
         }
     }
+    if let Some(code) = selected.profile.waltz_code() {
+        choices.push(AssumedRecognition::new(code));
+        if selected.profile.waltz_policy() == Some(WaltzPolicy::CalledAsDowngradedAxel) {
+            components.push(code);
+        }
+    }
     for length in 2..=policy.max_compound_length {
         let mut digits = vec![0; length];
         if components.is_empty() {
@@ -388,7 +558,7 @@ pub(crate) fn planned_jump_elements(
             let word: Vec<_> = digits.iter().map(|&i| components[i]).collect();
             // An atomic choice must itself fit the program's repetition limit.
             if word.iter().all(|code| {
-                (code.starts_with('1')
+                ((code.starts_with('1') || matches!(*code, "W" | "W(1A<<)"))
                     && crate::senior::selected(selected.profile, ProfileRule::Repetition))
                     || word.iter().filter(|other| *other == code).count() <= policy.max_repetitions
             }) {
@@ -407,11 +577,10 @@ pub(crate) fn planned_jump_elements(
                         choices.push(AssumedRecognition::new(&code));
                     }
                     if policy.max_sequences > 0
-                        && word
-                            .iter()
-                            .enumerate()
-                            .skip(1)
-                            .any(|(index, code)| code.ends_with('A') && euler_gap != Some(index))
+                        && word.iter().enumerate().skip(1).any(|(index, code)| {
+                            (code.ends_with('A') || matches!(*code, "W" | "W(1A<<)"))
+                                && euler_gap != Some(index)
+                        })
                     {
                         choices.push(AssumedRecognition {
                             code: format!("{code}+SEQ"),
@@ -497,6 +666,30 @@ pub fn selectable_jump_elements_with_limits(
     .map(|choices| choices.expect("noncancellable listing"))
 }
 
+/// Profile and personal repertoire choices with an optional step-sequence maximum.
+/// Choreographic elements have no level and are unaffected.
+pub fn selectable_elements_with_step_limit(
+    registry: &ProfileRegistry,
+    profile: &ProfileId,
+    table: ScoringTableId,
+    limits: &PersonalLimits,
+    maximum: Option<Level>,
+) -> Result<Vec<SelectableElement>, ProfileSelectionError> {
+    Ok(
+        selectable_elements_with_limits(registry, profile, table, limits)?
+            .into_iter()
+            .filter(|s| {
+                s.kind != SelectableElementKind::StepSequence
+                    || maximum.is_none_or(|maximum| {
+                        s.row
+                            .level
+                            .is_some_and(|level| level.number() <= maximum.number())
+                    })
+            })
+            .collect(),
+    )
+}
+
 #[cfg(test)]
 mod planning_tests {
     use super::*;
@@ -562,7 +755,12 @@ mod planning_tests {
             )
             .unwrap()
             .unwrap();
-            assert_eq!(choices.len(), count, "{}", profile.category);
+            assert_eq!(
+                choices.iter().filter(|c| !c.code.contains('W')).count(),
+                count,
+                "{}",
+                profile.category
+            );
             assert!(choices.iter().any(|c| c.code == present), "{present}");
             assert!(!choices.iter().any(|c| c.code == absent), "{absent}");
             let chosen = choices.iter().find(|c| c.code == present).unwrap().clone();

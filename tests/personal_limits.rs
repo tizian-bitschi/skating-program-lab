@@ -221,7 +221,7 @@ fn maximum_proof_carries_limits_and_required_conflicts_are_localized() {
     else {
         panic!("maximum");
     };
-    assert_eq!(maximum.maximum_base_hundredths, 1430);
+    assert_eq!(maximum.maximum_base_hundredths, 1480);
     assert_eq!(maximum.personal_limits, request.personal_limits);
     request
         .exclusions
@@ -231,7 +231,7 @@ fn maximum_proof_carries_limits_and_required_conflicts_are_localized() {
     else {
         panic!("maximum");
     };
-    assert_eq!(maximum.maximum_base_hundredths, 1300);
+    assert_eq!(maximum.maximum_base_hundredths, 1350);
     request.personal_limits.spin_levels.push(SpinLevelLimit {
         abbreviation: SpinAbbreviation {
             kind: RegularSpinKind::Combination,

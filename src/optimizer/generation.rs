@@ -489,7 +489,8 @@ fn generate_candidates(
     let profile = registry
         .resolve(&request.profile, request.scoring_table)
         .map_err(E::Profile)?;
-    let policy = crate::profiles::resolve_program_policy(profile, None)
+    let policy = registry
+        .program_policy(profile, None)
         .map_err(E::Profile)?
         .ok_or(E::UnsupportedGenerator(
             "only exact built-in Adult and Senior 2026/27 profiles have generation contracts",

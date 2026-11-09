@@ -50,6 +50,8 @@ pub struct ListedJump {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum JumpKind {
+    /// An intended half-revolution Waltz jump, distinct from listed 1A.
+    Waltz,
     ToeLoop,
     Salchow,
     Loop,

@@ -23,9 +23,18 @@ pub enum ProfileProvenance {
     Synthetic,
 }
 
+/// Source-bound treatment of an explicitly planned Waltz jump.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum WaltzPolicy {
+    Ignored,
+    CalledAsDowngradedAxel,
+}
+
 /// Each mechanism is a named implementation version, not an expression language.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RuleMechanism {
+    /// Adult jump rules with an explicit source-bound Waltz treatment.
+    AdultWaltzPlanV1(WaltzPolicy),
     JumpPlanV1,
     AdultScoringV1,
     SeniorJumpPlanV1,
@@ -297,6 +306,7 @@ impl RuleProfile {
 #[derive(Debug, Clone, Default)]
 pub struct ProfileRegistry {
     profiles: Vec<RuleProfile>,
+    program_policies: Vec<ProgramPolicy>,
 }
 fn citation_valid(source: &SourceReference) -> bool {
     [&source.document, &source.version, &source.location]
@@ -304,6 +314,81 @@ fn citation_valid(source: &SourceReference) -> bool {
         .all(|s| !s.trim().is_empty())
 }
 impl ProfileRegistry {
+    /// Register an immutable category with explicit existing program mechanisms.
+    /// Registration validates both policies before publishing either one.
+    pub fn register_with_program_policy(
+        &mut self,
+        profile: RuleProfile,
+        policy: ProgramPolicy,
+    ) -> Result<(), ProfileSelectionError> {
+        if (policy.spins.max_spins > 0 && policy.spins.allowed.is_empty())
+            || policy.spins.required.iter().any(Vec::is_empty)
+            || (!policy.spins.required.is_empty() && policy.spins.max_spins == 0)
+            || (policy.require_choreographic_spin
+                && (policy.max_choreographic_spins == 0 || policy.spins.max_spins == 0))
+        {
+            return Err(profile.error(
+                ProfileErrorKind::Invalid,
+                "program policy has impossible spin requirements",
+            ));
+        }
+        let mut candidate = self.clone();
+        candidate.register(profile.clone())?;
+        crate::program_validation::validate_program_scope_with_credit(
+            &candidate,
+            &ProfileProgram {
+                profile: profile.id.clone(),
+                scoring_table: profile.scoring_table,
+                elements: vec![],
+            },
+            &[],
+            &policy,
+            crate::program_validation::EvaluationScope::AssumedRecognition,
+        )?;
+        let sources = [
+            &policy.spins.source,
+            &policy.step_source,
+            &policy.choreography_source,
+            &policy.feature_source,
+        ]
+        .into_iter()
+        .chain(policy.spins.positions.as_ref().map(|p| &p.source))
+        .chain(policy.spins.per_foot.as_ref().map(|p| &p.source));
+        if sources.into_iter().any(|s| !profile.sources.contains(s)) {
+            return Err(profile.error(
+                ProfileErrorKind::Invalid,
+                "program policy sources must belong to the selected profile edition",
+            ));
+        }
+        candidate.program_policies.push(policy);
+        *self = candidate;
+        Ok(())
+    }
+
+    pub(crate) fn program_policy(
+        &self,
+        profile: &RuleProfile,
+        supplied: Option<&ProgramPolicy>,
+    ) -> Result<Option<ProgramPolicy>, ProfileSelectionError> {
+        let expected = self
+            .program_policies
+            .iter()
+            .find(|p| p.spins.profile == profile.id)
+            .cloned()
+            .or_else(|| built_in_program_policy(profile));
+        check_builtin_override(profile, expected.as_ref(), supplied)?;
+        Ok(supplied.cloned().or(expected))
+    }
+
+    pub(crate) fn spin_policy(
+        &self,
+        profile: &RuleProfile,
+        supplied: Option<&RegularSpinPolicy>,
+    ) -> Result<Option<RegularSpinPolicy>, ProfileSelectionError> {
+        let expected = self.program_policy(profile, None)?.map(|p| p.spins);
+        check_builtin_override(profile, expected.as_ref(), supplied)?;
+        Ok(supplied.cloned().or(expected))
+    }
     pub fn senior() -> Self {
         let mut registry = Self::default();
         for category in [SeniorCategory::Women, SeniorCategory::Men] {
@@ -503,6 +588,7 @@ impl ProfileRegistry {
                 && citation_valid(&b.source)
                 && profile.sources.contains(&b.source)
                 && match b.mechanism {
+                    RuleMechanism::AdultWaltzPlanV1(_) => b.rule == ProfileRule::Eligibility,
                     RuleMechanism::JumpPlanV1 | RuleMechanism::SeniorJumpPlanV1 => {
                         b.rule != ProfileRule::Scoring
                     }
@@ -900,7 +986,7 @@ pub fn adult_program_policy(category: AdultCategory) -> ProgramPolicy {
         spins: adult_regular_spin_policy(category),
         max_steps: usize::from(d.advanced),
         max_choreographic_sequences: usize::from(!d.advanced),
-        max_choreographic_spins: usize::from(d.advanced),
+        max_choreographic_spins: usize::from(d.advanced || category == AdultCategory::Silver),
         require_choreographic_spin: d.advanced,
         max_step_level: d.step_level,
         step_movement_required: d.step_movement,
@@ -1058,20 +1144,55 @@ fn check_builtin_override<T: PartialEq>(
     Ok(())
 }
 
-pub(crate) fn resolve_program_policy(
-    profile: &RuleProfile,
-    supplied: Option<&ProgramPolicy>,
-) -> Result<Option<ProgramPolicy>, ProfileSelectionError> {
-    let expected = built_in_program_policy(profile);
-    check_builtin_override(profile, expected.as_ref(), supplied)?;
-    Ok(supplied.cloned().or(expected))
+impl RuleProfile {
+    pub fn waltz_policy(&self) -> Option<WaltzPolicy> {
+        match self.binding(ProfileRule::Eligibility).mechanism {
+            RuleMechanism::AdultWaltzPlanV1(policy) => Some(policy),
+            RuleMechanism::JumpPlanV1 | RuleMechanism::SeniorJumpPlanV1
+                if !self.jumps.prohibited(&ListedJump {
+                    kind: Some(JumpKind::Axel),
+                    rotations: Some(1),
+                }) =>
+            {
+                Some(WaltzPolicy::CalledAsDowngradedAxel)
+            }
+            _ => None,
+        }
+    }
+    pub(crate) fn waltz_code(&self) -> Option<&'static str> {
+        if !self
+            .families
+            .allowed
+            .contains(&ProfileElementFamily::SoloJump)
+        {
+            return None;
+        }
+        self.waltz_policy().map(|_| {
+            if matches!(
+                self.binding(ProfileRule::Eligibility).mechanism,
+                RuleMechanism::AdultWaltzPlanV1(_)
+            ) {
+                "W"
+            } else {
+                "W(1A<<)"
+            }
+        })
+    }
 }
 
-pub(crate) fn resolve_spin_policy(
-    profile: &RuleProfile,
-    supplied: Option<&RegularSpinPolicy>,
-) -> Result<Option<RegularSpinPolicy>, ProfileSelectionError> {
-    let expected = built_in_program_policy(profile).map(|p| p.spins);
-    check_builtin_override(profile, expected.as_ref(), supplied)?;
-    Ok(supplied.cloned().or(expected))
+/// Admit the named mechanisms shared by manual planning and complete search.
+pub(crate) fn planning_mechanisms_supported(profile: &RuleProfile) -> bool {
+    let senior = crate::senior::selected(profile, ProfileRule::Repetition);
+    ProfileRule::ALL.iter().all(|rule| {
+        let mechanism = &profile.binding(*rule).mechanism;
+        (*rule == ProfileRule::Eligibility
+            && matches!(mechanism, RuleMechanism::AdultWaltzPlanV1(_)))
+            || *mechanism
+                == match (*rule, senior) {
+                    (ProfileRule::Scoring, true) => RuleMechanism::SeniorScoringV1,
+                    (ProfileRule::Scoring, false) => RuleMechanism::AdultScoringV1,
+                    (_, true) => RuleMechanism::SeniorJumpPlanV1,
+                    (_, false) => RuleMechanism::JumpPlanV1,
+                }
+    })
 }

@@ -60,7 +60,7 @@ mod measured {
             "Silver" => (
                 ProfileRegistry::adult(),
                 adult_profile(AdultCategory::Silver),
-                1430,
+                1480,
             ),
             "Gold" => (
                 ProfileRegistry::adult(),
@@ -158,6 +158,8 @@ mod measured {
                                 .validation
                                 .findings
                                 .is_empty()
+                            && p.assessment.planning_compliance()
+                                == Ok(PlanningCompliance::Compliant)
                     })
                     && (control.cancel.is_empty()
                         || (control.proved.get()

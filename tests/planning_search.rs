@@ -20,6 +20,143 @@ impl PlanningSearchControl for Continue {
 }
 
 #[test]
+fn malformed_exact_exclusions_are_invalid_but_other_category_codes_are_harmless() {
+    let mut r = request(AdultCategory::Bronze);
+    for code in ["", "unknown", "1T++1Lo", "1T+unknown"] {
+        r.exclusions = vec![PlanningExclusion::ExactElement(code.into())];
+        assert!(matches!(
+            search_maximum_bv(&ProfileRegistry::adult(), &r, &Continue),
+            Err(PlanningSearchError::InvalidRequest { .. })
+        ));
+    }
+    r.exclusions = vec![PlanningExclusion::ExactElement("4A".into())];
+    assert_eq!(proved(&r).maximum_base_hundredths, 1100);
+}
+
+#[test]
+fn exact_whole_exclusions_preserve_components_and_localize_duplicate_requirements() {
+    let mut r = request(AdultCategory::Bronze);
+    r.exclusions = vec![PlanningExclusion::ExactElement("1Lz+1Lo".into())];
+    let choices = selectable_jump_elements_with_exclusions(
+        &ProfileRegistry::adult(),
+        &r.profile,
+        r.scoring_table,
+        r.rotation_preference,
+        &r.personal_limits,
+        &r.exclusions,
+    )
+    .unwrap();
+    assert!(!choices.contains(&AssumedRecognition::new("1Lz+1Lo")));
+    assert!(choices.contains(&AssumedRecognition::new("1Lz")));
+    assert!(choices.contains(&AssumedRecognition::new("1Lo")));
+    assert!(choices.contains(&AssumedRecognition::new("1F+1Lo")));
+    let result = proved(&r);
+    assert_eq!(result.maximum_base_hundredths, 1100);
+    assert!(result
+        .alternatives
+        .iter()
+        .all(|p| !p.elements.contains(&AssumedRecognition::new("1Lz+1Lo"))));
+    require(&mut r, "first", "1Lz+1Lo");
+    require(&mut r, "second", "1Lz+1Lo");
+    let Err(PlanningSearchError::InvalidRequest { diagnostics, .. }) =
+        search_maximum_bv(&ProfileRegistry::adult(), &r, &Continue)
+    else {
+        panic!("expected conflicts")
+    };
+    assert_eq!(diagnostics[0].required_input_indices, [0, 1]);
+}
+
+#[test]
+fn exact_exclusions_cover_every_family_without_excluding_other_levels_or_forms() {
+    let registry = ProfileRegistry::adult();
+    for (category, code, retained) in [
+        (AdultCategory::Bronze, "CCSp1", "CCSpB"),
+        (AdultCategory::Bronze, "ChSq1", "CCSp1"),
+        (AdultCategory::Gold, "StSq2", "StSq1"),
+        (AdultCategory::Gold, "ChSp1", "StSq2"),
+    ] {
+        let mut r = request(category);
+        r.exclusions
+            .push(PlanningExclusion::ExactElement(code.into()));
+        let choices = selectable_elements_with_exclusions(
+            &registry,
+            &r.profile,
+            r.scoring_table,
+            &r.personal_limits,
+            &r.exclusions,
+        )
+        .unwrap();
+        assert!(!choices.iter().any(|s| s.row.notation == code));
+        assert!(choices.iter().any(|s| s.row.notation == retained));
+        require(&mut r, "excluded", code);
+        assert!(
+            matches!(search_maximum_bv(&registry, &r, &Continue), Err(PlanningSearchError::InvalidRequest { diagnostics, .. }) if diagnostics[0].required_input_indices == [0])
+        );
+    }
+    let mut r = request(AdultCategory::Silver);
+    r.exclusions
+        .push(PlanningExclusion::ExactElement("1F+1A+SEQ".into()));
+    require(&mut r, "sequence", "1F+1A+SEQ");
+    r.required[0].element.direct_transitions_assumed = true;
+    assert!(
+        matches!(search_maximum_bv(&registry, &r, &Continue), Err(PlanningSearchError::InvalidRequest { diagnostics, .. }) if diagnostics[0].required_input_indices == [0])
+    );
+}
+
+#[test]
+fn exact_spin_exclusions_prove_infeasibility_and_bounded_nonjump_optimum() {
+    let registry = ProfileRegistry::adult();
+    let mut r = request(AdultCategory::Silver);
+    r.exclusions = selectable_elements(&registry, &r.profile, r.scoring_table)
+        .unwrap()
+        .iter()
+        .filter(|s| matches!(s.kind, SelectableElementKind::RegularSpin(_)))
+        .map(|s| PlanningExclusion::ExactElement(s.row.notation.into()))
+        .collect();
+    assert!(matches!(
+        search_maximum_bv(&registry, &r, &Continue).unwrap(),
+        PlanningSearchOutcome::Infeasible { .. }
+    ));
+
+    let mut r = request(AdultCategory::Gold);
+    r.exclusions = [
+        JumpKind::ToeLoop,
+        JumpKind::Salchow,
+        JumpKind::Loop,
+        JumpKind::Flip,
+        JumpKind::Lutz,
+        JumpKind::Axel,
+    ]
+    .into_iter()
+    .map(PlanningExclusion::JumpKind)
+    .collect();
+    require(&mut r, "combination", "CCoSp3V");
+    require(&mut r, "flying", "FSSpB");
+    r.exclusions
+        .extend(["StSq2", "ChSp1"].map(|s| PlanningExclusion::ExactElement(s.into())));
+    assert!(matches!(
+        search_maximum_bv(&registry, &r, &Continue).unwrap(),
+        PlanningSearchOutcome::Infeasible { .. }
+    ));
+    r.exclusions.pop();
+    let result = proved(&r);
+    // Communication 2786 pp.7,9,14: 270 + 200 + StSq1 190 + ChSp1 350.
+    assert_eq!(result.maximum_base_hundredths, 1010);
+    assert_eq!(result.alternatives.len(), 1);
+    assert_eq!(
+        result.alternative_status,
+        PlanningAlternativeStatus::Exhausted
+    );
+    assert!(result.alternatives[0]
+        .elements
+        .contains(&AssumedRecognition::new("StSq1")));
+    assert_eq!(
+        result.alternatives[0].assessment.total.exact_hundredths,
+        Some(1010)
+    );
+}
+
+#[test]
 fn empty_bronze_request_proves_the_source_derived_maximum() {
     let request = request(AdultCategory::Bronze);
     let PlanningSearchOutcome::ProvenMaximum(result) =
@@ -59,8 +196,8 @@ fn empty_silver_request_proves_the_source_derived_maximum() {
         panic!("expected a proved maximum")
     };
     // Seven listed jumps: 2*1A(110)+2*1Lz(60)+2*1F(50)+1Lo(50)=490.
-    // CCoSp2=300 and CLSp2=290, ChSq1=350; Eu is zero value.
-    assert_eq!(result.maximum_base_hundredths, 1430);
+    // ChSp1=350 and mandatory-role CLSp2=290, ChSq1=350; Eu is zero value.
+    assert_eq!(result.maximum_base_hundredths, 1480);
 }
 
 fn require(request: &mut PlanningSearchRequest, id: &str, code: &str) {
@@ -84,7 +221,7 @@ fn silver_preserves_exact_free_placement_and_duplicate_occurrences() {
     require(&mut r, "spin", "CSSp2");
     require(&mut r, "compound", "1F+1Lo");
     let result = proved(&r);
-    assert_eq!(result.maximum_base_hundredths, 1420);
+    assert_eq!(result.maximum_base_hundredths, 1470);
     for (input_index, required) in r.required.iter().enumerate() {
         let c = &result.alternatives[0];
         let index = c
@@ -139,8 +276,8 @@ fn semantic_exclusions_cover_compounds_rotations_and_named_spin_forms() {
         PlanningExclusion::SpinKind(RegularSpinKind::Layback),
     ];
     let result = proved(&r);
-    // Seven permitted components: Lz,Lz,F,F,Lo,Lo,S =360. Best spins300+280.
-    assert_eq!(result.maximum_base_hundredths, 1290);
+    // Seven components Lz,Lz,F,F,Lo,Lo,S=360; ChSp350+CSSp280+ChSq350.
+    assert_eq!(result.maximum_base_hundredths, 1340);
     let c = &result.alternatives[0];
     assert!(c
         .elements
@@ -150,7 +287,7 @@ fn semantic_exclusions_cover_compounds_rotations_and_named_spin_forms() {
         kind: Some(JumpKind::Axel),
         rotations: Some(1),
     })];
-    assert_eq!(proved(&r).maximum_base_hundredths, 1300);
+    assert_eq!(proved(&r).maximum_base_hundredths, 1350);
 }
 
 #[test]
@@ -332,6 +469,7 @@ fn complete_public_repertoire_matches_an_independent_small_exhaustive_oracle() {
             require(&mut r, id, code);
         }
         r.exclusions = [
+            JumpKind::Waltz,
             JumpKind::Loop,
             JumpKind::Flip,
             JumpKind::Lutz,

@@ -86,13 +86,41 @@ impl AssumedRecognition {
                         )),
             };
             let details = crate::plan_recognition::intended_details(element, &evidence)?;
+            let scoring_code = self
+                .code
+                .split('+')
+                .map(|part| {
+                    if matches!(part, "W" | "W(1A<<)") {
+                        "1A<<"
+                    } else {
+                        part
+                    }
+                })
+                .collect::<Vec<_>>()
+                .join("+");
             let value = crate::scoring::assumed_jump_unit_value(
                 table,
                 &details,
-                &self.code,
+                &scoring_code,
                 ruleset == RulesetId::IsuSenior2026_27June12,
             )?;
             return Some((evidence, value));
+        }
+        if matches!(self.code.as_str(), "W" | "W(1A<<)")
+            && matches!(element, PlannedElement::Jump(JumpElement::Solo(j)) if j.kind == Some(JumpKind::Waltz) && j.rotations == Some(1))
+        {
+            let row = catalog_row(table, "1A<<")?;
+            return Some((
+                ElementPlanEvidence::Jump {
+                    direct_transitions_assumed: false,
+                },
+                BaseValue {
+                    hundredths: 0,
+                    table,
+                    notation: self.code.clone(),
+                    source: row.source.reference("1A<<"),
+                },
+            ));
         }
         let row = catalog_row(table, &self.code)?;
         resolve_individual_row(row, element, supplied)
