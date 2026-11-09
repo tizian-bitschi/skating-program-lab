@@ -20,8 +20,13 @@ _Avoid_: Competition rule
 
 **Personal maximum**:
 An upper bound on one exact regular-spin abbreviation's planned level, one
-jump kind's listed rotation class, or the step-sequence planned level. It intersects other planning preferences and
+jump kind's listed rotation class, or the step-sequence planned level. It includes
+eligible lower levels/classes and intersects other planning preferences and
 competition eligibility without changing scoring or competition rules.
+
+**Connection exclusion**:
+A personal restriction removing one exact whole jump combination or jump sequence.
+Its component jumps remain available as solos or in other whole elements.
 
 **Listed rotation class**:
 The notation class Single through Quintuple. Single Axel means 1A; it does not

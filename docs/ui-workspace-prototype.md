@@ -97,3 +97,17 @@ Observed connected-Chrome checks with the two-element Silver sample and two simu
 These are prototype browser/layout checks, not physical-device, participant or backend correctness tests. Calculation remains simulated. Earlier screenshots are preserved as historical versions.
 
 [Compact 1440×900 screenshot](prototype-ui-review/mixer/c2-compact-desktop.jpg) · [Compact 1280×720 screenshot](prototype-ui-review/mixer/c2-compact-1280.jpg)
+
+## Interactive connection exclusions
+
+The user clarified that personal level maxima are downward-inclusive: selecting level 3 includes Basic and levels 1/2/3. Excluding an individual lower spin level while allowing a higher one is not a required product interaction. C2 therefore exposes additional exact exclusions only for whole jump combinations/sequences. The older A/B/C experiments and the library's public capabilities are not removed.
+
+The C2 header action is now **Kombis & Sequenzen**. It opens a touch/click builder: choose Combination or Sequence, select the first jump, then select a continuation from the illustrative choices. Selected jumps form a visible whole connection. A third jump is explicitly optional when an exact two-jump choice already exists. Clicking a selected block edits from that position. Exclude acts on the complete current connection; excluded entries can be allowed again directly. Single jumps, their maxima and spin/step settings are not changed by that action. Mixed-direction preference remains available separately within the panel.
+
+No code typing or individual spin-level exclusion is offered in this C2 panel. Any exact non-connection exclusion carried over from another experiment remains visible in a legacy disclosure with removal only, so switching layouts never silently relaxes existing requests.
+
+The prototype uses a curated sample repertoire, not a newly implemented domain rule engine. Continuations are selected from that finite sample pool, filtered using the existing prototype category/repertoire checks. Already excluded exact connections remain in the choice pool, allowing restoration and distinct longer connections. In a product adapter, the authoritative permitted domain must come from Rust. Missing sample paths do not prove rule infeasibility. Calculation is still simulated.
+
+Observed Chrome checks: Lutz → Toeloop excluded only `1Lz+1T` while all jump-kind permissions remained true; Axel → Axel in sequence mode additionally excluded `1A+1A+SEQ`; allowing the Lutz connection again preserved the sequence exclusion. The optional third-jump path remained visible after excluding the exact two-jump whole. A 390px viewport showed no horizontal dialog overflow and no text-entry fields. Keyboard focus moves to the next choices or the whole-connection action. Syntax and whitespace checks pass; no physical-phone, participant or full-rule coverage claim is made.
+
+[Builder desktop screenshot](prototype-ui-review/connections/builder-desktop.jpg) · [Builder mobile screenshot](prototype-ui-review/connections/builder-mobile.jpg)
