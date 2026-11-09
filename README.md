@@ -14,6 +14,8 @@ separate maximum-proof and alternative-exhaustion status. See the [planning-sear
 For theoretical program construction, use `assess_manual_bv` to calculate
 base value from ordered SOV codes and check composition without supplying
 spin or step feature evidence. See the [assumed-recognition API](docs/specs/assumed-recognition.md).
+Planned Adult Waltz intentions, source-specific counting and zero-value alternatives are
+documented in the [Waltz contract](docs/specs/waltz-planning.md).
 `selectable_jump_elements` lists profile- and preference-permitted atomic jump
 code intentions, including sequences and Euler connections, with no
 1,000-variant cap. `RotationPreference::default()` restricts each compound to

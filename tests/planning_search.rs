@@ -469,6 +469,7 @@ fn complete_public_repertoire_matches_an_independent_small_exhaustive_oracle() {
             require(&mut r, id, code);
         }
         r.exclusions = [
+            JumpKind::Waltz,
             JumpKind::Loop,
             JumpKind::Flip,
             JumpKind::Lutz,

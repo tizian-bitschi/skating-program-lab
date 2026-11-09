@@ -56,6 +56,7 @@ fn codes(r: &CandidateGenerationResult) -> Vec<String> {
                             JumpKind::Loop => "Lo",
                             JumpKind::Flip => "F",
                             JumpKind::Lutz => "Lz",
+                            JumpKind::Waltz => unreachable!("clean listed-jump generation fixture"),
                             JumpKind::Axel => "A",
                         }
                     )

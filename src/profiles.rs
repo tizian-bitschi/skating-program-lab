@@ -23,9 +23,18 @@ pub enum ProfileProvenance {
     Synthetic,
 }
 
+/// Source-bound treatment of an explicitly planned Waltz jump.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum WaltzPolicy {
+    Ignored,
+    CalledAsDowngradedAxel,
+}
+
 /// Each mechanism is a named implementation version, not an expression language.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RuleMechanism {
+    /// Adult jump rules with an explicit source-bound Waltz treatment.
+    AdultWaltzPlanV1(WaltzPolicy),
     JumpPlanV1,
     AdultScoringV1,
     SeniorJumpPlanV1,
@@ -579,6 +588,7 @@ impl ProfileRegistry {
                 && citation_valid(&b.source)
                 && profile.sources.contains(&b.source)
                 && match b.mechanism {
+                    RuleMechanism::AdultWaltzPlanV1(_) => b.rule == ProfileRule::Eligibility,
                     RuleMechanism::JumpPlanV1 | RuleMechanism::SeniorJumpPlanV1 => {
                         b.rule != ProfileRule::Scoring
                     }
@@ -1132,4 +1142,40 @@ fn check_builtin_override<T: PartialEq>(
         ));
     }
     Ok(())
+}
+
+impl RuleProfile {
+    pub fn waltz_policy(&self) -> Option<WaltzPolicy> {
+        match self.binding(ProfileRule::Eligibility).mechanism {
+            RuleMechanism::AdultWaltzPlanV1(policy) => Some(policy),
+            RuleMechanism::JumpPlanV1 | RuleMechanism::SeniorJumpPlanV1
+                if !self.jumps.prohibited(&ListedJump {
+                    kind: Some(JumpKind::Axel),
+                    rotations: Some(1),
+                }) =>
+            {
+                Some(WaltzPolicy::CalledAsDowngradedAxel)
+            }
+            _ => None,
+        }
+    }
+    pub(crate) fn waltz_code(&self) -> Option<&'static str> {
+        if !self
+            .families
+            .allowed
+            .contains(&ProfileElementFamily::SoloJump)
+        {
+            return None;
+        }
+        self.waltz_policy().map(|_| {
+            if matches!(
+                self.binding(ProfileRule::Eligibility).mechanism,
+                RuleMechanism::AdultWaltzPlanV1(_)
+            ) {
+                "W"
+            } else {
+                "W(1A<<)"
+            }
+        })
+    }
 }

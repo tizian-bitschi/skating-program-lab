@@ -120,10 +120,10 @@ impl Atom {
     fn combination(&self) -> bool {
         self.family() == ProfileElementFamily::Combination
     }
-    fn excluded(&self, exclusions: &[PlanningExclusion]) -> bool {
+    fn excluded(&self, exclusions: &[PlanningExclusion], profile: &RuleProfile) -> bool {
         exclusions
             .iter()
-            .any(|exclusion| exclusion.excludes(&self.assumption.code))
+            .any(|exclusion| exclusion.excludes_in_profile(&self.assumption.code, profile))
     }
 }
 
@@ -211,7 +211,7 @@ fn domain(
         let value = value
             .map(|v| i32::from(v.hundredths))
             .ok_or(PlanningSearchError::InconsistentAssessment)?;
-        let (jumps, eulers) = match &element {
+        let (mut jumps, eulers) = match &element {
             PlannedElement::Jump(JumpElement::Solo(j)) => (vec![j.clone()], 0),
             PlannedElement::Jump(
                 JumpElement::Combination(parts) | JumpElement::Sequence(parts),
@@ -233,6 +233,13 @@ fn domain(
             ),
             _ => (vec![], 0),
         };
+        if profile.waltz_policy() == Some(WaltzPolicy::CalledAsDowngradedAxel) {
+            for jump in &mut jumps {
+                if jump.kind == Some(JumpKind::Waltz) {
+                    jump.kind = Some(JumpKind::Axel);
+                }
+            }
+        }
         let spin = match &evidence {
             ElementPlanEvidence::Spin { spin, .. } => spin.abbreviation,
             _ => None,
@@ -272,13 +279,18 @@ pub fn search_maximum_bv_with_step_limit(
         .map_err(PlanningSearchError::Profile)?;
     let senior = crate::senior::selected(profile, ProfileRule::Repetition);
     if ProfileRule::ALL.iter().any(|rule| {
-        profile.binding(*rule).mechanism
-            != match (*rule, senior) {
-                (ProfileRule::Scoring, true) => RuleMechanism::SeniorScoringV1,
-                (ProfileRule::Scoring, false) => RuleMechanism::AdultScoringV1,
-                (_, true) => RuleMechanism::SeniorJumpPlanV1,
-                (_, false) => RuleMechanism::JumpPlanV1,
-            }
+        !(*rule == ProfileRule::Eligibility
+            && matches!(
+                profile.binding(*rule).mechanism,
+                RuleMechanism::AdultWaltzPlanV1(_)
+            ))
+            && profile.binding(*rule).mechanism
+                != match (*rule, senior) {
+                    (ProfileRule::Scoring, true) => RuleMechanism::SeniorScoringV1,
+                    (ProfileRule::Scoring, false) => RuleMechanism::AdultScoringV1,
+                    (_, true) => RuleMechanism::SeniorJumpPlanV1,
+                    (_, false) => RuleMechanism::JumpPlanV1,
+                }
     }) {
         return Err(PlanningSearchError::UnsupportedCoverage {
             profile: request.profile.clone(),
@@ -393,7 +405,7 @@ pub fn search_maximum_bv_with_step_limit(
                 return Err(error);
             }
         };
-        if atom.excluded(&request.exclusions) {
+        if atom.excluded(&request.exclusions, profile) {
             excluded_required.push(i);
         }
     }
@@ -427,7 +439,7 @@ pub fn search_maximum_bv_with_step_limit(
     if !diagnostics.is_empty() {
         return Ok(PlanningSearchOutcome::Infeasible { diagnostics });
     }
-    atoms.retain(|a| !a.excluded(&request.exclusions));
+    atoms.retain(|a| !a.excluded(&request.exclusions, profile));
     if profile.jumps.require_axel
         && !atoms
             .iter()
@@ -442,7 +454,71 @@ pub fn search_maximum_bv_with_step_limit(
             }],
         });
     }
+    // Ignored movements have no finite multiplicity bound. Prove the objective
+    // without them, then construct distinct neutral extensions of a proved plan.
+    let neutral_waltz = profile.waltz_policy() == Some(WaltzPolicy::Ignored)
+        && atoms.iter().any(|a| a.assumption.code == "W");
+    if neutral_waltz {
+        atoms.retain(|a| a.assumption.code != "W");
+    }
     let mut outcome = model::search(registry, request, profile, &policy, &atoms, control)?;
+    if neutral_waltz {
+        if let PlanningSearchOutcome::ProvenMaximum(result) = &mut outcome {
+            let cancelled = result.alternative_status == PlanningAlternativeStatus::Cancelled;
+            let base = result.alternatives[0].clone();
+            result.alternatives.clear();
+            for extra in 0..5 {
+                if extra > 0
+                    && (cancelled || control.is_cancelled(PlanningSearchPhase::Alternatives))
+                {
+                    result.alternative_status = PlanningAlternativeStatus::Cancelled;
+                    break;
+                }
+                let mut candidate = base.clone();
+                for (input_index, required) in request
+                    .required
+                    .iter()
+                    .enumerate()
+                    .filter(|(_, r)| r.element.code == "W")
+                {
+                    candidate.elements.push(required.element.clone());
+                    candidate.provenance.push(PlanningProvenance::Required {
+                        id: required.id.clone(),
+                        input_index,
+                    });
+                }
+                for _ in 0..extra {
+                    candidate.elements.push(AssumedRecognition::new("W"));
+                    candidate.provenance.push(PlanningProvenance::Added);
+                }
+                let (assessment, program, _) = crate::manual_bv::assess_selections(
+                    registry,
+                    profile,
+                    &manual(
+                        request,
+                        candidate.elements.clone(),
+                        SubmissionState::Complete,
+                    ),
+                )
+                .map_err(PlanningSearchError::Profile)?;
+                if assessment.total.exact_hundredths
+                    != Some(i64::from(result.maximum_base_hundredths))
+                    || !assessment
+                        .legality
+                        .validation
+                        .validation
+                        .findings
+                        .is_empty()
+                {
+                    return Err(PlanningSearchError::InconsistentAssessment);
+                }
+                candidate.program = program;
+                candidate.assessment = assessment;
+                result.alternatives.push(candidate);
+                result.alternative_status = PlanningAlternativeStatus::LimitReached;
+            }
+        }
+    }
     if maximum.is_some() {
         if let PlanningSearchOutcome::ProvenMaximum(result) = &mut outcome {
             for alternative in &mut result.alternatives {
