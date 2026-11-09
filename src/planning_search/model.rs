@@ -261,6 +261,7 @@ fn atom_upper(atom: &Atom, profile: &RuleProfile, required: &[&Atom]) -> usize {
     upper
 }
 
+#[allow(clippy::too_many_arguments)]
 pub(super) fn search(
     registry: &ProfileRegistry,
     request: &PlanningSearchRequest,
@@ -268,6 +269,7 @@ pub(super) fn search(
     policy: &ProgramPolicy,
     atoms: &[Atom],
     control: &impl PlanningSearchControl,
+    retained: Option<&mut Option<Prepared>>,
 ) -> Result<PlanningSearchOutcome, PlanningSearchError> {
     // A new mechanism must explicitly choose a safe bound/model, rather than
     // silently inheriting the additive case. Category identities are irrelevant.
@@ -661,10 +663,11 @@ pub(super) fn search(
     let mut brancher = CountBrancher::new(InputOrder::new(&variables), InDomainMax);
     let mut incumbent_error = None;
     let mut incumbent_cancelled = false;
+    let mut resolver = ResolutionResolver::default();
     let outcome = solver.optimise(
         &mut brancher,
         &mut Cancellation(control),
-        &mut ResolutionResolver::default(),
+        &mut resolver,
         LinearSatUnsat::new(
             OptimisationDirection::Maximise,
             objective,
@@ -723,6 +726,30 @@ pub(super) fn search(
     else {
         return Ok(PlanningSearchOutcome::Cancelled);
     };
+    if let Some(retained) = retained {
+        let tag = solver.new_constraint_tag();
+        solver.add_clause(vec![predicate!(objective == maximum as i32)], tag);
+        *retained = Some(Prepared {
+            solver,
+            brancher,
+            resolver,
+            counts,
+            atoms: atoms.to_vec(),
+            pending: Some(selected.clone()),
+            delivered: Vec::new(),
+            blocked: 0,
+            pruning: CollectionPruning::new(policy.clone(), upper, jump_bound, selected.clone()),
+        });
+        return Ok(PlanningSearchOutcome::ProvenMaximum(PlanningMaximum {
+            personal_limits: request.personal_limits.clone(),
+            rotation_preference: request.rotation_preference,
+            profile: request.profile.clone(),
+            scoring_table: request.scoring_table,
+            maximum_base_hundredths: maximum,
+            alternatives: vec![first],
+            alternative_status: PlanningAlternativeStatus::LimitReached,
+        }));
+    }
     let mut alternatives = vec![first];
     let mut status = PlanningAlternativeStatus::Cancelled;
     let mut vectors = vec![selected.clone()];
@@ -742,55 +769,18 @@ pub(super) fn search(
         let tag = solver.new_constraint_tag();
         solver.add_clause(vec![predicate!(objective == maximum as i32)], tag);
         'collect: {
-            if request.required.is_empty() {
-                let mut rejected_components = Vec::new();
-                if senior {
-                    // Component presence leaves solo/compound placement open;
-                    // its optimistic credit must not assume a solo repeat loss.
-                    let nonjump_bound = i64::from(upper) - i64::from(jump_bound);
-                    for atom in atoms
-                        .iter()
-                        .filter(|a| matches!(a.element, PlannedElement::Jump(JumpElement::Solo(_))))
-                    {
-                        if control.is_cancelled(PlanningSearchPhase::Alternatives) {
-                            break 'collect;
-                        }
-                        let component = &atom.jumps[0];
-                        let bound = super::senior_bound::component_upper_bound(
-                            atoms, profile, request, component,
-                        );
-                        if i64::from(bound) + nonjump_bound < i64::from(maximum) {
-                            rejected_components.push(component.clone());
-                        }
-                    }
-                }
-                let mut forced = request.clone();
-                for (index, atom) in atoms.iter().enumerate() {
-                    if control.is_cancelled(PlanningSearchPhase::Alternatives) {
-                        break 'collect;
-                    }
-                    if atom_upper(atom, profile, &required) == 0 {
-                        continue;
-                    }
-                    let cannot_reach_maximum =
-                        atom.jumps.iter().any(|j| rejected_components.contains(j)) || {
-                            forced.required = vec![RequiredPlanningElement {
-                                id: "conditional-bound".into(),
-                                element: atom.assumption.clone(),
-                            }];
-                            let (_, _, bound) = value_upper_bound(atoms, profile, policy, &forced);
-                            i64::from(bound) < i64::from(maximum)
-                        };
-                    // Any optimum using this atom completes the forced request, so
-                    // only a strictly lower admissible bound rules the atom out.
-                    if cannot_reach_maximum {
-                        if selected[index] != 0 {
-                            return Err(PlanningSearchError::InconsistentAssessment);
-                        }
-                        let tag = solver.new_constraint_tag();
-                        solver.add_clause(vec![predicate!(counts[index] == 0)], tag);
-                    }
-                }
+            let mut pruning =
+                CollectionPruning::new(policy.clone(), upper, jump_bound, selected.clone());
+            if !pruning.apply(
+                &mut solver,
+                &counts,
+                atoms,
+                profile,
+                request,
+                maximum,
+                control,
+            )? {
+                break 'collect;
             }
             loop {
                 if control.is_cancelled(PlanningSearchPhase::Alternatives) {
@@ -842,21 +832,7 @@ pub(super) fn search(
                 // Strict supermultisets cannot share the fixed optimum in these
                 // positive-credit profiles. Retain full-vector blocking otherwise.
                 while blocked < vectors.len() {
-                    let vector = &vectors[blocked];
-                    let positive = atoms.iter().all(|a| a.value > 0);
-                    let block: Vec<_> = counts
-                        .iter()
-                        .zip(vector)
-                        .filter_map(|(&v, &n)| {
-                            if positive {
-                                (n > 0).then(|| predicate!(v <= n - 1))
-                            } else {
-                                Some(predicate!(v != n))
-                            }
-                        })
-                        .collect();
-                    let tag = solver.new_constraint_tag();
-                    solver.add_clause(block, tag);
+                    exclude_vector(&mut solver, &counts, atoms, &vectors[blocked]);
                     blocked += 1;
                     if control.is_cancelled(PlanningSearchPhase::Alternatives) {
                         break 'collect;
@@ -919,7 +895,7 @@ impl<C: PlanningSearchControl> TerminationCondition for CollectionCancellation<'
     }
 }
 
-fn reconstruct(
+pub(super) fn reconstruct(
     registry: &ProfileRegistry,
     request: &PlanningSearchRequest,
     profile: &RuleProfile,
@@ -988,4 +964,171 @@ fn reconstruct(
         provenance,
         assessment,
     }))
+}
+
+pub(super) struct Prepared {
+    solver: Solver,
+    brancher: CountBrancher,
+    resolver: ResolutionResolver,
+    counts: Vec<DomainId>,
+    pub(super) atoms: Vec<Atom>,
+    pub(super) pending: Option<Vec<i32>>,
+    pub(super) delivered: Vec<Vec<i32>>,
+    blocked: usize,
+    pruning: CollectionPruning,
+}
+
+impl Prepared {
+    pub(super) fn next(
+        &mut self,
+        profile: &RuleProfile,
+        request: &PlanningSearchRequest,
+        maximum: u32,
+        control: &impl PlanningSearchControl,
+    ) -> Result<Option<Vec<i32>>, PlanningSearchError> {
+        if !self.pruning.apply(
+            &mut self.solver,
+            &self.counts,
+            &self.atoms,
+            profile,
+            request,
+            maximum,
+            control,
+        )? {
+            return Ok(None);
+        }
+        while self.blocked < self.delivered.len() {
+            exclude_vector(
+                &mut self.solver,
+                &self.counts,
+                &self.atoms,
+                &self.delivered[self.blocked],
+            );
+            self.blocked += 1;
+        }
+        let mut termination = CollectionCancellation(control);
+        Ok(
+            match self
+                .solver
+                .satisfy(&mut self.brancher, &mut termination, &mut self.resolver)
+            {
+                SatisfactionResult::Satisfiable(s) => Some(
+                    self.counts
+                        .iter()
+                        .map(|&v| s.solution().get_integer_value(v))
+                        .collect(),
+                ),
+                SatisfactionResult::Unsatisfiable(..) | SatisfactionResult::Unknown(..) => None,
+            },
+        )
+    }
+}
+
+struct CollectionPruning {
+    policy: ProgramPolicy,
+    upper: i32,
+    jump_bound: i32,
+    component_cursor: usize,
+    atom_cursor: usize,
+    rejected_components: Vec<ListedJump>,
+    representative: Vec<i32>,
+}
+impl CollectionPruning {
+    fn new(policy: ProgramPolicy, upper: i32, jump_bound: i32, representative: Vec<i32>) -> Self {
+        Self {
+            policy,
+            upper,
+            jump_bound,
+            component_cursor: 0,
+            atom_cursor: 0,
+            rejected_components: Vec::new(),
+            representative,
+        }
+    }
+    #[allow(clippy::too_many_arguments)]
+    fn apply(
+        &mut self,
+        solver: &mut Solver,
+        counts: &[DomainId],
+        atoms: &[Atom],
+        profile: &RuleProfile,
+        request: &PlanningSearchRequest,
+        maximum: u32,
+        control: &impl PlanningSearchControl,
+    ) -> Result<bool, PlanningSearchError> {
+        if !request.required.is_empty() {
+            return Ok(true);
+        }
+        if crate::senior::selected(profile, ProfileRule::Repetition) {
+            let nonjump_bound = i64::from(self.upper) - i64::from(self.jump_bound);
+            while self.component_cursor < atoms.len() {
+                if control.is_cancelled(PlanningSearchPhase::Alternatives) {
+                    return Ok(false);
+                }
+                let atom = &atoms[self.component_cursor];
+                if matches!(atom.element, PlannedElement::Jump(JumpElement::Solo(_))) {
+                    let component = &atom.jumps[0];
+                    let bound = super::senior_bound::component_upper_bound(
+                        atoms, profile, request, component,
+                    );
+                    if i64::from(bound) + nonjump_bound < i64::from(maximum) {
+                        self.rejected_components.push(component.clone());
+                    }
+                }
+                self.component_cursor += 1;
+            }
+        }
+        let mut forced = request.clone();
+        while self.atom_cursor < atoms.len() {
+            if control.is_cancelled(PlanningSearchPhase::Alternatives) {
+                return Ok(false);
+            }
+            let index = self.atom_cursor;
+            let atom = &atoms[index];
+            if atom_upper(atom, profile, &[]) != 0 {
+                let cannot_reach_maximum = atom
+                    .jumps
+                    .iter()
+                    .any(|j| self.rejected_components.contains(j))
+                    || {
+                        forced.required = vec![RequiredPlanningElement {
+                            id: "conditional-bound".into(),
+                            element: atom.assumption.clone(),
+                        }];
+                        let (_, _, bound) =
+                            value_upper_bound(atoms, profile, &self.policy, &forced);
+                        i64::from(bound) < i64::from(maximum)
+                    };
+                // A strictly lower admissible forced bound excludes this atom from every optimum.
+                if cannot_reach_maximum {
+                    if self.representative[index] != 0 {
+                        return Err(PlanningSearchError::InconsistentAssessment);
+                    }
+                    let tag = solver.new_constraint_tag();
+                    solver.add_clause(vec![predicate!(counts[index] == 0)], tag);
+                }
+            }
+            self.atom_cursor += 1;
+        }
+        Ok(true)
+    }
+}
+
+fn exclude_vector(solver: &mut Solver, counts: &[DomainId], atoms: &[Atom], vector: &[i32]) {
+    // Positive-credit optima cannot be strict supermultisets. Otherwise exclude
+    // the complete vector so counted zero-value elements remain distinct.
+    let positive = atoms.iter().all(|a| a.value > 0);
+    let block = counts
+        .iter()
+        .zip(vector)
+        .filter_map(|(&v, &n)| {
+            if positive {
+                (n > 0).then(|| predicate!(v <= n - 1))
+            } else {
+                Some(predicate!(v != n))
+            }
+        })
+        .collect::<Vec<_>>();
+    let tag = solver.new_constraint_tag();
+    solver.add_clause(block, tag);
 }
