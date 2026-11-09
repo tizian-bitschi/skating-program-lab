@@ -1,0 +1,22 @@
+<!doctype html><html lang="de"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Rust-Service · Machbarkeitsnachweis</title>
+<style>body{font:16px/1.5 system-ui;max-width:1050px;margin:24px auto;padding:0 16px;color:#0f172a}h1{font-size:24px}button,select,input,textarea{font:inherit;padding:8px;margin:4px 0;min-height:40px}button{cursor:pointer}textarea{width:100%;box-sizing:border-box}pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#f1f5f9;padding:12px;font-size:12px;max-height:360px;overflow:auto}.controls{display:flex;gap:8px;flex-wrap:wrap}.note{color:#475569;font-size:13px}.live{font-variant-numeric:tabular-nums}</style>
+<h1>Rust-Service: echter Backend-Aufruf</h1><p class="note">Technischer Versuch, keine neue Produktansicht. Anfragen und Ergebnisse sind echt; das Test-Gate dient nur der kontrollierten Pause-/Abbruchprüfung.</p>
+<div class="controls"><label>Kategorie <select id="profile"></select></label><button id="elements">Elemente laden</button><button id="manual">Programm prüfen</button></div>
+<label>Elementcodes für die Programmprüfung<textarea id="codes" rows="2">1Lz,SSp1,ChSq1</textarea></label>
+<label>Bedienprobe während einer Suche <input id="typing" placeholder="Hier weiter schreiben"></label><p class="live" id="heartbeat"></p>
+<div class="controls"><button id="create">Bronze-Testsuche starten</button><button id="collect">Weitere Ergebnisse</button><button id="pause">Pause</button><button id="cancel">Abbruch</button><button id="dispose">Session freigeben</button></div>
+<label><input id="gate" type="checkbox"> Test-Gate für Pause/Abbruch während eines laufenden Aufrufs</label>
+<p id="state" role="status">Noch keine Suche.</p><pre id="output"></pre>
+<script>
+let job=null,poll=null,frames=0,last=performance.now(),maxGap=0;
+function beat(t){frames++;maxGap=Math.max(maxGap,t-last);last=t;if(frames%20===0)document.getElementById('heartbeat').textContent=`Browser aktiv: ${frames} Frames · größte beobachtete Frame-Lücke ${maxGap.toFixed(0)} ms`;requestAnimationFrame(beat)}requestAnimationFrame(beat);
+async function api(path,body,method=body?'POST':'GET'){const r=await fetch('/api'+path,{method,headers:body?{'Content-Type':'application/json'}:{},body:body?JSON.stringify(body):undefined});const v=await r.json();if(!r.ok)throw Error(v.error);return v}
+function show(v){document.getElementById('output').textContent=JSON.stringify(v,null,2)}
+async function refresh(){if(!job)return;try{const v=await api('/jobs/'+job);document.getElementById('state').textContent=`Session ${job}: ${v.state} · ${v.phase||''} · aktiv=${v.busy} · Maximum=${v.maximum_hundredths??'unbewiesen'} · Ergebnisse=${v.confirmed_count}`;show(v)}catch(e){document.getElementById('state').textContent=e.message;clearInterval(poll)}}
+function action(id,fn){document.getElementById(id).onclick=()=>fn().catch(e=>document.getElementById('state').textContent=e.message)}
+api('/profiles').then(v=>document.getElementById('profile').innerHTML=v.map(p=>`<option>${p}</option>`).join(''));
+action('elements',async()=>show(await api('/elements',{profile:document.getElementById('profile').value})));
+action('manual',async()=>show(await api('/assess',{profile:document.getElementById('profile').value,elements:document.getElementById('codes').value.split(',').map(s=>s.trim()).filter(Boolean)})));
+action('create',async()=>{if(job)await api('/jobs/'+job,null,'DELETE').catch(()=>{});const v=await api('/jobs',{profile:'bronze',required:['CCSp1','CLSp1','ChSq1'],jump_off:['W','Lz','A'],mixed:true,test_gate_collection:document.getElementById('gate').checked});job=v.id;await api('/jobs/'+job+'/prove',{});clearInterval(poll);poll=setInterval(refresh,200);await refresh()});
+action('collect',async()=>{await api('/jobs/'+job+'/collect',{size:3});await refresh()});action('pause',async()=>{await api('/jobs/'+job+'/pause',{});await refresh()});action('cancel',async()=>{await api('/jobs/'+job+'/cancel',{});await refresh()});action('dispose',async()=>{await api('/jobs/'+job,null,'DELETE');clearInterval(poll);job=null;document.getElementById('state').textContent='Session freigegeben.'});
+</script></html>

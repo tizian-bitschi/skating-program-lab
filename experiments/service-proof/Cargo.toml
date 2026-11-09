@@ -1,0 +1,9 @@
+[package]
+name = "skating-service-proof"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+skating-program-lab = { path = "../.." }
+serde_json = "1"

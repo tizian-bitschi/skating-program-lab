@@ -1,0 +1,920 @@
+{
+  "passed": true,
+  "oracle_maximum_hundredths": 1070,
+  "oracle_compositions": 16,
+  "http_observations": [
+    {
+      "path": "/api/profiles",
+      "status": 200,
+      "elapsed_ms": 16.318299999999994,
+      "response_bytes": 50
+    },
+    {
+      "path": "/api/elements",
+      "status": 200,
+      "elapsed_ms": 12.019500000000003,
+      "response_bytes": 280
+    },
+    {
+      "path": "/api/assess",
+      "status": 200,
+      "elapsed_ms": 5.10229999999999,
+      "response_bytes": 157
+    },
+    {
+      "path": "/api/elements",
+      "status": 200,
+      "elapsed_ms": 13.10699999999998,
+      "response_bytes": 785
+    },
+    {
+      "path": "/api/assess",
+      "status": 200,
+      "elapsed_ms": 5.301800000000023,
+      "response_bytes": 158
+    },
+    {
+      "path": "/api/elements",
+      "status": 200,
+      "elapsed_ms": 15.44420000000002,
+      "response_bytes": 711
+    },
+    {
+      "path": "/api/assess",
+      "status": 200,
+      "elapsed_ms": 5.492999999999998,
+      "response_bytes": 158
+    },
+    {
+      "path": "/api/elements",
+      "status": 200,
+      "elapsed_ms": 16.962000000000003,
+      "response_bytes": 673
+    },
+    {
+      "path": "/api/assess",
+      "status": 200,
+      "elapsed_ms": 22.903000000000006,
+      "response_bytes": 158
+    },
+    {
+      "path": "/api/elements",
+      "status": 200,
+      "elapsed_ms": 20.6103,
+      "response_bytes": 881
+    },
+    {
+      "path": "/api/assess",
+      "status": 200,
+      "elapsed_ms": 25.417100000000026,
+      "response_bytes": 158
+    },
+    {
+      "path": "/api/elements",
+      "status": 200,
+      "elapsed_ms": 32.10669999999999,
+      "response_bytes": 879
+    },
+    {
+      "path": "/api/assess",
+      "status": 200,
+      "elapsed_ms": 5.182200000000026,
+      "response_bytes": 158
+    },
+    {
+      "path": "/api/elements",
+      "status": 200,
+      "elapsed_ms": 14.951699999999956,
+      "response_bytes": 757
+    },
+    {
+      "path": "/api/assess",
+      "status": 200,
+      "elapsed_ms": 5.574199999999974,
+      "response_bytes": 919
+    },
+    {
+      "path": "/api/elements",
+      "status": 400,
+      "elapsed_ms": 0.7998000000000172,
+      "response_bytes": 27
+    },
+    {
+      "path": "/api/elements",
+      "status": 400,
+      "elapsed_ms": 0.7144000000000039,
+      "response_bytes": 36
+    },
+    {
+      "path": "/api/elements",
+      "status": 400,
+      "elapsed_ms": 12.164000000000009,
+      "response_bytes": 40
+    },
+    {
+      "path": "/api/elements",
+      "status": 400,
+      "elapsed_ms": 0.9152000000000049,
+      "response_bytes": 34
+    },
+    {
+      "path": "/api/jobs",
+      "status": 200,
+      "elapsed_ms": 6.393199999999988,
+      "response_bytes": 29
+    },
+    {
+      "path": "/api/jobs/1/collect",
+      "status": 409,
+      "elapsed_ms": 0.7574000000000192,
+      "response_bytes": 30
+    },
+    {
+      "path": "/api/jobs/1/prove",
+      "status": 200,
+      "elapsed_ms": 0.6151999999999824,
+      "response_bytes": 17
+    },
+    {
+      "path": "/api/jobs/1",
+      "status": 200,
+      "elapsed_ms": 0.49440000000000595,
+      "response_bytes": 113
+    },
+    {
+      "path": "/api/jobs/1",
+      "status": 200,
+      "elapsed_ms": 0.9952000000000294,
+      "response_bytes": 162
+    },
+    {
+      "path": "/api/jobs/1",
+      "status": 200,
+      "elapsed_ms": 0.6021999999999972,
+      "response_bytes": 162
+    },
+    {
+      "path": "/api/jobs/1/collect",
+      "status": 200,
+      "elapsed_ms": 0.5412000000000194,
+      "response_bytes": 17
+    },
+    {
+      "path": "/api/jobs/1",
+      "status": 200,
+      "elapsed_ms": 0.4598000000000102,
+      "response_bytes": 162
+    },
+    {
+      "path": "/api/jobs/1",
+      "status": 200,
+      "elapsed_ms": 0.6829999999999892,
+      "response_bytes": 1033
+    },
+    {
+      "path": "/api/jobs/1",
+      "status": 200,
+      "elapsed_ms": 0.5361999999999867,
+      "response_bytes": 1033
+    },
+    {
+      "path": "/api/jobs/1/collect",
+      "status": 200,
+      "elapsed_ms": 0.45960000000000445,
+      "response_bytes": 17
+    },
+    {
+      "path": "/api/jobs/1",
+      "status": 200,
+      "elapsed_ms": 0.4577000000000053,
+      "response_bytes": 1032
+    },
+    {
+      "path": "/api/jobs/1",
+      "status": 200,
+      "elapsed_ms": 0.828300000000004,
+      "response_bytes": 1903
+    },
+    {
+      "path": "/api/jobs/1",
+      "status": 200,
+      "elapsed_ms": 0.5729000000000428,
+      "response_bytes": 1903
+    },
+    {
+      "path": "/api/jobs/1/collect",
+      "status": 200,
+      "elapsed_ms": 0.5091000000000401,
+      "response_bytes": 17
+    },
+    {
+      "path": "/api/jobs/1",
+      "status": 200,
+      "elapsed_ms": 0.5156000000000049,
+      "response_bytes": 1902
+    },
+    {
+      "path": "/api/jobs/1",
+      "status": 200,
+      "elapsed_ms": 0.7728999999999653,
+      "response_bytes": 2773
+    },
+    {
+      "path": "/api/jobs/1",
+      "status": 200,
+      "elapsed_ms": 0.5404999999999993,
+      "response_bytes": 2773
+    },
+    {
+      "path": "/api/jobs/1/collect",
+      "status": 200,
+      "elapsed_ms": 0.4537000000000013,
+      "response_bytes": 17
+    },
+    {
+      "path": "/api/jobs/1",
+      "status": 200,
+      "elapsed_ms": 0.45730000000004933,
+      "response_bytes": 2772
+    },
+    {
+      "path": "/api/jobs/1",
+      "status": 200,
+      "elapsed_ms": 16.135200000000015,
+      "response_bytes": 3656
+    },
+    {
+      "path": "/api/jobs/1",
+      "status": 200,
+      "elapsed_ms": 0.7067000000000045,
+      "response_bytes": 3656
+    },
+    {
+      "path": "/api/jobs/1/collect",
+      "status": 200,
+      "elapsed_ms": 0.5570999999999771,
+      "response_bytes": 17
+    },
+    {
+      "path": "/api/jobs/1",
+      "status": 200,
+      "elapsed_ms": 0.46989999999996757,
+      "response_bytes": 3653
+    },
+    {
+      "path": "/api/jobs/1",
+      "status": 200,
+      "elapsed_ms": 0.9021999999999641,
+      "response_bytes": 4514
+    },
+    {
+      "path": "/api/jobs/1",
+      "status": 200,
+      "elapsed_ms": 0.6297000000000108,
+      "response_bytes": 4514
+    },
+    {
+      "path": "/api/jobs/1/collect",
+      "status": 200,
+      "elapsed_ms": 0.6043000000000021,
+      "response_bytes": 17
+    },
+    {
+      "path": "/api/jobs/1",
+      "status": 200,
+      "elapsed_ms": 0.5481999999999987,
+      "response_bytes": 4511
+    },
+    {
+      "path": "/api/jobs/1",
+      "status": 200,
+      "elapsed_ms": 0.7685000000000053,
+      "response_bytes": 4801
+    },
+    {
+      "path": "/api/jobs/1",
+      "status": 200,
+      "elapsed_ms": 0.5562000000000067,
+      "response_bytes": 4801
+    },
+    {
+      "path": "/api/assess",
+      "status": 200,
+      "elapsed_ms": 4.933000000000021,
+      "response_bytes": 158
+    },
+    {
+      "path": "/api/assess",
+      "status": 200,
+      "elapsed_ms": 5.055299999999985,
+      "response_bytes": 158
+    },
+    {
+      "path": "/api/assess",
+      "status": 200,
+      "elapsed_ms": 22.834699999999984,
+      "response_bytes": 158
+    },
+    {
+      "path": "/api/assess",
+      "status": 200,
+      "elapsed_ms": 5.203799999999981,
+      "response_bytes": 158
+    },
+    {
+      "path": "/api/assess",
+      "status": 200,
+      "elapsed_ms": 4.919400000000018,
+      "response_bytes": 158
+    },
+    {
+      "path": "/api/assess",
+      "status": 200,
+      "elapsed_ms": 4.956300000000025,
+      "response_bytes": 158
+    },
+    {
+      "path": "/api/assess",
+      "status": 200,
+      "elapsed_ms": 4.760399999999998,
+      "response_bytes": 158
+    },
+    {
+      "path": "/api/assess",
+      "status": 200,
+      "elapsed_ms": 5.467700000000075,
+      "response_bytes": 158
+    },
+    {
+      "path": "/api/assess",
+      "status": 200,
+      "elapsed_ms": 4.6663999999999595,
+      "response_bytes": 158
+    },
+    {
+      "path": "/api/assess",
+      "status": 200,
+      "elapsed_ms": 5.096999999999907,
+      "response_bytes": 158
+    },
+    {
+      "path": "/api/assess",
+      "status": 200,
+      "elapsed_ms": 4.843899999999901,
+      "response_bytes": 158
+    },
+    {
+      "path": "/api/assess",
+      "status": 200,
+      "elapsed_ms": 4.831699999999994,
+      "response_bytes": 158
+    },
+    {
+      "path": "/api/assess",
+      "status": 200,
+      "elapsed_ms": 5.004399999999909,
+      "response_bytes": 158
+    },
+    {
+      "path": "/api/assess",
+      "status": 200,
+      "elapsed_ms": 4.8304000000000125,
+      "response_bytes": 158
+    },
+    {
+      "path": "/api/assess",
+      "status": 200,
+      "elapsed_ms": 5.354799999999993,
+      "response_bytes": 158
+    },
+    {
+      "path": "/api/assess",
+      "status": 200,
+      "elapsed_ms": 5.256999999999956,
+      "response_bytes": 158
+    },
+    {
+      "path": "/api/jobs/1",
+      "status": 200,
+      "elapsed_ms": 0.5705000000000293,
+      "response_bytes": 17
+    },
+    {
+      "path": "/api/jobs/1",
+      "status": 404,
+      "elapsed_ms": 0.5260000000000264,
+      "response_bytes": 35
+    },
+    {
+      "path": "/api/jobs",
+      "status": 200,
+      "elapsed_ms": 5.078899999999997,
+      "response_bytes": 29
+    },
+    {
+      "path": "/api/jobs/2/prove",
+      "status": 200,
+      "elapsed_ms": 0.47450000000004433,
+      "response_bytes": 17
+    },
+    {
+      "path": "/api/jobs/2",
+      "status": 200,
+      "elapsed_ms": 0.4511000000000376,
+      "response_bytes": 113
+    },
+    {
+      "path": "/api/jobs/2",
+      "status": 200,
+      "elapsed_ms": 0.6738000000000577,
+      "response_bytes": 174
+    },
+    {
+      "path": "/api/jobs/2/collect",
+      "status": 200,
+      "elapsed_ms": 0.5952999999999653,
+      "response_bytes": 17
+    },
+    {
+      "path": "/api/jobs/2",
+      "status": 200,
+      "elapsed_ms": 0.46770000000007084,
+      "response_bytes": 192
+    },
+    {
+      "path": "/api/profiles",
+      "status": 200,
+      "elapsed_ms": 0.48839999999994443,
+      "response_bytes": 50
+    },
+    {
+      "path": "/api/jobs",
+      "status": 200,
+      "elapsed_ms": 5.081699999999967,
+      "response_bytes": 29
+    },
+    {
+      "path": "/api/jobs/3/prove",
+      "status": 200,
+      "elapsed_ms": 0.44909999999998007,
+      "response_bytes": 17
+    },
+    {
+      "path": "/api/jobs/3",
+      "status": 200,
+      "elapsed_ms": 0.4432999999999243,
+      "response_bytes": 113
+    },
+    {
+      "path": "/api/jobs/3",
+      "status": 200,
+      "elapsed_ms": 14.940900000000035,
+      "response_bytes": 174
+    },
+    {
+      "path": "/api/jobs/2",
+      "status": 200,
+      "elapsed_ms": 0.716300000000003,
+      "response_bytes": 192
+    },
+    {
+      "path": "/api/jobs",
+      "status": 400,
+      "elapsed_ms": 5.038199999999993,
+      "response_bytes": 55
+    },
+    {
+      "path": "/api/jobs/2/pause",
+      "status": 200,
+      "elapsed_ms": 0.5252999999999508,
+      "response_bytes": 29
+    },
+    {
+      "path": "/api/jobs/2",
+      "status": 200,
+      "elapsed_ms": 0.49960000000004445,
+      "response_bytes": 179
+    },
+    {
+      "path": "/api/jobs/2",
+      "status": 200,
+      "elapsed_ms": 0.4416999999999893,
+      "response_bytes": 179
+    },
+    {
+      "path": "/api/jobs/2/collect",
+      "status": 200,
+      "elapsed_ms": 0.42000000000008697,
+      "response_bytes": 17
+    },
+    {
+      "path": "/api/jobs/2",
+      "status": 200,
+      "elapsed_ms": 0.4944999999999533,
+      "response_bytes": 180
+    },
+    {
+      "path": "/api/jobs/2",
+      "status": 200,
+      "elapsed_ms": 0.8226000000000067,
+      "response_bytes": 1054
+    },
+    {
+      "path": "/api/jobs/2",
+      "status": 200,
+      "elapsed_ms": 15.58129999999991,
+      "response_bytes": 1054
+    },
+    {
+      "path": "/api/jobs/2/collect",
+      "status": 200,
+      "elapsed_ms": 0.8329999999999727,
+      "response_bytes": 17
+    },
+    {
+      "path": "/api/jobs/2",
+      "status": 200,
+      "elapsed_ms": 14.162299999999961,
+      "response_bytes": 1924
+    },
+    {
+      "path": "/api/jobs/2",
+      "status": 200,
+      "elapsed_ms": 15.785599999999956,
+      "response_bytes": 1924
+    },
+    {
+      "path": "/api/jobs/2/collect",
+      "status": 200,
+      "elapsed_ms": 0.725899999999946,
+      "response_bytes": 17
+    },
+    {
+      "path": "/api/jobs/2",
+      "status": 200,
+      "elapsed_ms": 0.587499999999963,
+      "response_bytes": 1921
+    },
+    {
+      "path": "/api/jobs/2",
+      "status": 200,
+      "elapsed_ms": 1.1624000000000079,
+      "response_bytes": 2794
+    },
+    {
+      "path": "/api/jobs/2",
+      "status": 200,
+      "elapsed_ms": 0.9436000000000444,
+      "response_bytes": 2794
+    },
+    {
+      "path": "/api/jobs/2/collect",
+      "status": 200,
+      "elapsed_ms": 0.6680999999999493,
+      "response_bytes": 17
+    },
+    {
+      "path": "/api/jobs/2",
+      "status": 200,
+      "elapsed_ms": 12.332200000000014,
+      "response_bytes": 3677
+    },
+    {
+      "path": "/api/jobs/2",
+      "status": 200,
+      "elapsed_ms": 0.8063999999999849,
+      "response_bytes": 3677
+    },
+    {
+      "path": "/api/jobs/2/collect",
+      "status": 200,
+      "elapsed_ms": 0.5882999999999861,
+      "response_bytes": 17
+    },
+    {
+      "path": "/api/jobs/2",
+      "status": 200,
+      "elapsed_ms": 0.50400000000006,
+      "response_bytes": 3676
+    },
+    {
+      "path": "/api/jobs/2",
+      "status": 200,
+      "elapsed_ms": 0.8926000000000212,
+      "response_bytes": 4535
+    },
+    {
+      "path": "/api/jobs/2",
+      "status": 200,
+      "elapsed_ms": 0.6489000000000633,
+      "response_bytes": 4535
+    },
+    {
+      "path": "/api/jobs/2/collect",
+      "status": 200,
+      "elapsed_ms": 0.5209000000000463,
+      "response_bytes": 17
+    },
+    {
+      "path": "/api/jobs/2",
+      "status": 200,
+      "elapsed_ms": 0.5640000000000089,
+      "response_bytes": 4532
+    },
+    {
+      "path": "/api/jobs/2",
+      "status": 200,
+      "elapsed_ms": 0.9033000000000513,
+      "response_bytes": 4822
+    },
+    {
+      "path": "/api/jobs/2",
+      "status": 200,
+      "elapsed_ms": 0.6009000000000153,
+      "response_bytes": 4822
+    },
+    {
+      "path": "/api/jobs/2",
+      "status": 200,
+      "elapsed_ms": 0.5252000000000034,
+      "response_bytes": 17
+    },
+    {
+      "path": "/api/jobs/3",
+      "status": 200,
+      "elapsed_ms": 0.4422000000000592,
+      "response_bytes": 17
+    },
+    {
+      "path": "/api/jobs",
+      "status": 200,
+      "elapsed_ms": 4.977400000000021,
+      "response_bytes": 29
+    },
+    {
+      "path": "/api/jobs/5/prove",
+      "status": 200,
+      "elapsed_ms": 0.5323000000000411,
+      "response_bytes": 17
+    },
+    {
+      "path": "/api/jobs/5",
+      "status": 200,
+      "elapsed_ms": 0.4658000000000717,
+      "response_bytes": 113
+    },
+    {
+      "path": "/api/jobs/5",
+      "status": 200,
+      "elapsed_ms": 0.8749000000000118,
+      "response_bytes": 174
+    },
+    {
+      "path": "/api/jobs/5/collect",
+      "status": 200,
+      "elapsed_ms": 0.5802000000000307,
+      "response_bytes": 17
+    },
+    {
+      "path": "/api/jobs/5",
+      "status": 200,
+      "elapsed_ms": 0.4433999999999827,
+      "response_bytes": 192
+    },
+    {
+      "path": "/api/jobs/5/cancel",
+      "status": 200,
+      "elapsed_ms": 0.4672999999999483,
+      "response_bytes": 30
+    },
+    {
+      "path": "/api/jobs/5",
+      "status": 200,
+      "elapsed_ms": 0.4506000000000787,
+      "response_bytes": 182
+    },
+    {
+      "path": "/api/jobs/5/collect",
+      "status": 409,
+      "elapsed_ms": 0.46120000000005046,
+      "response_bytes": 36
+    },
+    {
+      "path": "/api/jobs/5",
+      "status": 200,
+      "elapsed_ms": 0.4373999999999212,
+      "response_bytes": 17
+    },
+    {
+      "path": "/api/jobs",
+      "status": 200,
+      "elapsed_ms": 4.962000000000022,
+      "response_bytes": 29
+    },
+    {
+      "path": "/api/jobs/6/prove",
+      "status": 200,
+      "elapsed_ms": 0.5600000000000049,
+      "response_bytes": 17
+    },
+    {
+      "path": "/api/jobs/6/cancel",
+      "status": 200,
+      "elapsed_ms": 0.4771000000000081,
+      "response_bytes": 30
+    },
+    {
+      "path": "/api/jobs/6",
+      "status": 200,
+      "elapsed_ms": 0.46319999999999695,
+      "response_bytes": 155
+    },
+    {
+      "path": "/api/jobs/6",
+      "status": 200,
+      "elapsed_ms": 0.4762000000000377,
+      "response_bytes": 17
+    },
+    {
+      "path": "/api/jobs",
+      "status": 200,
+      "elapsed_ms": 5.007199999999989,
+      "response_bytes": 29
+    },
+    {
+      "path": "/api/jobs/7/prove",
+      "status": 200,
+      "elapsed_ms": 0.46149999999989255,
+      "response_bytes": 17
+    },
+    {
+      "path": "/api/jobs/7",
+      "status": 200,
+      "elapsed_ms": 0.4513999999999907,
+      "response_bytes": 113
+    },
+    {
+      "path": "/api/jobs/7",
+      "status": 200,
+      "elapsed_ms": 0.9752999999999012,
+      "response_bytes": 160
+    },
+    {
+      "path": "/api/jobs/7/collect",
+      "status": 200,
+      "elapsed_ms": 0.658700000000012,
+      "response_bytes": 17
+    },
+    {
+      "path": "/api/jobs/7",
+      "status": 200,
+      "elapsed_ms": 0.5401999999999907,
+      "response_bytes": 178
+    },
+    {
+      "path": "/api/jobs/7",
+      "status": 200,
+      "elapsed_ms": 0.4593999999999987,
+      "response_bytes": 17
+    },
+    {
+      "path": "/api/jobs/7",
+      "status": 404,
+      "elapsed_ms": 0.5448000000000119,
+      "response_bytes": 35
+    },
+    {
+      "path": "/api/jobs",
+      "status": 200,
+      "elapsed_ms": 5.042800000000014,
+      "response_bytes": 29
+    },
+    {
+      "path": "/api/jobs/8",
+      "status": 200,
+      "elapsed_ms": 2.0777999999994634,
+      "response_bytes": 109
+    },
+    {
+      "path": "/api/jobs/8/prove",
+      "status": 409,
+      "elapsed_ms": 1.1936999999999642,
+      "response_bytes": 34
+    },
+    {
+      "path": "/api/jobs/8",
+      "status": 200,
+      "elapsed_ms": 0.9689999999995536,
+      "response_bytes": 17
+    }
+  ],
+  "core_operations": [
+    {
+      "operation": "prove",
+      "state": "Collecting",
+      "elapsed_ms": 8.013
+    },
+    {
+      "operation": "collect",
+      "state": "Collecting",
+      "elapsed_ms": 1.0281,
+      "confirmed": 3
+    },
+    {
+      "operation": "collect",
+      "state": "Collecting",
+      "elapsed_ms": 0.9881,
+      "confirmed": 6
+    },
+    {
+      "operation": "collect",
+      "state": "Collecting",
+      "elapsed_ms": 1.1477,
+      "confirmed": 9
+    },
+    {
+      "operation": "collect",
+      "state": "Collecting",
+      "elapsed_ms": 1.0587000000000002,
+      "confirmed": 12
+    },
+    {
+      "operation": "collect",
+      "state": "Collecting",
+      "elapsed_ms": 1.1352,
+      "confirmed": 15
+    },
+    {
+      "operation": "collect",
+      "state": "Exhausted",
+      "elapsed_ms": 0.6545,
+      "confirmed": 16
+    },
+    {
+      "operation": "prove",
+      "state": "Collecting",
+      "elapsed_ms": 8.732099999999999
+    },
+    {
+      "operation": "prove",
+      "state": "Collecting",
+      "elapsed_ms": 8.006599999999999
+    },
+    {
+      "operation": "collect",
+      "state": "Collecting",
+      "elapsed_ms": 0.9194,
+      "confirmed": 3
+    },
+    {
+      "operation": "collect",
+      "state": "Collecting",
+      "elapsed_ms": 1.1547,
+      "confirmed": 6
+    },
+    {
+      "operation": "collect",
+      "state": "Collecting",
+      "elapsed_ms": 0.9299,
+      "confirmed": 9
+    },
+    {
+      "operation": "collect",
+      "state": "Collecting",
+      "elapsed_ms": 1.1509999999999998,
+      "confirmed": 12
+    },
+    {
+      "operation": "collect",
+      "state": "Collecting",
+      "elapsed_ms": 0.9919,
+      "confirmed": 15
+    },
+    {
+      "operation": "collect",
+      "state": "Exhausted",
+      "elapsed_ms": 0.6775,
+      "confirmed": 16
+    },
+    {
+      "operation": "prove",
+      "state": "Collecting",
+      "elapsed_ms": 7.873099999999999
+    },
+    {
+      "operation": "prove",
+      "state": "Collecting",
+      "elapsed_ms": 8.0
+    }
+  ],
+  "control_observations": [
+    {
+      "operation": "pause_gate_to_ack",
+      "wall_ms": 1.0970000000000146
+    },
+    {
+      "operation": "cancel_gate_to_ack",
+      "wall_ms": 0.9862999999999955
+    }
+  ]
+}

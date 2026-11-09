@@ -1,0 +1,132 @@
+{
+  "infeasible": {
+    "alternatives": [],
+    "busy": false,
+    "confirmed_count": 0,
+    "error": null,
+    "last_operation_ms": 62.2257,
+    "maximum_hundredths": null,
+    "phase": "Domain",
+    "state": "Infeasible"
+  },
+  "conflicting_request": {
+    "alternatives": [],
+    "busy": false,
+    "confirmed_count": 0,
+    "error": "Search(InvalidRequest { reason: \"Required element conflicts with a global exclusion.\", diagnostics: [PlanningDiagnostic { required_input_indices: [0], rule_id: None, message: \"Required element conflicts with a global exclusion.\" }] })",
+    "last_operation_ms": 15.757,
+    "maximum_hundredths": null,
+    "phase": "Domain",
+    "state": "Failed"
+  },
+  "combined_restrictions": {
+    "maximum_hundredths": 1070,
+    "identities": [
+      [
+        "1F",
+        "1F",
+        "1Lo",
+        "1Lo+1S"
+      ],
+      [
+        "1F",
+        "1F",
+        "1Lo",
+        "1Lo+1T"
+      ],
+      [
+        "1F",
+        "1F",
+        "1Lo",
+        "1S+1Lo"
+      ],
+      [
+        "1F",
+        "1F",
+        "1Lo",
+        "1T+1Lo"
+      ],
+      [
+        "1F",
+        "1F",
+        "1Lo+1Lo",
+        "1S"
+      ],
+      [
+        "1F",
+        "1F",
+        "1Lo+1Lo",
+        "1T"
+      ],
+      [
+        "1F",
+        "1F+1Lo",
+        "1Lo",
+        "1S"
+      ],
+      [
+        "1F",
+        "1F+1Lo",
+        "1Lo",
+        "1T"
+      ],
+      [
+        "1F",
+        "1F+1S",
+        "1Lo",
+        "1Lo"
+      ],
+      [
+        "1F",
+        "1F+1T",
+        "1Lo",
+        "1Lo"
+      ],
+      [
+        "1F",
+        "1Lo",
+        "1Lo",
+        "1S+1F"
+      ],
+      [
+        "1F",
+        "1Lo",
+        "1Lo",
+        "1T+1F"
+      ],
+      [
+        "1F",
+        "1Lo",
+        "1Lo+1F",
+        "1S"
+      ],
+      [
+        "1F",
+        "1Lo",
+        "1Lo+1F",
+        "1T"
+      ]
+    ],
+    "count": 14
+  },
+  "preference_independent_of_rules": {
+    "without_limit": {
+      "bv_hundredths": 280,
+      "compliance": {
+        "verdict": "Compliant"
+      },
+      "findings": "[]",
+      "personal_conflicts": "[]",
+      "scope": "planned construction; no duration or execution"
+    },
+    "with_limit": {
+      "bv_hundredths": 280,
+      "compliance": {
+        "verdict": "Compliant"
+      },
+      "findings": "[]",
+      "personal_conflicts": "[PersonalLimitConflict { element_index: 0, component_index: None, kind: SpinLevel { abbreviation: SpinAbbreviation { kind: Sit, entry: NonFlying, change_foot: true }, requested: Two, maximum: Basic } }]",
+      "scope": "planned construction; no duration or execution"
+    }
+  }
+}

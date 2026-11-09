@@ -1,0 +1,13 @@
+{
+  "rustc": "rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+  "cargo": "cargo 1.99.1 (5f94df478 2026-08-27)",
+  "target": "x86_64-pc-windows-msvc",
+  "build": "Release",
+  "loopback_only": true,
+  "verification_idle_seconds": 4,
+  "core_baseline": "5bc3333324fe54efab35a6879fe679c0f0e5fbc9",
+  "prototype_parent": "97e309bde58e0416db560f8b88eb101479b483ab",
+  "binary_sha256": "9436e6bc75efef4e0c2e6a4e04ce48b491c9b6991d07ec5a0bf50ffc1839c73d",
+  "binary_bytes": 1869312,
+  "lock_sha256": "bff0daccf5c0e6bc3d11a4fa50a483bf2be55e8aec8288ff5b853277f89083de"
+}

@@ -1,0 +1,241 @@
+{
+  "heartbeat": "Browser aktiv: 740 Frames · größte beobachtete Frame-Lücke 1002 ms",
+  "result": {
+    "alternatives": [
+      {
+        "bv_hundredths": 1070,
+        "codes": [
+          "1F+1F",
+          "1Lo",
+          "1Lo",
+          "1S",
+          "CCSp1",
+          "CLSp1",
+          "ChSq1"
+        ],
+        "compliance": "Ok(Compliant)",
+        "provenance": "[Added, Added, Added, Added, Required { id: \"required-0\", input_index: 0 }, Required { id: \"required-1\", input_index: 1 }, Required { id: \"required-2\", input_index: 2 }]"
+      },
+      {
+        "bv_hundredths": 1070,
+        "codes": [
+          "1F+1F",
+          "1Lo",
+          "1Lo",
+          "1T",
+          "CCSp1",
+          "CLSp1",
+          "ChSq1"
+        ],
+        "compliance": "Ok(Compliant)",
+        "provenance": "[Added, Added, Added, Added, Required { id: \"required-0\", input_index: 0 }, Required { id: \"required-1\", input_index: 1 }, Required { id: \"required-2\", input_index: 2 }]"
+      },
+      {
+        "bv_hundredths": 1070,
+        "codes": [
+          "1F",
+          "1F+1Lo",
+          "1Lo",
+          "1S",
+          "CCSp1",
+          "CLSp1",
+          "ChSq1"
+        ],
+        "compliance": "Ok(Compliant)",
+        "provenance": "[Added, Added, Added, Added, Required { id: \"required-0\", input_index: 0 }, Required { id: \"required-1\", input_index: 1 }, Required { id: \"required-2\", input_index: 2 }]"
+      },
+      {
+        "bv_hundredths": 1070,
+        "codes": [
+          "1F",
+          "1F+1Lo",
+          "1Lo",
+          "1T",
+          "CCSp1",
+          "CLSp1",
+          "ChSq1"
+        ],
+        "compliance": "Ok(Compliant)",
+        "provenance": "[Added, Added, Added, Added, Required { id: \"required-0\", input_index: 0 }, Required { id: \"required-1\", input_index: 1 }, Required { id: \"required-2\", input_index: 2 }]"
+      },
+      {
+        "bv_hundredths": 1070,
+        "codes": [
+          "1F",
+          "1Lo",
+          "1Lo+1F",
+          "1S",
+          "CCSp1",
+          "CLSp1",
+          "ChSq1"
+        ],
+        "compliance": "Ok(Compliant)",
+        "provenance": "[Added, Added, Added, Added, Required { id: \"required-0\", input_index: 0 }, Required { id: \"required-1\", input_index: 1 }, Required { id: \"required-2\", input_index: 2 }]"
+      },
+      {
+        "bv_hundredths": 1070,
+        "codes": [
+          "1F",
+          "1Lo",
+          "1Lo+1F",
+          "1T",
+          "CCSp1",
+          "CLSp1",
+          "ChSq1"
+        ],
+        "compliance": "Ok(Compliant)",
+        "provenance": "[Added, Added, Added, Added, Required { id: \"required-0\", input_index: 0 }, Required { id: \"required-1\", input_index: 1 }, Required { id: \"required-2\", input_index: 2 }]"
+      },
+      {
+        "bv_hundredths": 1070,
+        "codes": [
+          "1F",
+          "1F",
+          "1Lo+1Lo",
+          "1S",
+          "CCSp1",
+          "CLSp1",
+          "ChSq1"
+        ],
+        "compliance": "Ok(Compliant)",
+        "provenance": "[Added, Added, Added, Added, Required { id: \"required-0\", input_index: 0 }, Required { id: \"required-1\", input_index: 1 }, Required { id: \"required-2\", input_index: 2 }]"
+      },
+      {
+        "bv_hundredths": 1070,
+        "codes": [
+          "1F",
+          "1F",
+          "1Lo+1Lo",
+          "1T",
+          "CCSp1",
+          "CLSp1",
+          "ChSq1"
+        ],
+        "compliance": "Ok(Compliant)",
+        "provenance": "[Added, Added, Added, Added, Required { id: \"required-0\", input_index: 0 }, Required { id: \"required-1\", input_index: 1 }, Required { id: \"required-2\", input_index: 2 }]"
+      },
+      {
+        "bv_hundredths": 1070,
+        "codes": [
+          "1F",
+          "1F+1S",
+          "1Lo",
+          "1Lo",
+          "CCSp1",
+          "CLSp1",
+          "ChSq1"
+        ],
+        "compliance": "Ok(Compliant)",
+        "provenance": "[Added, Added, Added, Added, Required { id: \"required-0\", input_index: 0 }, Required { id: \"required-1\", input_index: 1 }, Required { id: \"required-2\", input_index: 2 }]"
+      },
+      {
+        "bv_hundredths": 1070,
+        "codes": [
+          "1F",
+          "1F+1T",
+          "1Lo",
+          "1Lo",
+          "CCSp1",
+          "CLSp1",
+          "ChSq1"
+        ],
+        "compliance": "Ok(Compliant)",
+        "provenance": "[Added, Added, Added, Added, Required { id: \"required-0\", input_index: 0 }, Required { id: \"required-1\", input_index: 1 }, Required { id: \"required-2\", input_index: 2 }]"
+      },
+      {
+        "bv_hundredths": 1070,
+        "codes": [
+          "1F",
+          "1F",
+          "1Lo",
+          "1Lo+1S",
+          "CCSp1",
+          "CLSp1",
+          "ChSq1"
+        ],
+        "compliance": "Ok(Compliant)",
+        "provenance": "[Added, Added, Added, Added, Required { id: \"required-0\", input_index: 0 }, Required { id: \"required-1\", input_index: 1 }, Required { id: \"required-2\", input_index: 2 }]"
+      },
+      {
+        "bv_hundredths": 1070,
+        "codes": [
+          "1F",
+          "1F",
+          "1Lo",
+          "1Lo+1T",
+          "CCSp1",
+          "CLSp1",
+          "ChSq1"
+        ],
+        "compliance": "Ok(Compliant)",
+        "provenance": "[Added, Added, Added, Added, Required { id: \"required-0\", input_index: 0 }, Required { id: \"required-1\", input_index: 1 }, Required { id: \"required-2\", input_index: 2 }]"
+      },
+      {
+        "bv_hundredths": 1070,
+        "codes": [
+          "1F",
+          "1Lo",
+          "1Lo",
+          "1S+1F",
+          "CCSp1",
+          "CLSp1",
+          "ChSq1"
+        ],
+        "compliance": "Ok(Compliant)",
+        "provenance": "[Added, Added, Added, Added, Required { id: \"required-0\", input_index: 0 }, Required { id: \"required-1\", input_index: 1 }, Required { id: \"required-2\", input_index: 2 }]"
+      },
+      {
+        "bv_hundredths": 1070,
+        "codes": [
+          "1F",
+          "1F",
+          "1Lo",
+          "1S+1Lo",
+          "CCSp1",
+          "CLSp1",
+          "ChSq1"
+        ],
+        "compliance": "Ok(Compliant)",
+        "provenance": "[Added, Added, Added, Added, Required { id: \"required-0\", input_index: 0 }, Required { id: \"required-1\", input_index: 1 }, Required { id: \"required-2\", input_index: 2 }]"
+      },
+      {
+        "bv_hundredths": 1070,
+        "codes": [
+          "1F",
+          "1Lo",
+          "1Lo",
+          "1T+1F",
+          "CCSp1",
+          "CLSp1",
+          "ChSq1"
+        ],
+        "compliance": "Ok(Compliant)",
+        "provenance": "[Added, Added, Added, Added, Required { id: \"required-0\", input_index: 0 }, Required { id: \"required-1\", input_index: 1 }, Required { id: \"required-2\", input_index: 2 }]"
+      },
+      {
+        "bv_hundredths": 1070,
+        "codes": [
+          "1F",
+          "1F",
+          "1Lo",
+          "1T+1Lo",
+          "CCSp1",
+          "CLSp1",
+          "ChSq1"
+        ],
+        "compliance": "Ok(Compliant)",
+        "provenance": "[Added, Added, Added, Added, Required { id: \"required-0\", input_index: 0 }, Required { id: \"required-1\", input_index: 1 }, Required { id: \"required-2\", input_index: 2 }]"
+      }
+    ],
+    "busy": false,
+    "confirmed_count": 16,
+    "error": null,
+    "gate_waiting": false,
+    "last_operation_ms": 1.0752,
+    "maximum_hundredths": 1070,
+    "phase": "Alternatives",
+    "state": "Exhausted"
+  },
+  "state": "Session 17: Exhausted · Alternatives · aktiv=false · Maximum=1070 · Ergebnisse=16",
+  "typed": "Bedienbar während des Rust-Aufrufs"
+}
