@@ -25,7 +25,7 @@ Open `http://127.0.0.1:8766/ui-workspace.prototype.html?variant=A`. No install, 
 - C: repertoire-first wide family matrix above the program and suggestions.
 - C2: a user-requested subvariant of C with vertical, discrete mixer faders. Open `?variant=C2` or use the existing comparison switcher; A/B/C remain available.
 
-A shared bottom switcher changes `?variant=A|B|C`; left/right keys switch when not editing or operating a control. All three share in-memory request state. Language can switch among German, English and Russian without clearing the plan. Display names/translations are prototype copy awaiting native-domain review.
+A shared comparison switcher changes `?variant=A|B|C|C2`; it sits at the bottom in A/B/C and in the header of desktop C2. Left/right keys switch when not editing or operating a control. Variants share in-memory request state. Language can switch among German, English and Russian without clearing the plan. Display names/translations are prototype copy awaiting native-domain review.
 
 ## Interaction scope
 
@@ -79,3 +79,21 @@ The user proposed a mixer/DJ-console interaction. The prototype tests one fader 
 Observed checks: ArrowDown excluded a kept Axel and produced a conflict; ArrowUp under Masters restored Axel with a maximum of Single; switching to C showed the same maximum. Home/ArrowUp on CSSp selected Basic and flagged the kept CSSp2. A step fader was excluded, and selecting Bronze disabled unavailable step content. At 320 and 390 CSS-pixel viewports, page scroll width equaled client width. JavaScript parsing and whitespace checks passed. No physical-phone or participant test was run; no real solver integration was added. The earlier independent review covers A/B/C, not C2.
 
 [Desktop screenshot](prototype-ui-review/mixer/c2-desktop.jpg) · [Mobile screenshot](prototype-ui-review/mixer/c2-mobile.jpg)
+
+## Compact desktop C2 revision
+
+The user rejected the centered layout, wide strips and repertoire tabs. C2 now uses the full desktop viewport with 16px workspace side padding, 68px channel strips, all fourteen jump/spin/step faders and both choreographic switches visible at once. Program editing and suggestions share the lower half. Extra restrictions open in a separate dialog; the main repertoire has no family tabs. The review switcher moves into the header instead of covering the program. A/B/C retain their existing layouts.
+
+The dense desktop mode is viewport-constrained. Main controls stay visible; program and result lists can scroll internally when content exceeds their panels. This is not a promise to show arbitrarily many alternatives simultaneously. Below the desktop breakpoint the grouped, tab-free controls reflow and the document may scroll; the fixed-viewport target in this revision is desktop.
+
+Exact spin abbreviations label compact channels. Full names remain accessible labels and titles, and appear in the shared inspector when a fader receives focus. No repeated explanatory paragraphs are needed in the mixer area. This trade-off still needs human comprehension review.
+
+Observed connected-Chrome checks with the two-element Silver sample and two simulated alternatives:
+
+- 1440×900: document scroll dimensions exactly 1440×900; 14 faders; 68px strip width; no repertoire bank overflow; calculation action within the viewport.
+- 1280×720: document scroll dimensions exactly 1280×720; banks fit; both result rows fit without result-list overflow after condensing rows; calculation and results end at y=708.
+- Extra restrictions dialog opens, closes with Escape and restores focus. Fader focus exposes the full spin name. JavaScript syntax and whitespace checks pass.
+
+These are prototype browser/layout checks, not physical-device, participant or backend correctness tests. Calculation remains simulated. Earlier screenshots are preserved as historical versions.
+
+[Compact 1440×900 screenshot](prototype-ui-review/mixer/c2-compact-desktop.jpg) · [Compact 1280×720 screenshot](prototype-ui-review/mixer/c2-compact-1280.jpg)
