@@ -23,6 +23,7 @@ Open `http://127.0.0.1:8766/ui-workspace.prototype.html?variant=A`. No install, 
 - A: persistent repertoire sidebar alongside the plan; mobile opens repertoire in a dialog.
 - B: program-first editor with a compact restriction summary and an on-demand repertoire dialog.
 - C: repertoire-first wide family matrix above the program and suggestions.
+- C2: a user-requested subvariant of C with vertical, discrete mixer faders. Open `?variant=C2` or use the existing comparison switcher; A/B/C remain available.
 
 A shared bottom switcher changes `?variant=A|B|C`; left/right keys switch when not editing or operating a control. All three share in-memory request state. Language can switch among German, English and Russian without clearing the plan. Display names/translations are prototype copy awaiting native-domain review.
 
@@ -64,3 +65,17 @@ The design-system query for a sports product returned a marketing hero pattern u
 ## Independent screenshot review
 
 At the user's request, an independent subagent reviewed eleven desktop/mobile screenshots using ui-ux-pro-max. See the [review and text audit](prototype-ui-review/review.md). The report recommends improving the shared interaction model before choosing the final layout. Its proposed desktop B/mobile A combination is not a user-approved decision. No UI source changes were made during this review.
+
+## Mixer subvariant C2
+
+The user proposed a mixer/DJ-console interaction. The prototype tests one fader per jump kind or exact spin form, not a fader per occurrence in the program. This is an explicit working interpretation awaiting feedback.
+
+- Jumps: Off, then the supported listed classes up to the selected category ceiling. Readouts show exact codes such as 1A or 2T, avoiding confusion between listed class and physical turns.
+- Spins and steps: Off, Basic, then levels 1–4 within the category ceiling. Choreographic choices stay binary; they do not acquire invented levels.
+- Moving to Off excludes the kind/form. Lowering a fader sets a personal maximum; reaching the category ceiling adds no further maximum. Existing exact exclusions remain available under More restrictions.
+- Native vertical range inputs support dragging, track activation and keyboard control. Live readouts update during movement; the request/history commits on change, so dragging does not repeatedly recreate the input.
+- The mixer shares the existing request, conflict reporting and stale-result behavior. Changing C2 to C retains the same settings. Mobile uses three channels per row without horizontal scrolling.
+
+Observed checks: ArrowDown excluded a kept Axel and produced a conflict; ArrowUp under Masters restored Axel with a maximum of Single; switching to C showed the same maximum. Home/ArrowUp on CSSp selected Basic and flagged the kept CSSp2. A step fader was excluded, and selecting Bronze disabled unavailable step content. At 320 and 390 CSS-pixel viewports, page scroll width equaled client width. JavaScript parsing and whitespace checks passed. No physical-phone or participant test was run; no real solver integration was added. The earlier independent review covers A/B/C, not C2.
+
+[Desktop screenshot](prototype-ui-review/mixer/c2-desktop.jpg) · [Mobile screenshot](prototype-ui-review/mixer/c2-mobile.jpg)
