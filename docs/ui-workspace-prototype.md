@@ -72,7 +72,7 @@ The user proposed a mixer/DJ-console interaction. The prototype tests one fader 
 
 - Jumps: Off, then the supported listed classes up to the selected category ceiling. Readouts show exact codes such as 1A or 2T, avoiding confusion between listed class and physical turns.
 - Spins and steps: Off, Basic, then levels 1–4 within the category ceiling. Choreographic choices stay binary; they do not acquire invented levels.
-- Moving to Off excludes the kind/form. Lowering a fader sets a personal maximum; reaching the category ceiling adds no further maximum. Existing exact exclusions remain available under More restrictions.
+- Moving to Off excludes the kind/form. Changing a nonzero fader records that exact personal maximum, including when it matches the category ceiling. Thus an explicit Single limit survives a later switch to a category permitting doubles. Absent personal limits initially display the effective category ceiling until edited; Reset restores unrestricted personal settings. Existing exact exclusions remain available under More restrictions.
 - Native vertical range inputs support dragging, track activation and keyboard control. Live readouts update during movement; the request/history commits on change, so dragging does not repeatedly recreate the input.
 - The mixer shares the existing request, conflict reporting and stale-result behavior. Changing C2 to C retains the same settings. Mobile uses three channels per row without horizontal scrolling.
 
