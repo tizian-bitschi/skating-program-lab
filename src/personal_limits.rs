@@ -45,6 +45,10 @@ pub struct PersonalLimits {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PersonalLimitConflictKind {
+    StepLevel {
+        requested: Level,
+        maximum: Level,
+    },
     JumpRotation {
         kind: JumpKind,
         requested: u8,
@@ -138,4 +142,28 @@ impl PersonalLimits {
         }
         conflicts
     }
+}
+
+pub(crate) fn step_limit_conflict(
+    evidence: &ElementPlanEvidence,
+    maximum: Option<Level>,
+    element_index: usize,
+) -> Option<PersonalLimitConflict> {
+    let maximum = maximum?;
+    if let ElementPlanEvidence::Step {
+        level: requested, ..
+    } = evidence
+    {
+        if requested.number() > maximum.number() {
+            return Some(PersonalLimitConflict {
+                element_index,
+                component_index: None,
+                kind: PersonalLimitConflictKind::StepLevel {
+                    requested: *requested,
+                    maximum,
+                },
+            });
+        }
+    }
+    None
 }

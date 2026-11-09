@@ -498,6 +498,30 @@ pub fn selectable_jump_elements_with_limits(
     .map(|choices| choices.expect("noncancellable listing"))
 }
 
+/// Profile and personal repertoire choices with an optional step-sequence maximum.
+/// Choreographic elements have no level and are unaffected.
+pub fn selectable_elements_with_step_limit(
+    registry: &ProfileRegistry,
+    profile: &ProfileId,
+    table: ScoringTableId,
+    limits: &PersonalLimits,
+    maximum: Option<Level>,
+) -> Result<Vec<SelectableElement>, ProfileSelectionError> {
+    Ok(
+        selectable_elements_with_limits(registry, profile, table, limits)?
+            .into_iter()
+            .filter(|s| {
+                s.kind != SelectableElementKind::StepSequence
+                    || maximum.is_none_or(|maximum| {
+                        s.row
+                            .level
+                            .is_some_and(|level| level.number() <= maximum.number())
+                    })
+            })
+            .collect(),
+    )
+}
+
 #[cfg(test)]
 mod planning_tests {
     use super::*;

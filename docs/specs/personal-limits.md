@@ -11,7 +11,7 @@ The module is available without the `optimizer` feature.
 kind, flying entry and change of foot. `Level::Basic`, `One`, `Two`, `Three` and
 `Four` are the supported maxima. CCoSp is independent of CoSp and FCCoSp. Its V
 variants share the same limit. Lower levels remain selectable. ChSp1, ChSq1 and
-step sequences have no personal level maximum.
+step sequences use the additive optional maximum described below.
 
 `JumpRotationLimit { kind, maximum }` uses `JumpRotationClass::{Single, Double,
 Triple, Quadruple, Quintuple}`. `TryFrom<u8>` explicitly rejects values outside
@@ -64,3 +64,22 @@ optional filtering and required alternatives, immutable conflicts and provenance
 Independent limited-domain bounds verify Bronze 10.20 and Senior Women/Men 21.70
 when all regular spins are capped at Basic and all jumps at Single. Baseline
 Silver remains 14.30, or 13.00 with Axel excluded.
+
+
+## Step-sequence maximum (#135)
+
+The additive `selectable_elements_with_step_limit`,
+`search_maximum_bv_with_step_limit` and `assess_manual_bv_with_step_limit`
+entry points accept `maximum: Option<Level>` alongside existing requests and
+personal limits. `None` preserves existing behavior. Basic through Four retain
+all lower eligible levels and intersect category ceilings. Exact catalog values
+remain unchanged; ChSq1 and ChSp1 have no invented levels.
+
+Required over-limit steps report `PersonalLimitConflictKind::StepLevel` with the
+original required-input index. Manual assessment reports the same indexed
+personal conflict without changing BV or category-rule findings. Existing
+request structs and entry points retain their layouts and behavior. Callers
+matching every personal-conflict variant must handle the added `StepLevel`
+variant. Keep the separate maximum with the request when recording provenance;
+`PlanningMaximum.personal_limits` continues to describe the original jump and
+regular-spin limits.
