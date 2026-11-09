@@ -1,7 +1,8 @@
-# Issue #132 compatibility proposal
+# Issue #132 compatibility decisions
 
-Status: **Pending user approval**. This proposal records two separate decisions;
-it grants neither approval and does not amend the accepted ADR or agent rules.
+Status: **Accepted by the user on 2026-11-09** in the requesting chat. The user
+explicitly approved both the enum additions and the narrowly scoped profile-version
+exception below. ADR 0002 records the exception.
 
 ## Public enum additions
 
@@ -20,9 +21,9 @@ These additions break downstream exhaustive matches even though existing enum
 cases and public struct layouts remain intact. Consumers must add the named
 arms (or an appropriate fallback) and recompile. Existing stored variants keep
 their meaning; no storage format migration is introduced. The exact additions
-above require explicit user approval before integration is accepted.
+above were explicitly approved by the user on 2026-11-09.
 
-## Narrow profile-version exception
+## Accepted profile-version exception
 
 [ADR 0002](../adr/0002-rule-profiles-proposal.md) says: “A changed
 policy or source edition requires a new profile version”. The
@@ -31,7 +32,7 @@ older versions. Current implementation corrections retain the built-in
 `isu-adult-2026-27-<category>` IDs and version `2026-07-16` while correcting
 Silver's `max_choreographic_spins` and Adult eligibility mechanisms.
 
-Approve a narrowly scoped exception for implementation corrections against the
+The user approved a narrowly scoped exception for implementation corrections against the
 same authoritative editions: Silver's permitted second spin of any nature
 (including ChSp), the category-specific bare-W policy, and the inherited jump-kind
 cap shared by W and its intended Axel identity. The corrected Silver maxima
@@ -40,15 +41,14 @@ replacing 1430 and 1420. The July 16 Adult announcement and the selected SOV
 edition remain unchanged; see [acceptance evidence](../milestone-132.md) and
 [Waltz contract](waltz-planning.md).
 
-Recommendation: retain these source-edition IDs for these corrections and record
+Retain these source-edition IDs for these corrections and record
 the corrected outcomes in acceptance evidence. Consumers comparing old calculated
 results must recalculate them; the same ID no longer reproduces the prior buggy
 result. An actual future change to rule policy, interpretation scope or source
 edition still requires a new profile version under ADR 0002. This exception does
 not authorize other same-ID policy changes.
 
-Explicit user approval is required for **both** the enum additions and this
-profile-version exception. Until both decisions are recorded, compatibility
-approval remains open regardless of passing tests. No ADR or AGENTS change is
-included in this proposal.
+Both compatibility decisions are approved. The exact scope above and the
+[ADR 0002 exception](../adr/0002-rule-profiles-proposal.md#approved-correction-exception-132)
+record the decision alongside the acceptance evidence.
 

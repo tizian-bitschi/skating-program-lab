@@ -155,17 +155,14 @@ The backend satisfies the four planning workflows within the documented
 construction scope. Native performance regressions remain visible; this acceptance
 adds no SLA and establishes no browser/WASM or UI latency claim.
 
-## Release approval
+## Compatibility approval
 
-The backend changes add public enum variants, including ExactElement,
-StepLevel, Waltz and AdultWaltzPlanV1. External exhaustive Rust matches need
-updating. Technical acceptance and approval of this source compatibility change
-are separate gates; repository-required approval remains with the parent task.
+The user explicitly approved both compatibility decisions on 2026-11-09 in the
+requesting chat: the ExactElement, StepLevel, Waltz and AdultWaltzPlanV1 enum
+additions, and the narrowly scoped profile-version exception for the listed #132
+corrections under unchanged authoritative editions. External exhaustive Rust
+matches need updating; prior calculated results need recomputation.
 
-
-## Pending compatibility approval
-
-The [compatibility proposal](specs/issue-132-compatibility-proposal.md) records
-four public enum additions and a narrowly scoped exception to ADR 0002's profile
-version rule for corrections under unchanged authoritative editions. Both need
-explicit user approval. Passing acceptance checks does not close these gates.
+The [accepted compatibility decisions](specs/issue-132-compatibility-proposal.md)
+and [ADR 0002](adr/0002-rule-profiles-proposal.md#approved-correction-exception-132)
+record the exact scope. Both repository-required approval gates are closed.
