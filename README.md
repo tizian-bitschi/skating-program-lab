@@ -80,6 +80,9 @@ printed official credit from timing verification and legacy hypothetical GOE.
 
 ## Documentation
 
+- Current complete backend planning acceptance and native baseline comparison:
+  [#132/#138 readiness report](docs/milestone-132.md).
+
 - Complete six-profile theoretical planning acceptance and repeated native Release
   evidence: [#117/#125 readiness report](docs/milestone-117.md).
 
