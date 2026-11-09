@@ -734,6 +734,67 @@ impl PlanningCollectionControl for CollectionActionAt {
     }
 }
 #[test]
+fn session_resumes_after_pause_at_every_collection_checkpoint() {
+    struct PauseAfter(std::cell::Cell<usize>);
+    impl PlanningCollectionControl for PauseAfter {
+        fn action(&self, _: PlanningSearchPhase) -> PlanningCollectionAction {
+            match self.0.get().checked_sub(1) {
+                Some(remaining) => {
+                    self.0.set(remaining);
+                    PlanningCollectionAction::Continue
+                }
+                None => PlanningCollectionAction::Pause,
+            }
+        }
+    }
+
+    let registry = ProfileRegistry::adult();
+    let request = restricted(&[JumpKind::ToeLoop]);
+    // Bronze permits two 1T occurrences, as solos or one indivisible pair.
+    // Communication 2786: 2 * 40 + 240 + 240 + 350 = 910 hundredths.
+    let expected = [vec!["1T".into(), "1T".into()], vec!["1T+1T".into()]]
+        .into_iter()
+        .collect();
+    let size = std::num::NonZeroUsize::new(3).unwrap();
+
+    // Sweep every prefix of cooperative checkpoints, including solver polls.
+    // Stop at uninterrupted exhaustion rather than assuming a poll count or order.
+    for prefix in 0.. {
+        let mut session = PlanningSearchSession::new(&registry, request.clone(), None);
+        assert_eq!(
+            session.prove(&Continue).unwrap(),
+            PlanningSessionState::Collecting
+        );
+        let first = session
+            .collect(size, &PauseAfter(std::cell::Cell::new(prefix)))
+            .unwrap();
+        assert_eq!(session.state(), first.state);
+        assert_eq!(session.confirmed(), first.alternatives);
+        assert_eq!(session.maximum_base_hundredths(), Some(910));
+        let paused = first.state == PlanningSessionState::Paused;
+        let mut all = first.alternatives;
+        if paused {
+            let retained = session.confirmed().to_vec();
+            let resumed = session.collect(size, &CollectionContinue).unwrap();
+            assert_eq!(resumed.state, PlanningSessionState::Exhausted);
+            assert!(session.confirmed().starts_with(&retained));
+            all.extend(resumed.alternatives);
+        }
+        assert_eq!(session.state(), PlanningSessionState::Exhausted);
+        assert_eq!(session.maximum_base_hundredths(), Some(910));
+        assert_eq!(all.len(), 2, "pause after checkpoint prefix {prefix}");
+        assert_eq!(program_jump_codes(&all), expected);
+        assert_eq!(session.confirmed(), all);
+        for candidate in &all {
+            assert_required_and_assessed(&registry, &request, candidate, 910);
+        }
+        if !paused {
+            break;
+        }
+    }
+}
+
+#[test]
 fn session_pauses_empty_and_interrupted_reconstruction_then_resumes_without_duplicates() {
     let registry = ProfileRegistry::adult();
     let request = restricted(&[JumpKind::Flip, JumpKind::Loop]);

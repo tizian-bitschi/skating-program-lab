@@ -245,6 +245,9 @@ In `Collecting` or `Paused`, call `collect(NonZeroUsize, &control)` to receive a
 most that many new alternatives. `PlanningCollectionControl` returns `Continue`,
 `Pause` or `Cancel` at `Alternatives` and `Reconstruction` checkpoints, including
 solver termination polls. The first pause/cancel observed in a call is latched.
+For Pumpkin 0.5.0, termination at root is deferred until a branching decision
+establishes a safe non-root checkpoint; backtracking clears that witness. This
+avoids its root-timeout reset defect while retaining the same solver.
 A paused call can return an empty or partial batch. Calling `collect` again
 resumes the same prepared model. The solver, learned constraints, brancher,
 resolver, fixed objective, pruning cursors, pending count vector and delivery

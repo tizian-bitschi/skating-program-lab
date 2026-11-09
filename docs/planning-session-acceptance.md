@@ -16,6 +16,7 @@ No persistence, UI, HTTP, duration assessment or execution recognition is added.
 | `registered_planning::registered_category_supports_all_four_planning_workflows` | Registered two-jump policy, all four workflows to exhaustion; independently worked 710/690/670/670 bounds and fresh manual assessment. |
 | `planning_alternatives::more_than_five_maxima_match_an_independent_bounded_atomic_oracle` | Complete independently enumerated optimum multiset set at1070, distinct compound orders, no duplicates, legacy subset capped5. |
 | `planning_alternatives::session_filled_batch_requires_a_separate_exhaustion_proof` and lifecycle tests | Filled batch, later exhaustion, required occurrence preservation, partial/empty pause and reconstruction continuation, retained results, cancellation and terminal errors. |
+| `planning_alternatives::session_resumes_after_pause_at_every_collection_checkpoint` | Sweeps every cooperative checkpoint prefix through exhaustion, including solver termination polls; resumes the same session and preserves exactly the two independently known Bronze ToeLoop compositions at 910, without duplicates or poll-count expectations. Fresh manual BV checks every delivery. |
 | `planning_alternatives::registered_ignored_mechanism_exhausts_required_waltz_compositions` | Registered mechanism, two retained caller-identified ignored Waltzes; exactly two compositions at910. |
 | `planning_alternatives::counted_zero_value_waltzes_remain_distinct_optional_elements` | Counted Silver zero-BV Waltz multiplicities0/1/2; exactly three compositions at980 through both APIs. |
 | `planning_alternatives::session_required_compound_is_indivisible_and_exact_exclusion_keeps_internal_order_distinct` | Exact compound and whole-code exclusion, retained multiplicities and provenance. |
@@ -40,6 +41,12 @@ outside timed API boundaries. This demonstrates full multibatch equivalence
 without depending on collection order or private solver structure.
 
 ## Native session measurements
+
+The checkpoint sweep first reproduced a Pumpkin 0.5.0 panic when resuming a
+root-level timeout. Collection now latches requests at every termination poll
+and defers stopping until a branching decision supplies a safe non-root
+checkpoint. Backtracking clears that witness; the retained solver, brancher and
+resolver survive the call. This adds no response-time bound.
 
 The [measurement protocol](../benchmarks/planning-sessions/README.md) defines
 reproduction commands and observable boundaries. On 2026-11-09, native-host-A

@@ -4,16 +4,20 @@ use pumpkin_solver::{
     core::{
         branching::{
             branchers::independent_variable_value_brancher::IndependentVariableValueBrancher,
-            value_selection::InDomainMax, variable_selection::InputOrder,
+            value_selection::InDomainMax, variable_selection::InputOrder, Brancher, BrancherEvent,
+            SelectionContext,
         },
         optimisation::{linear_sat_unsat::LinearSatUnsat, OptimisationDirection},
         predicate,
+        predicates::Predicate,
         results::{OptimisationResult, ProblemSolution, SatisfactionResult, SolutionReference},
+        statistics::StatisticLogger,
         termination::TerminationCondition,
         variables::{DomainId, TransformableVariable},
     },
     Solver,
 };
+use std::cell::Cell;
 use std::ops::ControlFlow;
 type CountBrancher = IndependentVariableValueBrancher<DomainId, InputOrder<DomainId>, InDomainMax>;
 
@@ -896,6 +900,64 @@ impl<C: PlanningSearchControl> TerminationCondition for CollectionCancellation<'
     }
 }
 
+// Pumpkin 0.5.0 leaves a root-level timeout in Timeout rather than Ready.
+// Only stop after a branching decision, so Unknown can restore the same solver.
+// Backtracking clears this conservative non-root witness before any next poll.
+#[derive(Debug)]
+struct ResumableBrancher<'a> {
+    inner: &'a mut CountBrancher,
+    non_root: &'a Cell<bool>,
+}
+impl Brancher for ResumableBrancher<'_> {
+    fn log_statistics(&self, logger: StatisticLogger) {
+        self.inner.log_statistics(logger);
+    }
+    fn next_decision(&mut self, context: &mut SelectionContext) -> Option<Predicate> {
+        let decision = self.inner.next_decision(context);
+        self.non_root.set(decision.is_some());
+        decision
+    }
+    fn on_backtrack(&mut self) {
+        self.non_root.set(false);
+        self.inner.on_backtrack();
+    }
+    fn on_conflict(&mut self) {
+        self.inner.on_conflict();
+    }
+    fn on_unassign_integer(&mut self, variable: DomainId, value: i32) {
+        self.inner.on_unassign_integer(variable, value);
+    }
+    fn on_appearance_in_conflict_predicate(&mut self, predicate: Predicate) {
+        self.inner.on_appearance_in_conflict_predicate(predicate);
+    }
+    fn on_solution(&mut self, solution: SolutionReference) {
+        self.inner.on_solution(solution);
+    }
+    fn on_restart(&mut self) {
+        self.non_root.set(false);
+        self.inner.on_restart();
+    }
+    fn synchronise(&mut self, context: &mut SelectionContext) {
+        self.inner.synchronise(context);
+    }
+    fn is_restart_pointless(&mut self) -> bool {
+        self.inner.is_restart_pointless()
+    }
+    fn subscribe_to_events(&self) -> Vec<BrancherEvent> {
+        self.inner.subscribe_to_events()
+    }
+}
+
+struct ResumableCancellation<'a, C> {
+    control: &'a C,
+    non_root: &'a Cell<bool>,
+}
+impl<C: PlanningSearchControl> TerminationCondition for ResumableCancellation<'_, C> {
+    fn should_stop(&mut self) -> bool {
+        self.control.is_cancelled(PlanningSearchPhase::Alternatives) && self.non_root.get()
+    }
+}
+
 pub(super) fn reconstruct(
     registry: &ProfileRegistry,
     request: &PlanningSearchRequest,
@@ -1008,11 +1070,19 @@ impl Prepared {
             );
             self.blocked += 1;
         }
-        let mut termination = CollectionCancellation(control);
-        Ok(
+        let non_root = Cell::new(false);
+        let mut brancher = ResumableBrancher {
+            inner: &mut self.brancher,
+            non_root: &non_root,
+        };
+        let mut termination = ResumableCancellation {
+            control,
+            non_root: &non_root,
+        };
+        let next = Ok(
             match self
                 .solver
-                .satisfy(&mut self.brancher, &mut termination, &mut self.resolver)
+                .satisfy(&mut brancher, &mut termination, &mut self.resolver)
             {
                 SatisfactionResult::Satisfiable(s) => {
                     if s.solution().get_integer_value(self.objective) != maximum as i32 {
@@ -1027,7 +1097,8 @@ impl Prepared {
                 }
                 SatisfactionResult::Unsatisfiable(..) | SatisfactionResult::Unknown(..) => None,
             },
-        )
+        );
+        next
     }
 }
 
