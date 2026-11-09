@@ -12,7 +12,8 @@ cooperative cancellation. It returns up to five equally optimal whole-element co
 separate maximum-proof and alternative-exhaustion status. `PlanningSearchSession`
 adds uncapped collection in caller-sized batches, with cooperative pause/resume
 and explicit exhaustion in the same open session. See the
-[planning-search contract](docs/specs/planning-search.md).
+[planning-search contract](docs/specs/planning-search.md) and the
+[session acceptance evidence](docs/planning-session-acceptance.md).
 
 Complete category construction verdicts are available through
 `ManualBvAssessment::planning_compliance()` with a
@@ -31,14 +32,14 @@ broader theoretical repertoire. Manual assessment preserves BV and reports
 personal conflicts separately from rule findings. See the
 [rotation preference](docs/specs/rotation-preference-proposal.md) and
 [planned jump grammar](docs/specs/planned-jump-domain.md).
-`PersonalLimits` caps each exact regular-spin abbreviation at Basic or level 1–4
+`PersonalLimits` caps each exact regular-spin abbreviation at Basic or level 1â€“4
 and each jump kind at a listed rotation class (Single through Quintuple).
 Selection, generation, optimization and immutable completion share these limits;
 manual assessment reports personal conflicts separately from BV and competition
 legality. Empty limits preserve existing behavior. See the
 [personal limits contract](docs/specs/personal-limits.md).
 `selectable_elements_with_step_limit`, `search_maximum_bv_with_step_limit` and
-`assess_manual_bv_with_step_limit` add an optional Basic–4 step-sequence ceiling
+`assess_manual_bv_with_step_limit` add an optional Basicâ€“4 step-sequence ceiling
 while preserving existing request layouts and category-rule findings.
 The [manual category workflow](docs/manual-category-planning.md) explains selection,
 credited values and the distinction between drafts, violations and unsupported choices.

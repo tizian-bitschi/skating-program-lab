@@ -276,3 +276,17 @@ This state belongs to one open in-process session. Dropping it releases the
 solver and memory. Reload persistence, HTTP, UI, WASM integration and `Send`/`Sync`
 are outside the contract. The existing `search_maximum_bv` functions keep their
 five-alternative cap and `LimitReached` semantics.
+
+
+### Workflow acceptance (#143)
+
+`tests/backend_acceptance.rs` exercises all six built-in profiles and four request
+workflows through the public session boundary, with source-derived literal maxima,
+continued delivery, required provenance and fresh independent manual assessment.
+`tests/registered_planning.rs` exhausts all four workflows under a registered
+synthetic two-jump policy. `tests/planning_alternatives.rs` establishes complete
+finite sets, more than five results, required ignored movements and counted
+zero-value identity. Step/jump/spin ceilings, rotation preferences and indexed
+conflicts remain public-boundary regression obligations. See
+[acceptance evidence](../planning-session-acceptance.md) and the
+[native measurement protocol](../../benchmarks/planning-sessions/README.md).

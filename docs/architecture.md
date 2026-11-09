@@ -4,7 +4,7 @@
 
 ## Current state
 
-The repository contains a Rust library and a separate solver-comparison executable. It accepts caller-provided plans, observations and panel recognition. It returns partial validation findings, scoring scenarios and bounded optimization results. It has no UI, network service, persistence, rule database or automatic panel inference. [Implementation status](implementation-status.md) defines current support.
+The repository contains a Rust library and a separate solver-comparison executable. It accepts caller-provided plans, observations and panel recognition. It returns partial validation findings, scoring scenarios, bounded legacy optimization results and incremental complete planning-search sessions. It has no UI, network service, persistence, rule database or automatic panel inference. [Implementation status](implementation-status.md) defines current support.
 
 The core is intended for native and eventual WebAssembly use. Correctness and traceability take priority, followed by independent tests, reproducibility, maintainability and measured performance. WebAssembly compatibility is not established.
 
@@ -13,7 +13,7 @@ The core is intended for native and eventual WebAssembly use. Correctness and tr
 | Path | Responsibility and interface |
 | --- | --- |
 | `src/lib.rs` | Public re-exports, ruleset and table identities, source references. |
-| `src/planning_search.rs`, `src/planning_search/model.rs` | Complete theoretical Adult and Senior repertoires, exact required occurrences, semantic exclusions and bounded atomic-count Pumpkin proof, followed by shared manual-BV reconstruction. |
+| `src/planning_search.rs`, `src/planning_search/model.rs` | Complete theoretical registered-policy repertoires, exact required occurrences, semantic exclusions and atomic-count Pumpkin proof; an owned session retains the solver for incremental collection and shared manual-BV reconstruction. |
 | `src/plan.rs` | Ordered `Program` and intended elements; incomplete plans are representable. |
 | `src/personal_limits.rs` | Shared typed repertoire maxima and indexed personal conflicts, independent of solver, scoring and competition policies. |
 | `src/assessment.rs` | Additive manual-program entry point; combines existing validation and scoring while preserving intended and supplied-recognition stages, optional GOE and incomplete aggregates. |
@@ -70,3 +70,15 @@ completions; see [ADR 0003](adr/0003-immutable-program-completion.md).
 
 The versioned `AdultDefinition` in `profiles.rs` is the single built-in policy-data contract for jump, spin and mixed-program adapters. Family sources are explicit. Validators record source-bound `AppliedRule` entries while checking evidence; the optimizer distinguishes this trace from its available-rule inventory.
 
+
+## Session acceptance boundary (#143)
+
+The public `PlanningSearchSession` and fresh `assess_manual_bv_with_step_limit`
+are the acceptance boundaries. Tests compare source-derived maximum literals and
+independent finite composition sets, including registered policies. They inspect
+required provenance and exact whole-element identities across batches and pause,
+without depending on solver assignments or delivery order. The session owns its
+solver and immutable request, borrows the selected registry and releases its state
+when dropped. Legacy APIs remain capped at five deliveries. See the
+[contract](specs/planning-search.md#incremental-search-sessions-142) and
+[acceptance evidence](planning-session-acceptance.md).

@@ -643,6 +643,26 @@ fn counted_zero_value_waltzes_remain_distinct_optional_elements() {
         [0, 1, 2].into_iter().collect()
     );
     assert_eq!(result.alternatives.len(), 3);
+    let mut session = PlanningSearchSession::new(&registry, request.clone(), None);
+    session.prove(&Continue).unwrap();
+    while session.state() == PlanningSessionState::Collecting {
+        session
+            .collect(std::num::NonZeroUsize::new(1).unwrap(), &CollectionContinue)
+            .unwrap();
+    }
+    assert_eq!(session.state(), PlanningSessionState::Exhausted);
+    assert_eq!(session.confirmed().len(), 3);
+    assert_eq!(
+        session
+            .confirmed()
+            .iter()
+            .map(|p| p.elements.iter().filter(|e| e.code == "W").count())
+            .collect::<std::collections::BTreeSet<_>>(),
+        [0, 1, 2].into_iter().collect()
+    );
+    for candidate in session.confirmed() {
+        assert_required_and_assessed(&registry, &request, candidate, 980);
+    }
     for candidate in &result.alternatives {
         assert_required_and_assessed(&registry, &request, candidate, 980);
     }
