@@ -126,8 +126,12 @@ observed `Pause` or `Cancel` for that call. `Pause` returns a possibly empty bat
 with state `Paused`; `Cancel` returns a possibly empty batch with state
 `Cancelled`. Both preserve all previously delivered programs and all programs
 committed earlier in the current batch. Neither means exhaustion. A request can
-arrive during a SAT call; Pumpkin stops cooperatively at its next termination
-poll. A pause imposes no deadline or guarantee of a bounded response time.
+arrive during a SAT call; collection polls and latches it in the termination
+condition. With Pumpkin 0.5.0, stopping is deferred until a branching decision
+establishes a non-root checkpoint: a root-level timeout does not reset its solver
+state for reuse. Backtracking clears that checkpoint witness. If root solving
+finishes first, the latched action still governs the collection return. A pause
+imposes no deadline or guarantee of a bounded response time.
 
 Commit delivery atomically: finish assessment, record the complete count vector
 as delivered, append the program to `confirmed()`, and append its clone to the
@@ -184,7 +188,9 @@ an optional internal speed optimization, not part of the public contract.
 Pumpkin 0.5.0 reexports `pumpkin-core` 0.5.0. Its
 `api/solver.rs::satisfy` returns a result borrowing solver, brancher and resolver;
 `api/outputs/mod.rs::SatisfactionResult` documents that dropping a satisfiable
-result resets the solver to root. `Unknown` also restores root before return.
+result resets the solver to root. `Unknown` also restores root before return,
+but version 0.5.0 only restores its reusable state after a non-root timeout;
+collection therefore uses the safe checkpoint deferral described above.
 Therefore never store `SatisfactionResult`, `Satisfiable`, `SolutionReference`
 or `SolutionIterator` inside the session. In a short scope copy all atomic counts
 and objective value into owned Rust data, then drop the borrowed result before
