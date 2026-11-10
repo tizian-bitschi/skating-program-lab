@@ -40,17 +40,18 @@ local native Debug service, dedicated ports 3161/3162, no server reuse:
   serializer field allowlist, genuine service-issued connection identity across
   category changes, retained exact exclusions/rotation in ordinary requests,
   and German/English/Russian storage-error reflow at 1280/390/320 CSS pixels.
-- Reload to matching localized assessment was 439ms in the final workspace run,
+- Reload to matching localized assessment was 442ms in the final combined run,
   unthrottled loopback. This is an observation, not the parent controlled-network
   performance gate.
-- All sixteen then-current browser tests passed before the final restored
-  restriction propagation/focus additions. The manual oracle loop now explicitly
+- All seventeen final browser tests passed (nine workspace, eight existing
+  manual/repertoire tests). The manual oracle loop now explicitly
   starts each independent fixture with an empty workspace rather than relying on
   reload to erase content. Initial failures exposed this fixture assumption and
   a real early-edit/late-restore race; the readiness guard fixes the race.
 - `npm run build` (including TypeScript checking) passed. No Rust/service or
   library implementation changed; unchanged library/service suites were not
-  repeated. Final browser/static check results are recorded below.
+  repeated. `git diff --check` passed. The latest integration branch was already
+  merged at base `60857dc`; no newer integration commits were present.
 
 The genuine search-adoption flow lands with #157 and still needs combined parent
 verification; this slice tests its existing shared replacement seam through

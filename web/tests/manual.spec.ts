@@ -4,7 +4,7 @@ test('manual edits preserve occurrences and assess automatically',async({page})=
 });
 test('independent complete fixtures work across six profiles and registered policy',async({page})=>{
  // Each independent oracle starts with an explicitly empty local workspace.
- await page.addInitScript(()=>localStorage.removeItem('skating-c2-workspace')); 
+ await page.addInitScript(()=>localStorage.removeItem('skating-c2-workspace'));
  for(const origin of ['',`http://127.0.0.1:${process.env.C2_FIXTURE_PORT??3158}`]){
  await page.goto(origin||'/');const profiles=await(await page.request.get(`${origin}/api/v1/profiles`)).json();
  const bases:Record<string,string[]>={bronze:['1Lz','SSp1','ChSq1'],silver:['1A','CLSp2','ChSp1','ChSq1'],gold:['1A','CCoSp3','FSSp3','ChSp1','StSq2'],masters:['1A','CoSp4','FSSp4','ChSp1','StSq4'],women:['1A','CoSp4','FSSp4','ChSp1','StSq4','ChSq1'],men:['1A','CoSp4','FSSp4','ChSp1','StSq4','ChSq1'],'Independent HTTP test policy':['1Lz','SSp1','ChSq1']};
