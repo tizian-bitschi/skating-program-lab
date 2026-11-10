@@ -163,3 +163,56 @@ Final search browser verification passed all four scenarios in 54.2 seconds in
 the original order with explicit HTTP cleanup. After preserving cancellation
 priority over a pending pause/continue request, the focused real control flow
 passed again in 27.5 seconds. Final build, formatting and diff checks pass.
+
+## Live recovery (#161)
+
+Connection recovery retains the page's creation receipt, access capability,
+command receipt, delivered cursor and confirmed programs. A lost accepted create
+or control response retries that exact request; it does not allocate another
+calculation. Cursor reads are sequenced against controls and newer reads, so a
+delayed pre-pause snapshot cannot overwrite confirmed pause or rewind delivery.
+Control response snapshots are never used as delivery cursors. Result IDs remain
+the service's IDs and replayed deltas are deduplicated.
+
+Transport interruptions offer connection retry. Typed service, input, capacity
+and unavailable-session failures retain separate messages; an unavailable
+session stops polling and enables the explicit calculation action. Confirmed
+programs and the proved maximum remain in page memory. Recovery never silently
+creates a replacement after expiry, service restart, changed constraints or
+reload. No automatic admission queue is added. A pagehide handler sends a
+best-effort authenticated keepalive DELETE and forgets live page identity;
+failed unload delivery remains covered by the independent 15-minute lease.
+Ordinary disposal also uses DELETE directly, so failure of an earlier separate
+cancel request cannot prevent a disposal attempt.
+
+### Verification on 2026-11-10
+
+- The new lost-create/unavailable-session browser regression failed before the
+  change because unavailable sessions still offered connection retry; it then
+  passed with explicit new calculation recovery.
+- The real Chrome search suite passes six scenarios on dedicated ports
+  3167/3168. Requests pass through the production HTTP routes; response loss and
+  delay are injected after real service processing. Tests cover lost accepted
+  creation/pause/continue/cancel responses with unchanged creation/command
+  receipts, proof reconnect, paused disconnect with the same cursor, delayed
+  pre-pause reads, result identity deduplication, preserved confirmed programs,
+  semantic-edit rejection of stale replies and actual reload without restart.
+  Captured capabilities are disposed through public HTTP after each test.
+- All 21 service HTTP tests pass. The additional paused-owner scenario uses
+  the existing injectable monotonic clock: valid contact at 899 and 1798 seconds
+  retains pause and its confirmed count; no contact through 2699 seconds expires
+  the session. Replaying the old create stays unavailable. A fresh explicit
+  create is accepted after termination frees capacity. Four consecutive fresh
+  create/dispose cycles at capacity one each reject reads of their disposed
+  handles and admit subsequent work.
+  Existing HTTP coverage retains busy proof expiry, restart rejection, access
+  isolation, finite exhaustion and cancelled proof/data preservation.
+- Production TypeScript/Vite build, service Clippy with warnings denied, Rust
+  formatting and diff checks pass after integration of 9414fd1. The environment
+  emitted incremental-cache hard-link warnings and copied files instead.
+
+These checks exercise browser event/network behavior and actual native owners;
+they do not establish physical-device or screen-reader acceptance. The combined
+screen-reader runtime blocker remains recorded in the parent evidence. Large
+result rendering and retained-memory measurements belong to #162. The unchanged
+library baseline was not rerun for this controller change.

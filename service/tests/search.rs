@@ -604,11 +604,34 @@ async fn every_finite_optimum_has_full_identity_provenance_and_replayable_deltas
 
 #[tokio::test]
 async fn pause_continue_and_cancel_reach_the_same_collecting_owner() {
-    let app = skating_planning_service::app();
+    collecting_owner_recovery(false).await;
+}
+
+#[tokio::test]
+async fn paused_heartbeat_renews_the_lease_and_expiry_releases_the_owner() {
+    collecting_owner_recovery(true).await;
+}
+
+async fn collecting_owner_recovery(expire: bool) {
+    let clock = std::sync::Arc::new(Clock::default());
+    let app = skating_planning_service::app_with_catalog_and_search_options(
+        skating_planning_service::Catalog::default(),
+        skating_planning_service::SearchServiceOptions {
+            capacity: 1,
+            clock: clock.clone(),
+        },
+    );
     let (_, namespace) = call(&app, "GET", "/api/v1/searches/identity", None, None).await;
     let (_, profiles) = call(&app, "GET", "/api/v1/profiles", None, None).await;
     let request = json!({"creationKey":format!("{}:{}",namespace["creationNamespace"].as_str().unwrap(),"f".repeat(64)),"requestId":"live-controls","revision":9,"context":profiles[1]["context"],"requiredElements":[],"allowMixedDirections":true,"personalLimits":{"jumps":{"T":{"enabled":false},"S":{"enabled":false},"Lz":{"enabled":false},"F":{"enabled":true,"maximum":1},"Lo":{"enabled":true,"maximum":1},"A":{"enabled":true,"maximum":1}},"unlevelledElements":{"W":false}}});
-    let (_, owner) = call(&app, "POST", "/api/v1/searches", Some(request), None).await;
+    let (_, owner) = call(
+        &app,
+        "POST",
+        "/api/v1/searches",
+        Some(request.clone()),
+        None,
+    )
+    .await;
     let id = owner["id"].as_str().unwrap();
     let token = owner["accessToken"].as_str().unwrap();
     let path = format!("/api/v1/searches/{id}/updates?limit=0");
@@ -646,6 +669,76 @@ async fn pause_continue_and_cancel_reach_the_same_collecting_owner() {
     assert!(paused["controlRequested"].is_null());
     assert_eq!(paused["proof"], "proved");
     assert_eq!(paused["collectionComplete"], false);
+    if expire {
+        // Public status contact renews a paused owner's lease, without continuing it.
+        for seconds in [899, 1798] {
+            clock.0.store(seconds, std::sync::atomic::Ordering::SeqCst);
+            let (status, heartbeat) = call(&app, "GET", &path, None, Some(token)).await;
+            assert_eq!(status, StatusCode::OK);
+            assert_eq!(heartbeat["status"], "paused");
+            assert_eq!(heartbeat["confirmedCount"], paused["confirmedCount"]);
+        }
+        clock.0.store(2699, std::sync::atomic::Ordering::SeqCst);
+        assert_eq!(
+            call(&app, "GET", &path, None, Some(token)).await.0,
+            StatusCode::NOT_FOUND
+        );
+        assert_eq!(
+            call(
+                &app,
+                "POST",
+                "/api/v1/searches",
+                Some(request.clone()),
+                None
+            )
+            .await
+            .0,
+            StatusCode::NOT_FOUND
+        );
+        for suffix in ["a", "b", "c", "d"] {
+            let mut next = request.clone();
+            next["creationKey"] = json!(format!(
+                "{}:{}",
+                namespace["creationNamespace"].as_str().unwrap(),
+                suffix.repeat(64)
+            ));
+            let wait = std::time::Instant::now();
+            loop {
+                let (status, replacement) =
+                    call(&app, "POST", "/api/v1/searches", Some(next.clone()), None).await;
+                if status == StatusCode::ACCEPTED {
+                    assert_ne!(replacement["id"], owner["id"]);
+                    let replacement_id = replacement["id"].as_str().unwrap();
+                    call(
+                        &app,
+                        "DELETE",
+                        &format!("/api/v1/searches/{replacement_id}"),
+                        None,
+                        replacement["accessToken"].as_str(),
+                    )
+                    .await;
+                    assert_eq!(
+                        call(
+                            &app,
+                            "GET",
+                            &format!("/api/v1/searches/{replacement_id}/updates"),
+                            None,
+                            replacement["accessToken"].as_str()
+                        )
+                        .await
+                        .0,
+                        StatusCode::NOT_FOUND
+                    );
+                    break;
+                }
+                assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE);
+                assert!(wait.elapsed().as_secs() < 10);
+                tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+            }
+        }
+        return;
+    }
+
     tokio::time::sleep(std::time::Duration::from_millis(300)).await;
     assert_eq!(
         call(&app, "GET", &path, None, Some(token)).await.1["confirmedCount"],
