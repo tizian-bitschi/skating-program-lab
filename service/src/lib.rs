@@ -238,6 +238,36 @@ fn permits(limits: &Limits, id: &str, family: &str, level: Option<u8>) -> bool {
     };
     limit.is_none_or(|l| l.enabled && l.maximum.is_none_or(|max| level.is_some_and(|n| n <= max)))
 }
+/// Personal permissions for every component of one exact intention. The profile's
+/// typed Waltz policy determines whether Axel Off also disables Waltz.
+fn disabled_settings(
+    profile: &RuleProfile,
+    limits: &Limits,
+    choices: &[SelectableElement],
+    code: &str,
+) -> Vec<String> {
+    let mut disabled = Vec::new();
+    for part in code.split('+').filter(|p| !matches!(*p, "Eu" | "SEQ")) {
+        if matches!(part, "W" | "W(1A<<)") {
+            if !permits(limits, "W", "unlevelled", None) {
+                disabled.push("W".into());
+            }
+            if profile.waltz_policy() == Some(WaltzPolicy::CalledAsDowngradedAxel)
+                && limits.jumps.get("A").is_some_and(|l| !l.enabled)
+            {
+                disabled.push("A".into());
+            }
+        } else if let Some(choice) = choices.iter().find(|c| c.row.notation == part) {
+            let (id, family, level) = form(choice);
+            if !permits(limits, &id, family, level) {
+                disabled.push(id);
+            }
+        }
+    }
+    disabled.sort();
+    disabled.dedup();
+    disabled
+}
 /// Shared conversion for repertoire, assessment and search. Off remains a
 /// separate whole-element exclusion; it cannot be represented by Basic/Single.
 pub fn core_limits(
@@ -336,12 +366,7 @@ pub fn repertoire_response(catalog: &Catalog, r: &RepertoireRequest) -> Result<V
             let entry = &assessment.elements[0];
             if let Ok(outcome) = &entry.credited_base {
                 waltz_available = true;
-                if r.personal_limits
-                    .unlevelled_elements
-                    .get("W")
-                    .copied()
-                    .unwrap_or(true)
-                {
+                if disabled_settings(profile, &r.personal_limits, &choices, code).is_empty() {
                     let value = match outcome {
                         BaseValueOutcome::Value(value) => value.hundredths,
                         _ => 0,
@@ -656,34 +681,16 @@ pub fn assessment_response(catalog: &Catalog, r: &AssessmentRequest) -> Result<V
     let mut conflicts=assessment.personal_conflicts.iter().map(|f|json!({"entryId":r.entries[f.element_index].id,"componentIndex":f.component_index,"translationKey":"maximum","setting":personal_setting(&f.kind,&choices),"maximum":personal_maximum(&f.kind)})).collect::<Vec<_>>();
     for (index, element) in elements.iter().enumerate() {
         let excluded = excluded.contains(element);
-        let off = element
-            .code
-            .split('+')
-            .filter(|c| !matches!(*c, "Eu" | "SEQ"))
-            .any(|code| {
-                if matches!(code, "W" | "W(1A<<)") {
-                    return !request
-                        .personal_limits
-                        .unlevelled_elements
-                        .get("W")
-                        .copied()
-                        .unwrap_or(true);
-                }
-                choices
-                    .iter()
-                    .find(|c| c.row.notation == code)
-                    .is_some_and(|c| {
-                        let (id, family, n) = form(c);
-                        !permits(&request.personal_limits, &id, family, n)
-                    })
-            });
+        let disabled =
+            disabled_settings(profile, &request.personal_limits, &choices, &element.code);
+        let off = !disabled.is_empty();
         if (off || excluded)
             && !conflicts
                 .iter()
                 .any(|c| c["entryId"] == r.entries[index].id)
         {
             conflicts
-                .push(json!({"entryId":r.entries[index].id,"translationKey":if excluded{"excluded"}else{"disabled"},"setting":element_parts(catalog,&element.code).iter().filter_map(|p|p["form"].as_str()).collect::<Vec<_>>() }));
+                .push(json!({"entryId":r.entries[index].id,"translationKey":if excluded{"excluded"}else{"disabled"},"setting":if excluded {element_parts(catalog,&element.code).iter().filter_map(|p|p["form"].as_str().map(str::to_owned)).collect::<Vec<_>>()} else {disabled} }));
         }
     }
     conflicts.extend(assessment.rotation_conflicts.iter().map(
@@ -723,26 +730,7 @@ pub fn connection_response(catalog: &Catalog, r: &ConnectionRequest) -> Result<V
         })
         .collect::<Result<Vec<_>, _>>()?;
     let permitted = |a: &&AssumedRecognition| {
-        a.code.split('+').all(|code| {
-            if matches!(code, "Eu" | "SEQ") {
-                return true;
-            }
-            if matches!(code, "W" | "W(1A<<)") {
-                return request
-                    .personal_limits
-                    .unlevelled_elements
-                    .get("W")
-                    .copied()
-                    .unwrap_or(true);
-            }
-            choices
-                .iter()
-                .find(|c| c.row.notation == code)
-                .is_none_or(|c| {
-                    let (id, f, n) = form(c);
-                    permits(&request.personal_limits, &id, f, n)
-                })
-        })
+        disabled_settings(profile, &request.personal_limits, &choices, &a.code).is_empty()
     };
     let mut next = std::collections::BTreeSet::new();
     let mut completions = Vec::new();

@@ -148,7 +148,7 @@ impl Manager {
                 >= LEASE
             {
                 job.disposed.store(true, Ordering::Release);
-                job.control.store(2, Ordering::Release);
+                Control::Cancel.store(&job.control);
                 job.wake.notify_all();
                 false
             } else {
@@ -212,21 +212,53 @@ impl Drop for Manager {
             .values()
             .filter_map(|r| r.job.as_ref())
         {
-            job.control.store(2, Ordering::Release);
+            Control::Cancel.store(&job.control);
             job.wake.notify_all();
         }
     }
 }
+#[derive(Clone, Copy, PartialEq, Eq)]
+#[repr(u8)]
+enum Control {
+    Running = 0,
+    Pause = 1,
+    Cancel = 2,
+    Continue = 3,
+}
+impl Control {
+    fn load(atomic: &AtomicU8) -> Self {
+        match atomic.load(Ordering::Acquire) {
+            0 => Self::Running,
+            1 => Self::Pause,
+            2 => Self::Cancel,
+            3 => Self::Continue,
+            _ => unreachable!("private control value"),
+        }
+    }
+    fn store(self, atomic: &AtomicU8) {
+        atomic.store(self as u8, Ordering::Release);
+    }
+    fn resume(atomic: &AtomicU8) -> bool {
+        atomic
+            .compare_exchange(
+                Self::Continue as u8,
+                Self::Running as u8,
+                Ordering::AcqRel,
+                Ordering::Acquire,
+            )
+            .is_ok()
+    }
+}
 impl PlanningSearchControl for Job {
     fn is_cancelled(&self, _: PlanningSearchPhase) -> bool {
-        self.control.load(Ordering::Acquire) == 2
+        Control::load(&self.control) == Control::Cancel
     }
 }
 impl PlanningCollectionControl for Job {
     fn action(&self, _: PlanningSearchPhase) -> PlanningCollectionAction {
-        match self.control.load(Ordering::Acquire) {
-            2 => PlanningCollectionAction::Cancel,
-            1 => PlanningCollectionAction::Pause,
+        match Control::load(&self.control) {
+            Control::Cancel => PlanningCollectionAction::Cancel,
+            Control::Pause => PlanningCollectionAction::Pause,
             _ => PlanningCollectionAction::Continue,
         }
     }
@@ -235,7 +267,7 @@ fn snapshot(job: &Job, after: usize, limit: usize) -> Value {
     let d = job.data.lock().unwrap();
     let end = after.saturating_add(limit).min(d.results.len());
     let after = after.min(d.results.len());
-    json!({"id":job.id,"requestId":job.request.repertoire.request_id,"revision":job.request.repertoire.revision,"context":job.request.repertoire.context,"status":d.status,"phase":d.phase,"proof":if d.maximum.is_some(){"proved"}else{"unproved"},"maximumBaseHundredths":d.maximum,"confirmedCount":d.results.len(),"collectionComplete":d.status=="completed","controlRequested":match (d.status,job.control.load(Ordering::Acquire)){("running"|"paused",2)=>Some("cancel"),("running",1)=>Some("pause"),("paused",3)=>Some("continue"),_=>None},"cursor":end,"results":d.results[after..end],"failure":d.failure,"diagnostics":d.diagnostics})
+    json!({"id":job.id,"requestId":job.request.repertoire.request_id,"revision":job.request.repertoire.revision,"context":job.request.repertoire.context,"status":d.status,"phase":d.phase,"proof":if d.maximum.is_some(){"proved"}else{"unproved"},"maximumBaseHundredths":d.maximum,"confirmedCount":d.results.len(),"collectionComplete":d.status=="completed","controlRequested":match (d.status,Control::load(&job.control)){("running"|"paused",Control::Cancel)=>Some("cancel"),("running",Control::Pause)=>Some("pause"),("paused",Control::Continue)=>Some("continue"),_=>None},"cursor":end,"results":d.results[after..end],"failure":d.failure,"diagnostics":d.diagnostics})
 }
 pub(super) fn router(catalog: Arc<Catalog>, options: SearchServiceOptions) -> Router {
     Router::new()
@@ -324,7 +356,7 @@ async fn create(
         id: opaque(),
         token: opaque(),
         request: r,
-        control: AtomicU8::new(0),
+        control: AtomicU8::new(Control::Running as u8),
         disposed: AtomicBool::new(false),
         last_contact: Mutex::new(m.options.clock.now()),
         data: Mutex::new(Data {
@@ -437,9 +469,9 @@ fn control_command(
             "pause" => {
                 d.status == "running"
                     && d.phase == "collecting"
-                    && job.control.load(Ordering::Acquire) == 0
+                    && Control::load(&job.control) == Control::Running
             }
-            "continue" => d.status == "paused" && job.control.load(Ordering::Acquire) == 1,
+            "continue" => d.status == "paused" && Control::load(&job.control) == Control::Pause,
             "cancel" => true,
             _ => false,
         };
@@ -447,14 +479,12 @@ fn control_command(
             return Err(error(StatusCode::CONFLICT, "invalid_transition"));
         }
         d.commands.insert(command.command_id, action.into());
-        job.control.store(
-            match action {
-                "pause" => 1,
-                "cancel" => 2,
-                _ => 3,
-            },
-            Ordering::Release,
-        );
+        match action {
+            "pause" => Control::Pause,
+            "cancel" => Control::Cancel,
+            _ => Control::Continue,
+        }
+        .store(&job.control);
         job.wake.notify_all();
     }
     drop(d);
@@ -467,7 +497,7 @@ async fn dispose(
 ) -> Result<Json<Value>, ApiError> {
     let job = m.authorize(&id, &headers)?;
     job.disposed.store(true, Ordering::Release);
-    job.control.store(2, Ordering::Release);
+    Control::Cancel.store(&job.control);
     job.wake.notify_all();
     m.jobs.lock().unwrap().remove(&id);
     Ok(Json(json!({"disposed":true})))
@@ -630,7 +660,7 @@ fn run(catalog: &Catalog, job: &Job) {
         }
         if session.state() == PlanningSessionState::Paused {
             let mut d = job.data.lock().unwrap();
-            while job.control.load(Ordering::Acquire) == 1 {
+            while Control::load(&job.control) == Control::Pause {
                 // The mutex synchronizes the predicate and notification. Timed wake
                 // also lets disposal/lease cancellation reach a sleeping native owner.
                 d = job
@@ -639,11 +669,7 @@ fn run(catalog: &Catalog, job: &Job) {
                     .unwrap()
                     .0;
             }
-            if job
-                .control
-                .compare_exchange(3, 0, Ordering::AcqRel, Ordering::Acquire)
-                .is_ok()
-            {
+            if Control::resume(&job.control) {
                 d.status = "running";
             }
             drop(d);
