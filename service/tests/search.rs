@@ -94,6 +94,33 @@ async fn proved_program_is_assessed_and_required_occurrences_survive_http() {
     assert_eq!(result["confirmedCount"], 5);
     let programs = result["results"].as_array().unwrap();
     assert_eq!(programs.len(), 5);
+    let actual = programs
+        .iter()
+        .map(|p| {
+            let mut codes = p["entries"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .filter_map(|e| e["code"].as_str())
+                .filter(|c| c.starts_with('1'))
+                .map(str::to_owned)
+                .collect::<Vec<_>>();
+            codes.sort();
+            codes
+        })
+        .collect::<std::collections::BTreeSet<_>>();
+    let expected = [
+        vec!["1F", "1F", "1Lo", "1Lo"],
+        vec!["1F+1F", "1Lo", "1Lo"],
+        vec!["1F", "1F+1Lo", "1Lo"],
+        vec!["1F", "1Lo", "1Lo+1F"],
+        vec!["1F", "1F", "1Lo+1Lo"],
+    ]
+    .into_iter()
+    .map(|v| v.into_iter().map(str::to_owned).collect())
+    .collect();
+    assert_eq!(actual, expected);
+
     for p in programs {
         assert_eq!(p["assessment"]["construction"], "compliant");
         assert_eq!(p["assessment"]["totalHundredths"], 1030);

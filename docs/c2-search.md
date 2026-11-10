@@ -89,3 +89,11 @@ combined network/device/layout matrix, screen-reader checks and measured resourc
 budgets remain their dependent/parent acceptance work. Viewport or Chrome tests
 do not establish physical-device, native-language participant or deployment
 acceptance.
+
+Final integrated verification: all 20 current browser tests passed on ports
+3159/3160 in 53.7 seconds after merging the current integration branch and the
+workspace readiness changes. The final production build, Rust formatting check
+and `git diff --check` passed. The exact five-composition literal HTTP oracle
+was rerun successfully after adding its full-set assertion. The compiler emitted
+only the environment's incremental-cache hard-link/copy warning; Clippy with
+warnings denied passed.
