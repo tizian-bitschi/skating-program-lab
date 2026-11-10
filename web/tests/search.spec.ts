@@ -61,11 +61,44 @@ test('real collection pauses, continues, compares and adopts without losing focu
  test.setTimeout(90000);
  await page.goto('/');await page.getByLabel('Language').selectOption('en');await page.getByLabel('Category').selectOption('isu-adult-2026-27-silver');for(const kind of ['T','S','Lz'])await page.getByTestId(`enabled-${kind}`).uncheck();for(const kind of ['F','Lo','A'])await page.getByTestId(`maximum-${kind}`).selectOption('1');await page.getByTestId('enabled-W').uncheck();await page.getByTestId('calculate').click();
  const control=page.getByTestId('collection-control');await expect(control).toHaveText('Pause collection',{timeout:30000});await control.focus();await page.keyboard.press('Enter');await expect(control).toHaveText('Continue collection',{timeout:30000});await expect(control).toBeFocused();
+ let disconnected=false;const reconnectReads:string[]=[];
+ await page.route('**/api/v1/searches/*/updates?*',async route=>{reconnectReads.push(route.request().url());if(!disconnected){disconnected=true;await route.abort('failed');}else await route.continue();});
+ await page.getByRole('button',{name:'Retry connection',exact:true}).click();await expect(control).toHaveText('Continue collection');await expect.poll(()=>reconnectReads.length).toBeGreaterThanOrEqual(2);expect(reconnectReads[0]).toBe(reconnectReads[1]);await page.unroute('**/api/v1/searches/*/updates?*');
  await expect(page.getByTestId('adopt-result').first()).toBeEnabled();const compare=page.locator('.search-results input[type=checkbox]');await compare.nth(0).check();await compare.nth(1).check();await expect(page.getByTestId('program-comparison').locator('tbody tr')).toHaveCount(2);
  const before=await page.locator('.search-results > li').first().getAttribute('data-result-id');
  for(const [locale,label] of [['de','Sammlung fortsetzen'],['ru','Продолжить сбор'],['en','Continue collection']]){await page.getByLabel('Language').selectOption(locale);await expect(control).toHaveText(label);}
  await control.focus();await page.keyboard.press('Enter');await expect(control).toHaveText('Pause collection',{timeout:10000});await expect(control).toBeFocused();await expect(page.locator('.search-results > li').first()).toHaveAttribute('data-result-id',before!);
+ let releaseOld=()=>{},seenOld=()=>{};const oldHeld=new Promise<void>(r=>releaseOld=r),oldSeen=new Promise<void>(r=>seenOld=r);let holdOld=true;
+ await page.route('**/api/v1/searches/*/updates?*',async route=>{const response=await route.fetch();if(holdOld){holdOld=false;seenOld();await oldHeld;}await route.fulfill({response});});await oldSeen;
  let lost=true;const commands:string[]=[];await page.route('**/api/v1/searches/*/pause',async route=>{commands.push(route.request().postData()!);const response=await route.fetch();if(lost){lost=false;await route.abort('failed');}else await route.fulfill({response});});
- await control.click();await page.getByRole('button',{name:'Retry connection',exact:true}).click();await expect(control).toHaveText('Continue collection',{timeout:10000});expect(commands).toHaveLength(2);expect(commands[0]).toBe(commands[1]);
- await page.getByRole('button',{name:'Cancel calculation',exact:true}).click();await expect(page.getByText('Calculation cancelled.',{exact:true})).toBeVisible({timeout:10000});await page.getByTestId('adopt-result').first().focus();await page.keyboard.press('Enter');await expect(page.getByTestId('assessment')).toContainText('Construction complies');
+ await control.click();await page.getByRole('button',{name:'Retry connection',exact:true}).click();await expect(control).toHaveText('Continue collection',{timeout:10000});expect(commands).toHaveLength(2);expect(commands[0]).toBe(commands[1]);releaseOld();await page.unroute('**/api/v1/searches/*/updates?*');await expect(control).toHaveText('Continue collection');
+ const continueCommands:string[]=[];await page.route('**/api/v1/searches/*/continue',async route=>{continueCommands.push(route.request().postData()!);const response=await route.fetch();if(continueCommands.length===1)await route.abort('failed');else await route.fulfill({response});});
+ await control.click();await page.getByRole('button',{name:'Retry connection',exact:true}).click();await expect(control).toHaveText('Pause collection');expect(continueCommands).toHaveLength(2);expect(continueCommands[0]).toBe(continueCommands[1]);
+ const cancelCommands:string[]=[];await page.route('**/api/v1/searches/*/cancel',async route=>{cancelCommands.push(route.request().postData()!);const response=await route.fetch();if(cancelCommands.length===1)await route.abort('failed');else await route.fulfill({response});});
+ await page.getByRole('button',{name:'Cancel calculation',exact:true}).click();await page.getByRole('button',{name:'Retry connection',exact:true}).click();expect(cancelCommands).toHaveLength(2);expect(cancelCommands[0]).toBe(cancelCommands[1]);await expect(page.getByText('Calculation cancelled.',{exact:true})).toBeVisible({timeout:10000});await page.getByTestId('adopt-result').first().focus();await page.keyboard.press('Enter');await expect(page.getByTestId('assessment')).toContainText('Construction complies');
+});
+
+test('lost accepted creation retries its capability and expired sessions require explicit calculation',async({page})=>{
+ await page.goto('/');await page.getByLabel('Language').selectOption('en');
+ await page.getByLabel('Category').selectOption('isu-adult-2026-27-silver');for(const kind of ['T','S','Lz'])await page.getByTestId(`enabled-${kind}`).uncheck();for(const kind of ['F','Lo','A'])await page.getByTestId(`maximum-${kind}`).selectOption('1');await page.getByTestId('enabled-W').uncheck();
+ const bodies:string[]=[];let owner:{id:string;accessToken:string}|undefined;
+ await page.route('**/api/v1/searches',async route=>{bodies.push(route.request().postData()!);const response=await route.fetch();owner=await response.json();if(bodies.length===1)await route.abort('failed');else await route.fulfill({response});});
+ await page.getByTestId('calculate').click();await page.getByRole('button',{name:'Retry connection',exact:true}).click();await expect.poll(()=>bodies.length).toBe(2);expect(bodies[0]).toBe(bodies[1]);await expect(page.getByTestId('search-maximum')).toBeVisible({timeout:30000});await expect(page.getByTestId('adopt-result').first()).toBeEnabled();const maximum=await page.getByTestId('search-maximum').textContent();const first=await page.locator('[data-result-id]').first().getAttribute('data-result-id');
+ await page.request.delete(`/api/v1/searches/${owner!.id}`,{headers:{Authorization:`Bearer ${owner!.accessToken}`}});
+ await expect(page.getByRole('alert')).toContainText('This session is unavailable.',{timeout:10000});
+ await expect(page.getByRole('button',{name:'Retry connection',exact:true})).toHaveCount(0);for(const [locale,message] of [['de','Diese Sitzung ist nicht verfügbar.'],['ru','Сессия недоступна.'],['en','This session is unavailable.']]){await page.getByLabel('Language').selectOption(locale);await expect(page.getByRole('alert')).toContainText(message);}
+ await expect(page.getByTestId('calculate')).toBeEnabled();expect(bodies).toHaveLength(2);await expect(page.getByTestId('search-maximum')).toHaveText(maximum!);await expect(page.locator('[data-result-id]').first()).toHaveAttribute('data-result-id',first!);await expect(page.getByTestId('adopt-result').first()).toBeEnabled();
+});
+
+
+test('proof disconnection reconnects the page-held identity without another calculation',async({page})=>{
+ await page.goto('/');await page.getByLabel('Language').selectOption('en');
+ for(const code of ['CCSp1','CLSp1','ChSq1']){await page.getByTestId('element-query').fill(code);await page.getByTestId(`add-${code}`).click();await page.getByTestId('program-entry').last().getByRole('checkbox').check();}
+ for(const kind of ['T','S','Lz'])await page.getByTestId(`enabled-${kind}`).uncheck();await page.getByTestId('enabled-W').uncheck();
+ let creates=0;page.on('request',r=>{if(r.method()==='POST'&&r.url().endsWith('/api/v1/searches'))creates++;});
+ const reads:string[]=[];await page.route('**/api/v1/searches/*/updates?*',async route=>{reads.push(route.request().url());const response=await route.fetch();if(reads.length===1)await route.abort('failed');else await route.fulfill({response});});
+ const accepted=page.waitForResponse(r=>r.request().method()==='POST'&&r.url().endsWith('/api/v1/searches'));await page.getByTestId('calculate').click();const owner=await(await accepted).json();await page.getByRole('button',{name:'Retry connection',exact:true}).click();await expect(page.getByTestId('search-maximum')).toContainText('10.30',{timeout:30000});expect(creates).toBe(1);expect(reads[0]).toBe(reads[1]);
+ const ids=await page.locator('[data-result-id]').evaluateAll(nodes=>nodes.map(n=>n.getAttribute('data-result-id')));expect(new Set(ids).size).toBe(ids.length);
+ await page.reload();await expect(page.getByTestId('calculate')).toBeEnabled();await expect(page.getByTestId('search-maximum')).toHaveCount(0);expect(creates).toBe(1);
+ await expect.poll(async()=>{const response=await page.request.get(`/api/v1/searches/${owner.id}/updates`,{headers:{Authorization:`Bearer ${owner.accessToken}`}});return response.status();}).toBe(404);
 });
