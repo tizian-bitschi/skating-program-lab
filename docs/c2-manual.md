@@ -91,3 +91,8 @@ final combined viewport fit.
 The [local workspace](c2-workspace.md) now automatically saves/restores the editor,
 category, limits, exact exclusions, rotation preference and language. Search
 sessions and result history stay outside durable storage.
+
+
+The [proved program search and adoption](c2-search.md) now uses this editor
+replacement/change seam. Required IDs and retention flags survive adoption;
+newly added occurrences remain replaceable and autosave as ordinary program content.

@@ -1137,6 +1137,7 @@ name = "skating-planning-service"
 version = "0.1.0"
 dependencies = [
  "axum",
+ "getrandom",
  "http-body-util",
  "serde",
  "serde_json",
