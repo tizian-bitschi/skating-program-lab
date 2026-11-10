@@ -175,7 +175,103 @@ warnings denied passed. The parent integration ran the prescribed library
 formatting, Clippy, default tests and no-default-features tests successfully.
 No CI, security, agent instruction, deployment or main-branch change is included.
 
-The required real Narrator/browser check is blocked by the documented desktop
-automation initialization failure and missing alternate `orca` command. Neither
-an accessibility tree nor keyboard success is recorded as spoken output. Final
-parent acceptance must retain that open gate until a real run is observed.
+The required real Narrator/browser check remains unperformed. The fresh check
+in sibling `issue-154-screenreader-fresh-check.md` initialized desktop automation,
+then stopped on browser-window access because the current URL could not be
+established confidently enough for the tool policy. Narrator was not started.
+Earlier initialization failures remain historical evidence. No alternate
+presentation or automation path is treated as spoken output. Parent acceptance
+retains this gate until an actual user-observed Narrator/browser run is recorded.
+Informal language feedback remains optional and uncollected.
+
+## Final review fixes and exact-build evidence
+
+Source commit `5508042c9dd98f04aa8239379a9a5dd97cb12c30` aligns whole-intention
+permissions with the core's typed `WaltzPolicy`. Axel Off disables called Waltz in
+repertoire, connection options and manual conflicts, matching search exclusions.
+Ignored Bronze Waltz remains controlled separately by W. Conflicts identify A or
+W as responsible; credit and category findings keep their independent meaning.
+The core is unchanged. Private typed control conversions retain AtomicU8, memory
+ordering, cancellation priority, condition-variable wakeups, command idempotency
+and existing wire values.
+
+The public HTTP matrix proves unrestricted, required-only, restricted-only and
+combined workflows for all six profiles and the independently registered policy.
+It obtains actual keys from repertoire/options, checks independent literal bounds
+from `tests/backend_acceptance.rs`, retains exact required occurrence identities,
+fetches a confirmed prefix, repeats its cursor, and submits fresh complete manual
+assessment. The synthetic Lutz-only policy's literal 950 bound is two 1Lz (120),
+two distinct change-foot level-one spins (480), and ChSq1 (350). Capacity-one
+admission after DELETE verifies actual owner termination between workflows.
+Large domains do not require exhaustive enumeration. Standalone and compound
+Waltz regressions cover W/A toggles, preserved entries, optimizer requirements
+and responsible settings. Browser recovery disables Axel after adding Waltz,
+observes A's conflict, restores Axel and recovers the picker.
+
+The final production assets and Release native executable were rebuilt before
+three identical cold repetitions in each of the five reference configurations.
+The calibrated shared shaper used 4 Mbit/s down, 1 Mbit/s up and 100ms added RTT
+on ports 3175/3176. Fresh browser contexts/profiles, blocked service workers,
+English locale, no CPU throttle and the recorded Windows 11/i9-13900K host were
+used. These exact-build runs supersede the earlier pre-final-fix cold samples.
+
+| Configuration | Startup ms (three runs) | Ordinary assessment ms | Local feedback ms |
+| --- | ---: | ---: | ---: |
+| Chrome Stable 157.0.8103.50, 1280×720 | 840.8–864.8 | 275.4–283.6 | 7.9–8.1 |
+| Edge Stable 157.0.4341.46, 1280×720 | 857.4–863.5 | 273.7–298.2 | 8.2–9.2 |
+| Firefox Stable 159.0.1 / geckodriver 0.37.1, 1280×720 | 905–915 | 291–356 | 3–4 |
+| Android Chrome proxy, 360×844 | 816.6–842.2 | 274.9–278.8 | 5.4–5.8 |
+| iPhone WebKit 26.5 proxy, 390×844 | 865–870 | 298–310 | 12–17 |
+
+All fifteen cold runs met the 3s/1s/200ms targets. Desktop had no document
+overflow; phone had no horizontal overflow. Phone rows remain engine, viewport
+and touch emulation, not physical-device or Safari certification.
+
+A real constrained Silver search through the same shaper showed local
+pause/continue/cancel requested feedback in 0.9–2.5ms. An independent public
+`GET updates?after=0&limit=0` observer acknowledged confirmed paused/running/
+cancelled states while ordinary UI polling stayed unchanged. Observer-ack to
+visible state measured 774.5ms, 5.2ms and 812.5ms respectively, below 2s.
+The command responses themselves still reported running/pause-requested,
+paused/continue-requested and running/cancel-requested. Their request-ack to
+confirmation-visible durations were 2462.7ms, 128.1ms and 2474.2ms. Earlier
+2477.6ms/2459.6ms observations remain preserved. Those durations include
+cooperative interruption and are not substituted for confirmed-state propagation
+or claimed to meet a solver interruption deadline. First collecting control took
+2061ms separately; cancellation preserved 14.10 proved BV and 50 confirmed
+programs without implying exhaustion.
+
+The final unshaped Release diagnostic also completed six finite constrained
+profile workloads with public HTTP DELETE cleanup. Proof observations ranged
+64.2–154.6ms, first confirmed results 112.1–309.5ms, and full finite collection
+142.6–8739.0ms (2/21/21/21/122/122 distinct results). These are separate
+workloads from the unrestricted literal-bound matrix and do not establish a
+solver-time promise; exact inputs and samples are in
+`154-review-profile-diagnostics.json`.
+
+The final 10,000-record synthetic browser fixture produced 100 receipt-to-frame
+samples of 1.6–10.1ms. It also exercised bounded result/comparison DOM, focus,
+selection and three reset/reload cycles. This is presentation/resource evidence,
+not 10,000 computed optima or a universal memory bound.
+
+Exact SHA-256 artifacts are in sibling
+`issue-154-evidence/154-review-final-artifact-hashes.json`:
+
+| Artifact | SHA-256 |
+| --- | --- |
+| Release service | `10fbf9df6513b58ff984d648f87445f1fbe0c9d549b46f769c7bba1e95d62cdb` |
+| `dist/index.html` | `bd0a252e8bd96c44592690d73b333a1716efe1d41efda881a0d286c51e37cd61` |
+| `index-BiwD9y-0.js` | `17e6b5f7c80b0fb1df93e4ec51ec697baf431e86f28f0f122dccd53b154c96a9` |
+| `index-Bn6b7tfG.css` | `a5cf3ec57219616d084e9a72e71c21d4c154290557f7df79a1fc942bc22b7f35` |
+
+Final sibling evidence uses the `154-review-` prefix: browser/Firefox matrices,
+state timing and command/receipt-only observations, six-profile diagnostics,
+synthetic resource observations, service-test log and browser-suite record. Runners target this worktree's own
+executable/assets. Sandbox Edge profile launch failed; the normal local runner
+succeeded outside that sandbox. The first sandboxed browser suite stalled before
+tests; the isolated local suite passed 34/34, including new Waltz recovery.
+Initial install-cache and Clippy needless-borrow failures were corrected before
+the final build. Earlier timing/tooling failures remain evidence, not passes.
+The final Release service suite passed 24/24, including all 28 matrix cases.
+Build, service formatting and all-target Clippy with warnings denied passed.
+The real Narrator gate above remains open.

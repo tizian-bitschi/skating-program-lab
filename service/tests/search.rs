@@ -843,3 +843,229 @@ async fn ignored_zero_value_required_occurrences_keep_distinct_http_identity() {
         assert_eq!(result["assessment"]["construction"], "compliant");
     }
 }
+
+#[tokio::test]
+async fn called_waltz_respects_axel_off_while_ignored_waltz_stays_independent() {
+    let app = skating_planning_service::app();
+    let (_, profiles) = call(&app, "GET", "/api/v1/profiles", None, None).await;
+    for index in 0..3 {
+        let base = json!({"requestId":"waltz-permission","revision":1,"context":profiles[index]["context"],"personalLimits":{}});
+        let (_, unrestricted) =
+            call(&app, "POST", "/api/v1/repertoire", Some(base.clone()), None).await;
+        let w = unrestricted["elements"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|e| e["form"] == "W")
+            .unwrap();
+        for axel in [false, true] {
+            for waltz in [false, true] {
+                let allowed = waltz && (index == 0 || axel);
+                let mut request = base.clone();
+                request["personalLimits"] =
+                    json!({"jumps":{"A":{"enabled":axel}},"unlevelledElements":{"W":waltz}});
+                let (_, repertoire) = call(
+                    &app,
+                    "POST",
+                    "/api/v1/repertoire",
+                    Some(request.clone()),
+                    None,
+                )
+                .await;
+                assert_eq!(
+                    repertoire["elements"]
+                        .as_array()
+                        .unwrap()
+                        .iter()
+                        .any(|e| e["form"] == "W"),
+                    allowed,
+                    "profile {index}, Axel {axel}, W {waltz}"
+                );
+                request["entries"] = json!([{"id":"kept-waltz","elementKey":w["key"]}]);
+                request["submission"] = json!("draft");
+                let (status, assessed) = call(
+                    &app,
+                    "POST",
+                    "/api/v1/program-assessments",
+                    Some(request),
+                    None,
+                )
+                .await;
+                assert_eq!(status, StatusCode::OK, "{assessed}");
+                assert_eq!(
+                    assessed["personalConflicts"].as_array().unwrap().is_empty(),
+                    allowed,
+                    "{assessed}"
+                );
+                if waltz && !axel && index != 0 {
+                    assert_eq!(assessed["personalConflicts"][0]["setting"], json!(["A"]));
+                }
+            }
+        }
+    }
+}
+
+#[tokio::test]
+async fn whole_called_waltz_connections_and_retained_search_match_manual_permissions() {
+    let app = skating_planning_service::app_with_catalog_and_search_options(
+        skating_planning_service::Catalog::default(),
+        skating_planning_service::SearchServiceOptions {
+            capacity: 1,
+            ..Default::default()
+        },
+    );
+    let (_, profiles) = call(&app, "GET", "/api/v1/profiles", None, None).await;
+    let (_, namespace) = call(&app, "GET", "/api/v1/searches/identity", None, None).await;
+    for index in 0..3 {
+        let base = json!({"requestId":"whole-waltz","revision":1,"context":profiles[index]["context"],"personalLimits":{}});
+        let (_, repertoire) =
+            call(&app, "POST", "/api/v1/repertoire", Some(base.clone()), None).await;
+        let solo = repertoire["elements"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|e| e["form"] == "W")
+            .unwrap()
+            .clone();
+        let w = solo["code"].as_str().unwrap().to_owned();
+        let mut query = base.clone();
+        query["prefix"] = json!([w, "1Lo"]);
+        query["allowMixedDirections"] = json!(true);
+        let (_, options) = call(
+            &app,
+            "POST",
+            "/api/v1/connections/options",
+            Some(query),
+            None,
+        )
+        .await;
+        // Ignored Bronze Waltz is a separate optional movement, never fabricated
+        // as a counted compound; Silver/Gold support the exact called intention.
+        let compound = options["completions"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|e| e["code"] == format!("{w}+1Lo"))
+            .cloned();
+        if index == 0 {
+            assert!(compound.is_none());
+        } else {
+            assert!(compound.is_some(), "{options}");
+        }
+        for (which, element) in std::iter::once(solo).chain(compound).enumerate() {
+            for (mode, axel, waltz) in [(0, false, true), (1, true, false), (2, true, true)] {
+                let allowed = waltz && (index == 0 || axel);
+                let mut request = base.clone();
+                request["personalLimits"] =
+                    json!({"jumps":{"A":{"enabled":axel}},"unlevelledElements":{"W":waltz}});
+                let mut manual = request.clone();
+                manual["submission"] = json!("draft");
+                manual["entries"] = json!([{"id":"retained","elementKey":element["key"]}]);
+                let (_, assessed) = call(
+                    &app,
+                    "POST",
+                    "/api/v1/program-assessments",
+                    Some(manual),
+                    None,
+                )
+                .await;
+                assert_eq!(
+                    assessed["personalConflicts"].as_array().unwrap().is_empty(),
+                    allowed,
+                    "{assessed}"
+                );
+                if which == 1 {
+                    let mut query = request.clone();
+                    query["prefix"] = json!([w, "1Lo"]);
+                    query["allowMixedDirections"] = json!(true);
+                    let (_, options) = call(
+                        &app,
+                        "POST",
+                        "/api/v1/connections/options",
+                        Some(query),
+                        None,
+                    )
+                    .await;
+                    assert_eq!(
+                        options["completions"]
+                            .as_array()
+                            .unwrap()
+                            .iter()
+                            .any(|e| e["key"] == element["key"]),
+                        allowed
+                    );
+                }
+                request["creationKey"] = json!(format!(
+                    "{}:{:064x}",
+                    namespace["creationNamespace"].as_str().unwrap(),
+                    100 + index * 10 + which * 3 + mode
+                ));
+                request["requiredElements"] =
+                    json!([{"id":"retained","elementKey":element["key"]}]);
+                request["allowMixedDirections"] = json!(true);
+                let wait = std::time::Instant::now();
+                let owner = loop {
+                    let (status, owner) = call(
+                        &app,
+                        "POST",
+                        "/api/v1/searches",
+                        Some(request.clone()),
+                        None,
+                    )
+                    .await;
+                    if status == StatusCode::ACCEPTED {
+                        break owner;
+                    }
+                    assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE, "{owner}");
+                    assert!(wait.elapsed().as_secs() < 30, "owner did not terminate");
+                    tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+                };
+                let id = owner["id"].as_str().unwrap();
+                let token = owner["accessToken"].as_str().unwrap();
+                let start = std::time::Instant::now();
+                loop {
+                    let (_, state) = call(
+                        &app,
+                        "GET",
+                        &format!("/api/v1/searches/{id}/updates?limit=1"),
+                        None,
+                        Some(token),
+                    )
+                    .await;
+                    if state["status"] == "failed" {
+                        assert!(!allowed, "{state}");
+                        assert_eq!(state["failure"]["code"], "request_invalid");
+                        assert_eq!(state["failure"]["entryIds"], json!(["retained"]));
+                        break;
+                    }
+                    if state["confirmedCount"].as_u64().unwrap() > 0 {
+                        assert!(allowed, "{state}");
+                        assert!(state["results"][0]["entries"]
+                            .as_array()
+                            .unwrap()
+                            .iter()
+                            .any(|e| e["requiredId"] == "retained"
+                                && e["elementKey"] == element["key"]));
+                        break;
+                    }
+                    assert!(start.elapsed().as_secs() < 120, "{state}");
+                    tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+                }
+                assert_eq!(
+                    call(
+                        &app,
+                        "DELETE",
+                        &format!("/api/v1/searches/{id}"),
+                        None,
+                        Some(token)
+                    )
+                    .await
+                    .0,
+                    StatusCode::OK
+                );
+                // Sequential owner cleanup; cancellation is cooperative.
+                tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+            }
+        }
+    }
+}

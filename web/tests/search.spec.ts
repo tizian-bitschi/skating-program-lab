@@ -103,3 +103,16 @@ test('proof disconnection reconnects the page-held identity without another calc
  await page.reload();await expect(page.getByTestId('calculate')).toBeEnabled();await expect(page.getByTestId('search-maximum')).toHaveCount(0);expect(creates).toBe(1);
  await expect.poll(async()=>{const response=await page.request.get(`/api/v1/searches/${owner.id}/updates`,{headers:{Authorization:`Bearer ${owner.accessToken}`}});return response.status();}).toBe(404);
 });
+
+test('called Waltz conflict names Axel Off and recovers when Axel is enabled',async({page})=>{
+ await page.goto('/');await page.getByLabel('Language').selectOption('en');await page.getByLabel('Category').selectOption('isu-adult-2026-27-silver');
+ const repertoire=await(await page.request.post('/api/v1/repertoire',{data:{requestId:'waltz-browser',revision:0,context:(await(await page.request.get('/api/v1/profiles')).json())[1].context,personalLimits:{}}})).json();
+ const w=repertoire.elements.find((e:{form:string})=>e.form==='W');expect(w).toBeTruthy();
+ await openPicker(page);await page.getByTestId('element-query').fill('W');await page.getByTestId(`add-${w.code}`).click();
+ const conflict=page.waitForResponse(async r=>r.url().endsWith('/api/v1/program-assessments')&&r.request().method()==='POST'&&(await r.json()).personalConflicts?.some((f:{setting:string[]})=>f.setting?.includes('A')));
+ await page.getByTestId('enabled-A').uncheck();const assessed=await(await conflict).json();expect(assessed.personalConflicts[0].setting).toEqual(['A']);
+ await openPicker(page);await page.getByTestId('element-query').fill('W');await expect(page.getByTestId(`add-${w.code}`)).toHaveCount(0);await page.keyboard.press('Escape');
+ const restored=page.waitForResponse(async r=>r.url().endsWith('/api/v1/program-assessments')&&r.request().method()==='POST'&&(await r.json()).personalConflicts?.length===0);
+ await page.getByTestId('enabled-A').check();await restored;
+ await openPicker(page);await page.getByTestId('element-query').fill('W');await expect(page.getByTestId(`add-${w.code}`)).toBeVisible();
+});
