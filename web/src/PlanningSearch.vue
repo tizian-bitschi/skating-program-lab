@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import {computed,onBeforeUnmount,ref,watch} from 'vue';
+import ResultList from './ResultList.vue';
 import {type Context,type Limits,type ProgramEntry} from './api';
 import {type Locale,formName} from './i18n';
 const props=defineProps<{context?:Context;limits:Limits;entries:ProgramEntry[];locale:Locale;excludedConnections:string[];allowMixedDirections:boolean}>();
@@ -46,14 +47,16 @@ onBeforeUnmount(invalidate);
 </script>
 <template>
 <div class="planning-search">
+ <div class="search-actions">
  <button data-testid="calculate" :disabled="!context||busy" @click="calculate">{{labels.calculate}}</button>
  <button v-if="busy&&identity" :disabled="cancelRequested||pendingControl?.action==='cancel'" @click="control('cancel')">{{labels.cancel}}</button>
  <button v-if="update?.phase==='collecting'&&busy" data-testid="collection-control" :aria-disabled="!!pendingControl||!!update.controlRequested" @click="control(update.status==='paused'?'continue':'pause')">{{update.status==='paused'?labels.continue:labels.pause}}</button>
+ </div>
  <div role="status" aria-live="polite"><p>{{stateMessage}}</p><p v-if="update?.controlRequested==='pause'||pendingControl?.action==='pause'">{{labels.pauseRequested}}</p><p v-if="update?.controlRequested==='continue'||pendingControl?.action==='continue'">{{labels.continueRequested}}</p><p v-if="cancelRequested&&busy">{{labels.requested}}</p><p v-if="update?.maximumBaseHundredths!=null" data-testid="search-maximum">{{labels.maximum}}: <strong>{{number(update.maximumBaseHundredths)}}</strong></p><p v-if="update">{{labels.count}}: {{update.confirmedCount}}<span v-if="update.status!=='completed'"> · {{labels.unknown}}</span></p></div>
  <p v-if="connection||problem" role="alert">{{errorMessage}} <button v-if="connection" @click="retry">{{labels.retry}}</button></p>
  <ul v-if="update?.failure?.entryIds?.length"><li v-for="id in update.failure.entryIds" :key="id">{{labels.retained}}: {{entries.find(e=>e.id===id)?.code??id}}</li></ul>
  <p v-if="stale" data-testid="search-stale" role="status">{{labels.stale}}</p>
- <section v-if="compared.length" :aria-label="labels.comparison" data-testid="program-comparison"><h3>{{labels.comparison}}</h3><table><thead><tr><th>{{labels.count}}</th><th>{{labels.maximum}}</th><th>{{labels.retained}} / {{labels.added}}</th></tr></thead><tbody><tr v-for="result in compared" :key="result.id"><td>{{results.indexOf(result)+1}}</td><td>{{number(result.assessment.totalHundredths)}}</td><td><ul><li v-for="(entry,index) in result.entries" :key="index"><code>{{entry.code}}</code> {{entryName(result,index)}} · {{entry.requiredId?labels.retained:labels.added}} · {{number(result.assessment.elements[index]?.creditedHundredths)}}</li></ul></td></tr></tbody></table></section>
- <ol class="search-results"><li v-for="result in results" :key="result.id" :data-result-id="result.id"><label><input v-model="selected" type="checkbox" :value="result.id"> {{labels.compare}} {{results.indexOf(result)+1}}</label> <strong>{{number(result.assessment.totalHundredths)}}</strong><ul><li v-for="(entry,index) in result.entries" :key="index"><code>{{entry.code}}</code> <span>{{entryName(result,index)}}</span> · {{entry.requiredId?labels.retained:labels.added}} · {{number(result.assessment.elements[index]?.creditedHundredths)}}</li></ul><button data-testid="adopt-result" :disabled="stale" @click="adopt(result)">{{labels.adopt}}</button></li></ol>
+ <section v-if="compared.length" :aria-label="labels.comparison" data-testid="program-comparison"><h3>{{labels.comparison}}</h3><ResultList :results="compared" :locale="locale" v-slot="{result}"><table><tbody><tr><th scope="row">{{labels.compare}} {{results.indexOf(result)+1}}</th><td>{{number(result.assessment.totalHundredths)}}</td><td><ul><li v-for="(entry,index) in result.entries" :key="index"><code>{{entry.code}}</code> {{entryName(result,index)}} · {{entry.requiredId?labels.retained:labels.added}} · {{number(result.assessment.elements[index]?.creditedHundredths)}}</li></ul></td></tr></tbody></table></ResultList></section>
+ <ResultList :results="results" :locale="locale" v-slot="{result,index:resultIndex}"><label><input v-model="selected" type="checkbox" :value="result.id"> {{labels.compare}} {{resultIndex+1}}</label> <strong>{{number(result.assessment.totalHundredths)}}</strong><ul><li v-for="(entry,index) in result.entries" :key="index"><code>{{entry.code}}</code> <span>{{entryName(result,index)}}</span> · {{entry.requiredId?labels.retained:labels.added}} · {{number(result.assessment.elements[index]?.creditedHundredths)}}</li></ul><button data-testid="adopt-result" :disabled="stale" @click="adopt(result)">{{labels.adopt}}</button></ResultList>
 </div>
 </template>

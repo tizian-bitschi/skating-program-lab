@@ -1,7 +1,8 @@
+import {openPicker} from './picker';
 import {test,expect} from '@playwright/test';
 test('workspace reload preserves entries, retention, limits and locale without a search',async({page})=>{
  let searches=0;page.on('request',r=>{if(r.url().includes('/api/v1/searches'))searches++;});
- await page.goto('/');await page.getByLabel('Language').selectOption('en');await page.getByTestId('element-query').fill('1Lz');await page.getByTestId('add-1Lz').click();await page.getByTestId('program-entry').getByRole('checkbox').check();const id=await page.getByTestId('program-entry').getAttribute('data-entry-id');await page.getByTestId('maximum-T').selectOption('1');await page.getByLabel('Language').selectOption('de');const restoredAt=Date.now();await page.reload();await expect(page.getByTestId('program-entry')).toHaveAttribute('data-entry-id',id!);await expect(page.getByTestId('program-entry').getByRole('checkbox')).toBeChecked();await expect(page.getByLabel('Language')).toHaveValue('de');await expect(page.getByTestId('assessment')).toContainText('0,60');console.log(`workspace reload to matching assessment: ${Date.now()-restoredAt}ms; ${await page.evaluate(()=>navigator.userAgent)}`);expect(searches).toBe(0);
+ await page.goto('/');await page.getByLabel('Language').selectOption('en');await openPicker(page);await page.getByTestId('element-query').fill('1Lz');await page.getByTestId('add-1Lz').click();await page.getByTestId('program-entry').getByRole('checkbox').check();const id=await page.getByTestId('program-entry').getAttribute('data-entry-id');await page.getByTestId('maximum-T').selectOption('1');await page.getByLabel('Language').selectOption('de');const restoredAt=Date.now();await page.reload();await expect(page.getByTestId('program-entry')).toHaveAttribute('data-entry-id',id!);await expect(page.getByTestId('program-entry').getByRole('checkbox')).toBeChecked();await expect(page.getByLabel('Language')).toHaveValue('de');await expect(page.getByTestId('assessment')).toContainText('0,60');console.log(`workspace reload to matching assessment: ${Date.now()-restoredAt}ms; ${await page.evaluate(()=>navigator.userAgent)}`);expect(searches).toBe(0);
 });
 
 test('corrupt snapshot stays intact until explicit replacement',async({page})=>{
@@ -21,7 +22,7 @@ test('quota failure preserves previous save and explicit retry saves current edi
  await page.goto('/');await page.getByLabel('Language').selectOption('en');await expect(page.getByTestId('workspace-storage')).toContainText('saved');
  const before=await page.evaluate(()=>localStorage.getItem('skating-c2-workspace'));
  await page.evaluate(()=>{const original=Storage.prototype.setItem;Object.assign(window,{restoreStorage:()=>{Storage.prototype.setItem=original;}});Storage.prototype.setItem=function(){throw new DOMException('Quota exceeded','QuotaExceededError');};});
- await page.getByTestId('element-query').fill('1Lz');await page.getByTestId('add-1Lz').click();await expect(page.getByTestId('workspace-storage')).toContainText('could not be saved');expect(await page.evaluate(()=>localStorage.getItem('skating-c2-workspace'))).toBe(before);
+ await openPicker(page);await page.getByTestId('element-query').fill('1Lz');await page.getByTestId('add-1Lz').click();await expect(page.getByTestId('workspace-storage')).toContainText('could not be saved');expect(await page.evaluate(()=>localStorage.getItem('skating-c2-workspace'))).toBe(before);
  await page.evaluate(()=>(window as unknown as {restoreStorage:()=>void}).restoreStorage());await page.getByRole('button',{name:'Retry local workspace'}).click();await expect(page.getByTestId('workspace-storage')).toContainText('saved on this browser');await page.reload();await expect(page.getByTestId('program-entry')).toContainText('1Lz');
 });
 
@@ -36,7 +37,7 @@ test('saved locale wins over browser locale; unsupported browser falls back to E
 });
 
 test('snapshot allowlist contains only bounded workspace inputs',async({page})=>{
- await page.goto('/');await page.getByLabel('Language').selectOption('en');await page.getByTestId('element-query').fill('1Lz');await page.getByTestId('add-1Lz').click();await page.getByText('Program is fully described',{exact:true}).click();await page.getByTestId('enabled-T').uncheck();await page.reload();await expect(page.getByTestId('enabled-T')).not.toBeChecked();await expect(page.getByText('Program is fully described',{exact:true}).getByRole('checkbox')).toBeChecked();
+ await page.goto('/');await page.getByLabel('Language').selectOption('en');await openPicker(page);await page.getByTestId('element-query').fill('1Lz');await page.getByTestId('add-1Lz').click();await page.getByText('Program is fully described',{exact:true}).click();await page.getByTestId('enabled-T').uncheck();await page.reload();await expect(page.getByTestId('enabled-T')).not.toBeChecked();await expect(page.getByText('Program is fully described',{exact:true}).getByRole('checkbox')).toBeChecked();
  const snapshot=await page.evaluate(()=>JSON.parse(localStorage.getItem('skating-c2-workspace')!));expect(Object.keys(snapshot).sort()).toEqual(['allowMixedDirections','complete','context','entries','excludedConnections','locale','personalLimits','version']);expect(Object.keys(snapshot.entries[0]).sort()).toEqual(['code','elementKey','id','retained']);expect(snapshot.excludedConnections).toEqual([]);expect(snapshot.allowMixedDirections).toBe(false);expect(snapshot.personalLimits.jumps.T.enabled).toBe(false);
 });
 

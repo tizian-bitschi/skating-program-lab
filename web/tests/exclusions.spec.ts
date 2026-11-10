@@ -1,3 +1,4 @@
+import {openPicker} from './picker';
 import {test,expect} from '@playwright/test';
 test('exact exclusion preserves pair components and longer wholes, survives reload and unavailable limits',async({page})=>{
  await page.goto('/');await page.getByLabel('Language').selectOption('en');await page.getByLabel('Category').selectOption({label:'Adult Gold'});
@@ -6,7 +7,7 @@ test('exact exclusion preserves pair components and longer wholes, survives relo
  await exclusions.getByRole('button',{name:'Exclude connection 1Lz+1Lo',exact:true}).focus();await page.keyboard.press('Enter');
  await expect(exclusions.locator('[data-restore]')).toHaveCount(1);await expect(exclusions.locator('[data-restore]')).toBeFocused();await expect(exclusions.getByRole('button',{name:'Next part: 1Lo',exact:true})).toBeVisible();
  await exclusions.getByRole('button',{name:'Next part: 1Lo',exact:true}).click();await expect(exclusions.getByRole('button',{name:'Exclude connection 1Lz+1Lo+1Lo',exact:true})).toBeVisible();
- await page.getByTestId('element-query').fill('1Lz');await expect(page.getByTestId('add-1Lz')).toBeVisible();await page.getByTestId('element-query').fill('1Lo');await expect(page.getByTestId('add-1Lo')).toBeVisible();
+ await openPicker(page);await page.getByTestId('element-query').fill('1Lz');await expect(page.getByTestId('add-1Lz')).toBeVisible();await openPicker(page);await page.getByTestId('element-query').fill('1Lo');await expect(page.getByTestId('add-1Lo')).toBeVisible();await page.getByTestId('close-element-picker').click();
  await page.getByTestId('enabled-Lo').uncheck();await page.getByLabel('Category').selectOption({label:'Adult Bronze'});await page.reload();await expect(exclusions.locator('[data-restore]')).toHaveCount(1);
  await exclusions.locator('[data-restore]').focus();await page.keyboard.press('Enter');await expect(exclusions.locator('[data-restore]')).toHaveCount(0);await expect(exclusions.locator('.connection-builder>summary')).toBeFocused();
  await page.reload();await expect(exclusions.locator('[data-restore]')).toHaveCount(0);
@@ -14,9 +15,9 @@ test('exact exclusion preserves pair components and longer wholes, survives relo
 
 test('retained connection conflict is localized and restoration recovers a genuine calculation',async({page})=>{
  await page.goto('/');await page.getByLabel('Language').selectOption('en');
- for(const code of ['CCSp1','CLSp1','ChSq1']){await page.getByTestId('element-query').fill(code);await page.getByTestId(`add-${code}`).click();await page.getByTestId('program-entry').last().getByRole('checkbox').check();}
+ for(const code of ['CCSp1','CLSp1','ChSq1']){await openPicker(page);await page.getByTestId('element-query').fill(code);await page.getByTestId(`add-${code}`).click();await page.getByTestId('program-entry').last().getByRole('checkbox').check();}
  for(const kind of ['T','S','Lz','W'])await page.getByTestId(`enabled-${kind}`).uncheck();
- const builder=page.getByTestId('program-connection-builder');await builder.getByText('Build a connection',{exact:true}).click();await builder.getByRole('button',{name:'Next part: 1F',exact:true}).click();await builder.getByRole('button',{name:'Next part: 1Lo',exact:true}).click();await builder.getByRole('button',{name:'Add connection 1F+1Lo',exact:true}).click();await page.getByTestId('program-entry').last().getByRole('checkbox').check();
+ await openPicker(page);const builder=page.getByTestId('program-connection-builder');await builder.getByText('Build a connection',{exact:true}).click();await builder.getByRole('button',{name:'Next part: 1F',exact:true}).click();await builder.getByRole('button',{name:'Next part: 1Lo',exact:true}).click();await builder.getByRole('button',{name:'Add connection 1F+1Lo',exact:true}).click();await page.getByTestId('program-entry').last().getByRole('checkbox').check();
  const exclusions=page.getByTestId('connection-exclusions');await exclusions.getByText('Build a connection',{exact:true}).click();await exclusions.getByRole('button',{name:'Next part: 1F',exact:true}).click();await exclusions.getByRole('button',{name:'Next part: 1Lo',exact:true}).click();
  await page.getByTestId('calculate').click();await expect(page.getByTestId('search-maximum')).toContainText('10.30',{timeout:30000});
  let mutations=0;page.on('request',r=>{if(r.url().match(/\/api\/v1\/searches(?:\/[^/]+(?:\/cancel)?)?$/)&&r.method()!=='GET')mutations++;});
