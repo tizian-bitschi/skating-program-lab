@@ -55,3 +55,28 @@ test('every service-advertised built-in profile renders through the same UI',asy
  }
 });
 
+
+test('an independently registered policy uses the unchanged browser and HTTP path',async({page,request})=>{
+ const origin='http://127.0.0.1:3156';
+ const profilesResponse=await request.get(`${origin}/api/v1/profiles`);
+ expect(profilesResponse.ok()).toBe(true);
+ const profiles=await profilesResponse.json();
+ const profile=profiles.find((p:{label:string})=>p.label==='Independent HTTP test policy');
+ expect(profile).toBeDefined();
+ await page.goto(origin);
+ await page.getByLabel('Language').selectOption('en');
+ await page.getByLabel('Category').selectOption(profile.context.profile);
+ await expect(page.getByTestId('enabled-T')).toBeDisabled();
+ await expect(page.getByTestId('enabled-Lz')).toBeEnabled();
+ const codes=page.getByTestId('repertoire').locator('code');
+ await expect(codes.filter({hasText:/^1Lz$/})).toHaveCount(1);
+ await expect(codes.filter({hasText:/^1T$/})).toHaveCount(0);
+ await expect(page.locator('[data-family="spin"]')).toHaveCount(20);
+ await page.getByTestId('enabled-Lz').uncheck();
+ await expect(codes.filter({hasText:/^1Lz$/})).toHaveCount(0);
+ const response=await request.post(`${origin}/api/v1/repertoire`,{data:{requestId:'independent-browser-check',revision:3,context:profile.context,personalLimits:{}}});
+ expect(response.status()).toBe(200);
+ const body=await response.json();
+ expect(body.elements.some((element:{code:string})=>element.code==='1Lz')).toBe(true);
+ expect(body.elements.some((element:{code:string})=>element.code==='1T')).toBe(false);
+});
