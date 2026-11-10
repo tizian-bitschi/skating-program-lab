@@ -2,6 +2,12 @@ import {test,expect} from '@playwright/test';
 
 test('synthetic 10000 HTTP records append without moving focus or losing selection',async({page})=>{
  test.setTimeout(60000);
+ await page.addInitScript(()=>{
+  const metrics:{batches:number[];latest?:{cursor:number;time:number}}={batches:[]};(window as unknown as {syntheticMetrics:typeof metrics}).syntheticMetrics=metrics;
+  const original=Response.prototype.json;
+  Response.prototype.json=async function(){const body=await original.call(this);if(body.id==='synthetic-presentation'&&body.results)metrics.latest={cursor:body.cursor,time:performance.now()};return body;};
+  new MutationObserver(()=>{const batch=metrics.latest;if(batch&&document.querySelector('.planning-search>.result-browser .result-pages span')?.textContent?.includes(`/ ${batch.cursor} `)){metrics.latest=undefined;requestAnimationFrame(()=>metrics.batches.push(performance.now()-batch.time));}}).observe(document,{childList:true,subtree:true,characterData:true});
+ });
  // Presentation workload only: these are explicitly synthetic, not computed optima.
  let revision=0,requestId='',delivered=0,release=()=>{};
  const held=new Promise<void>(resolve=>release=resolve);
@@ -31,4 +37,5 @@ test('synthetic 10000 HTTP records append without moving focus or losing selecti
  await list.getByRole('checkbox').last().check();
  await expect(page.getByTestId('program-comparison')).toContainText('SYNTHETIC 1');await expect(page.getByTestId('program-comparison')).toContainText('SYNTHETIC 10000');
  await list.getByRole('spinbutton',{name:'Page'}).fill('1');await list.getByRole('spinbutton',{name:'Page'}).press('Enter');await expect(list.getByRole('checkbox').first()).toBeChecked();
+ const batches=await page.evaluate(()=>(window as unknown as {syntheticMetrics:{batches:number[]}}).syntheticMetrics.batches);expect(batches.length).toBeGreaterThan(0);console.log(`synthetic batch presentation ms: ${JSON.stringify(batches)}`);expect(Math.max(...batches)).toBeLessThanOrEqual(200);
 });
