@@ -94,7 +94,7 @@ test('lost accepted creation retries its capability and expired sessions require
 
 test('proof disconnection reconnects the page-held identity without another calculation',async({page})=>{
  await page.goto('/');await page.getByLabel('Language').selectOption('en');
- for(const code of ['CCSp1','CLSp1','ChSq1']){await page.getByTestId('element-query').fill(code);await page.getByTestId(`add-${code}`).click();await page.getByTestId('program-entry').last().getByRole('checkbox').check();}
+ for(const code of ['CCSp1','CLSp1','ChSq1']){await openPicker(page);await page.getByTestId('element-query').fill(code);await page.getByTestId(`add-${code}`).click();await page.getByTestId('program-entry').last().getByRole('checkbox').check();}
  for(const kind of ['T','S','Lz'])await page.getByTestId(`enabled-${kind}`).uncheck();await page.getByTestId('enabled-W').uncheck();
  let creates=0;page.on('request',r=>{if(r.method()==='POST'&&r.url().endsWith('/api/v1/searches'))creates++;});
  const reads:string[]=[];await page.route('**/api/v1/searches/*/updates?*',async route=>{reads.push(route.request().url());const response=await route.fetch();if(reads.length===1)await route.abort('failed');else await route.fulfill({response});});

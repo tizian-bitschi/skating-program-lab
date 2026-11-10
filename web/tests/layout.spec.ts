@@ -40,3 +40,7 @@ test('phone starts with discoverable program and calculation and exposes every c
  await page.getByRole('button',{name:'Show all controls'}).click();await expect(page.locator('[data-family=spin]')).toHaveCount(20);
  await page.getByRole('link',{name:'Program suggestions',exact:true}).click();await expect(page.getByTestId('calculate')).toBeInViewport();
 });
+
+test('Escape closes the picker even while a search query is filled and restores focus',async({page})=>{
+ await page.goto('/');await page.getByLabel('Language').selectOption('en');await openPicker(page);await page.getByTestId('element-query').fill('Lutz');await page.keyboard.press('Escape');await expect(page.getByRole('dialog')).toHaveCount(0);await expect(page.getByTestId('open-element-picker')).toBeFocused();
+});

@@ -32,7 +32,7 @@ defineExpose({replaceEntries});
 </script>
 <template>
 <div class="manual-editor"><button ref="pickerButton" data-testid="open-element-picker" class="manual-search" @click="openPicker">{{pickerLabels.open}}</button>
-<dialog ref="picker" class="element-picker" :aria-label="pickerLabels.open" @close="pickerButton?.focus()"><div class="picker-heading"><h2>{{pickerLabels.open}}</h2><button data-testid="close-element-picker" @click="picker?.close()">{{pickerLabels.close}}</button></div><label class="manual-search">{{labels.search}}<input data-testid="element-query" v-model="query" type="search"></label>
+<dialog ref="picker" class="element-picker" :aria-label="pickerLabels.open" @keydown.esc.prevent="picker?.close()" @close="pickerButton?.focus()"><div class="picker-heading"><h2>{{pickerLabels.open}}</h2><button data-testid="close-element-picker" @click="picker?.close()">{{pickerLabels.close}}</button></div><label class="manual-search">{{labels.search}}<input data-testid="element-query" v-model="query" type="search"></label>
 <ul class="element-choices" data-testid="repertoire"><li v-for="e in matches" :key="e.key"><code>{{e.code}}</code><span>{{formName(locale,e.form)}}</span><span>{{number(e.baseHundredths)}}</span><button :data-testid="`add-${e.code}`" @click="add(e)">{{labels.add}} {{e.code}}</button></li></ul>
 <ConnectionBuilder :context="context" :limits="limits" :locale="locale" :excluded-connections="excludedConnections" :allow-mixed-directions="allowMixedDirections" @select="add" />
 </dialog>
