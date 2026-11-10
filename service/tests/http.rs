@@ -1,3 +1,4 @@
+mod support;
 use axum::{
     body::Body,
     http::{Request, StatusCode},
@@ -121,35 +122,8 @@ async fn off_basic_and_omitted_maxima_are_distinct_and_v_levels_share_the_form()
 
 #[tokio::test]
 async fn independently_registered_policy_is_advertised_and_controls_eligibility() {
-    use skating_program_lab::*;
-    let mut catalog = skating_planning_service::Catalog::default();
-    let mut profile = adult_profile(AdultCategory::Bronze);
-    profile.id.name = "independent-http-policy".into();
-    profile.category = "Independent HTTP test policy".into();
-    profile.provenance = ProfileProvenance::Synthetic;
-    profile
-        .jumps
-        .allowed
-        .retain(|permission| permission.kind == JumpKind::Lutz);
-    let mut policy = adult_program_policy(AdultCategory::Bronze);
-    policy.spins.profile = profile.id.clone();
-    policy.spins.source = profile.sources[0].clone();
-    profile.sources.extend([
-        policy.step_source.clone(),
-        policy.choreography_source.clone(),
-        policy.feature_source.clone(),
-    ]);
-    profile
-        .sources
-        .extend(policy.spins.positions.iter().map(|p| p.source.clone()));
-    profile
-        .sources
-        .extend(policy.spins.per_foot.iter().map(|p| p.source.clone()));
-    catalog
-        .registry
-        .register_with_program_policy(profile.clone(), policy)
-        .unwrap();
-    catalog.profiles.push(profile.clone());
+    let catalog = support::catalog();
+    let profile = catalog.profiles.last().unwrap().clone();
     let app = skating_planning_service::app_with_catalog(catalog);
     let request = json!({"requestId":"registered","revision":1,"context":skating_planning_service::Context::for_profile(&profile),"personalLimits":{}});
     let response = app

@@ -57,10 +57,31 @@ optimization, save or recovery outcome is simulated.
 
 These are Chromium desktop/emulated viewport checks, not physical-phone tests.
 Native-language domain review, screen-reader walkthrough, touch hardware,
-contrast measurement, three cold-start timing runs and registered-policy browser
-presentation remain part of combined acceptance. No whole WCAG or performance
-claim follows from these checks. The independent registered policy is currently
-verified at HTTP, not through a separate browser fixture server. Manual entry,
+contrast measurement, three cold-start timing runs remain part of combined acceptance. No whole WCAG or performance
+claim follows from these checks. The independent registered policy is verified through HTTP and the unchanged browser build using the explicit test-service example described below. Manual entry,
 search, alternatives, exclusions, storage and recovery belong to subsequent
 #154 slices. No library code, CI or security configuration changed.
 
+
+## Registered-policy browser fixture followup
+
+`cargo run --manifest-path service/Cargo.toml --example registered_policy`
+starts an explicit acceptance fixture on `127.0.0.1:3156`. Its shared
+`tests/support` constructor registers a synthetic policy based on the
+source-bound Adult Bronze definitions, admitting only Lutz while retaining the
+Bronze spin/step mechanisms. The fixture is not imported by the production
+service. No mocked domain responses or category-name eligibility branches are
+used. Its unknown category label exercises the browser's generic profile path.
+
+The browser test checks the real advertised context, all twenty spin forms,
+Lutz availability, Toe-loop unavailability, exact returned codes, and the Lutz
+Off setting. It also queries the fixture's public HTTP boundary independently.
+The original registered-policy HTTP regression shares the same constructor.
+Playwright launches both real services and refuses to reuse an existing port,
+so a different running application cannot silently satisfy the readiness check.
+The new test initially failed with ECONNREFUSED before the fixture existed;
+all four Chrome tests and all three HTTP tests pass with the fixture running.
+
+The selected C2 vertical fader presentation remains pending in the combined
+#162 workspace pass. This slice currently uses native enabled and maximum
+controls; it does not establish final visual acceptance of the selected mixer.
