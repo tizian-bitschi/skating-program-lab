@@ -319,7 +319,7 @@ async fn terminal(app: &axum::Router, owner: &Value) -> Value {
     loop {
         let (status, v) = call(app, "GET", &path, None, Some(token)).await;
         assert_eq!(status, StatusCode::OK);
-        if v["status"] != "running" {
+        if v["status"] != "running" && v["status"] != "paused" {
             return v;
         }
         assert!(start.elapsed().as_secs() < 30, "{v}");
@@ -369,4 +369,384 @@ async fn invalid_inputs_keep_correlation_and_are_distinct_from_infeasibility() {
     assert!(result["maximumBaseHundredths"].is_null());
     assert!(result["results"].as_array().unwrap().is_empty());
     assert!(!result["diagnostics"].as_array().unwrap().is_empty());
+}
+
+#[tokio::test]
+async fn collection_controls_reject_proof_and_wrong_receipt_action() {
+    let app = skating_planning_service::app();
+    let (_, identity) = call(&app, "GET", "/api/v1/searches/identity", None, None).await;
+    let (_, profiles) = call(&app, "GET", "/api/v1/profiles", None, None).await;
+    let request = json!({"creationKey":format!("{}:{}",identity["creationNamespace"].as_str().unwrap(),"c".repeat(64)),"requestId":"controls","revision":0,"context":profiles[5]["context"],"requiredElements":[],"personalLimits":{}});
+    let (_, owner) = call(&app, "POST", "/api/v1/searches", Some(request), None).await;
+    let id = owner["id"].as_str().unwrap();
+    let token = owner["accessToken"].as_str().unwrap();
+    for action in ["pause", "continue"] {
+        assert_eq!(
+            call(
+                &app,
+                "POST",
+                &format!("/api/v1/searches/{id}/{action}"),
+                Some(json!({"commandId":action})),
+                Some(token)
+            )
+            .await
+            .0,
+            StatusCode::CONFLICT
+        );
+    }
+    let path = format!("/api/v1/searches/{id}/cancel");
+    for _ in 0..2 {
+        assert_eq!(
+            call(
+                &app,
+                "POST",
+                &path,
+                Some(json!({"commandId":"stop"})),
+                Some(token)
+            )
+            .await
+            .0,
+            StatusCode::OK
+        );
+    }
+    assert_eq!(
+        call(
+            &app,
+            "POST",
+            &format!("/api/v1/searches/{id}/pause"),
+            Some(json!({"commandId":"stop"})),
+            Some(token)
+        )
+        .await
+        .1["code"],
+        "command_conflict"
+    );
+    let end = terminal(&app, &owner).await;
+    assert_eq!(end["status"], "cancelled");
+    assert!(end["controlRequested"].is_null());
+}
+
+// Independent Bronze stock argument: four entries permit one pair; the optimum
+// is two Flips + two Loops + one Toe/Salchow = 240, plus retained 830.
+fn finite_oracle() -> std::collections::BTreeSet<Vec<String>> {
+    let mut expected = std::collections::BTreeSet::new();
+    for low in ["1T", "1S"] {
+        for (a, b) in [
+            (low, "1F"),
+            ("1F", low),
+            (low, "1Lo"),
+            ("1Lo", low),
+            ("1F", "1F"),
+            ("1F", "1Lo"),
+            ("1Lo", "1F"),
+            ("1Lo", "1Lo"),
+        ] {
+            let mut stock = vec![low, "1F", "1F", "1Lo", "1Lo"];
+            for code in [a, b] {
+                let i = stock.iter().position(|c| *c == code).unwrap();
+                stock.remove(i);
+            }
+            let mut codes = stock.into_iter().map(str::to_owned).collect::<Vec<_>>();
+            codes.push(format!("{a}+{b}"));
+            codes.extend(["CCSp1", "CLSp1", "ChSq1"].map(str::to_owned));
+            codes.sort();
+            expected.insert(codes);
+        }
+    }
+    assert_eq!(expected.len(), 16);
+    expected
+}
+#[tokio::test]
+async fn every_finite_optimum_has_full_identity_provenance_and_replayable_deltas() {
+    let app = skating_planning_service::app();
+    let (_, identity) = call(&app, "GET", "/api/v1/searches/identity", None, None).await;
+    let (_, profiles) = call(&app, "GET", "/api/v1/profiles", None, None).await;
+    let context = &profiles[0]["context"];
+    let key = |code: &str| {
+        format!(
+            "{}:{}:{}:{code}:false",
+            context["profile"].as_str().unwrap(),
+            context["ruleEdition"].as_str().unwrap(),
+            context["scoringTable"].as_str().unwrap()
+        )
+    };
+    for excluded in [false, true] {
+        let required = [
+            ("spin-a", "CCSp1"),
+            ("spin-b", "CLSp1"),
+            ("choreo", "ChSq1"),
+        ];
+        let request = json!({"creationKey":format!("{}:{}",identity["creationNamespace"].as_str().unwrap(),if excluded {"e"}else{"d"}.repeat(64)),"requestId":"finite","revision":3,"context":context,"requiredElements":required.map(|(id,code)|json!({"id":id,"elementKey":key(code)})),"allowMixedDirections":true,"excludedConnections":if excluded {vec![key("1F+1Lo")]}else{vec![]},"personalLimits":{"jumps":{"Lz":{"enabled":false},"A":{"enabled":false}},"unlevelledElements":{"W":false}}});
+        let (_, owner) = call(
+            &app,
+            "POST",
+            "/api/v1/searches",
+            Some(request.clone()),
+            None,
+        )
+        .await;
+        if !excluded {
+            let token = owner["accessToken"].as_str().unwrap();
+            let id = owner["id"].as_str().unwrap();
+            let start = std::time::Instant::now();
+            loop {
+                let (status, _) = call(
+                    &app,
+                    "POST",
+                    &format!("/api/v1/searches/{id}/pause"),
+                    Some(json!({"commandId":"finite-pause"})),
+                    Some(token),
+                )
+                .await;
+                if status == StatusCode::OK {
+                    break;
+                }
+                assert_eq!(status, StatusCode::CONFLICT);
+                assert!(start.elapsed().as_secs() < 30);
+                tokio::task::yield_now().await;
+            }
+            loop {
+                let (_, state) = call(
+                    &app,
+                    "GET",
+                    &format!("/api/v1/searches/{id}/updates?limit=0"),
+                    None,
+                    Some(token),
+                )
+                .await;
+                if state["status"] == "paused" {
+                    break;
+                }
+                assert_eq!(state["status"], "running", "{state}");
+                assert!(start.elapsed().as_secs() < 30);
+                tokio::task::yield_now().await;
+            }
+            assert_eq!(
+                call(
+                    &app,
+                    "POST",
+                    &format!("/api/v1/searches/{id}/continue"),
+                    Some(json!({"commandId":"finite-continue"})),
+                    Some(token)
+                )
+                .await
+                .0,
+                StatusCode::OK
+            );
+        }
+        let end = terminal(&app, &owner).await;
+        assert_eq!(end["status"], "completed", "{end}");
+        assert_eq!(end["maximumBaseHundredths"], 1070);
+        let mut expected = finite_oracle();
+        if excluded {
+            expected.retain(|codes| !codes.contains(&"1F+1Lo".into()));
+        }
+        assert_eq!(expected.len(), if excluded { 14 } else { 16 });
+        let token = owner["accessToken"].as_str().unwrap();
+        let id = owner["id"].as_str().unwrap();
+        let mut cursor = 0;
+        let mut actual = std::collections::BTreeSet::new();
+        let mut ids = std::collections::BTreeSet::new();
+        while cursor < expected.len() {
+            let path = format!("/api/v1/searches/{id}/updates?after={cursor}&limit=3");
+            let (_, page) = call(&app, "GET", &path, None, Some(token)).await;
+            assert_eq!(page, call(&app, "GET", &path, None, Some(token)).await.1);
+            for result in page["results"].as_array().unwrap() {
+                assert!(ids.insert(result["id"].clone().to_string()));
+                let entries = result["entries"].as_array().unwrap();
+                let mut codes = Vec::new();
+                for entry in entries {
+                    let code = entry["code"].as_str().unwrap();
+                    assert_eq!(entry["elementKey"], key(code));
+                    codes.push(code.to_owned());
+                    if let Some((required_id, _)) = required.iter().find(|(_, c)| *c == code) {
+                        assert_eq!(entry["requiredId"], *required_id);
+                    } else {
+                        assert!(entry["requiredId"].is_null());
+                    }
+                }
+                codes.sort();
+                assert!(actual.insert(codes));
+                assert_eq!(result["assessment"]["totalHundredths"], 1070);
+                assert_eq!(result["assessment"]["construction"], "compliant");
+                let assessment = json!({"requestId":"fresh","revision":4,"context":context,"personalLimits":request["personalLimits"],"entries":entries.iter().enumerate().map(|(i,e)|json!({"id":format!("fresh-{i}"),"elementKey":e["elementKey"]})).collect::<Vec<_>>(),"submission":"complete","allowMixedDirections":true,"excludedConnections":request["excludedConnections"]});
+                let (status, fresh) = call(
+                    &app,
+                    "POST",
+                    "/api/v1/program-assessments",
+                    Some(assessment),
+                    None,
+                )
+                .await;
+                assert_eq!(status, StatusCode::OK, "{fresh}");
+                assert_eq!(fresh["totalHundredths"], 1070);
+                assert_eq!(fresh["construction"], "compliant");
+            }
+            cursor = page["cursor"].as_u64().unwrap() as usize;
+        }
+        assert_eq!(actual, expected);
+        for action in ["pause", "continue"] {
+            assert_eq!(
+                call(
+                    &app,
+                    "POST",
+                    &format!("/api/v1/searches/{id}/{action}"),
+                    Some(json!({"commandId":format!("terminal-{action}")})),
+                    Some(token)
+                )
+                .await
+                .0,
+                StatusCode::CONFLICT
+            );
+        }
+    }
+}
+
+#[tokio::test]
+async fn pause_continue_and_cancel_reach_the_same_collecting_owner() {
+    let app = skating_planning_service::app();
+    let (_, namespace) = call(&app, "GET", "/api/v1/searches/identity", None, None).await;
+    let (_, profiles) = call(&app, "GET", "/api/v1/profiles", None, None).await;
+    let request = json!({"creationKey":format!("{}:{}",namespace["creationNamespace"].as_str().unwrap(),"f".repeat(64)),"requestId":"live-controls","revision":9,"context":profiles[1]["context"],"requiredElements":[],"allowMixedDirections":true,"personalLimits":{"jumps":{"T":{"enabled":false},"S":{"enabled":false},"Lz":{"enabled":false},"F":{"enabled":true,"maximum":1},"Lo":{"enabled":true,"maximum":1},"A":{"enabled":true,"maximum":1}},"unlevelledElements":{"W":false}}});
+    let (_, owner) = call(&app, "POST", "/api/v1/searches", Some(request), None).await;
+    let id = owner["id"].as_str().unwrap();
+    let token = owner["accessToken"].as_str().unwrap();
+    let path = format!("/api/v1/searches/{id}/updates?limit=0");
+    let start = std::time::Instant::now();
+    loop {
+        let (_, v) = call(&app, "GET", &path, None, Some(token)).await;
+        if v["phase"] == "collecting" {
+            break;
+        }
+        assert_eq!(v["status"], "running", "{v}");
+        assert!(start.elapsed().as_secs() < 30);
+        tokio::time::sleep(std::time::Duration::from_millis(1)).await;
+    }
+    let command = |action: &str| format!("/api/v1/searches/{id}/{action}");
+    assert_eq!(
+        call(
+            &app,
+            "POST",
+            &command("pause"),
+            Some(json!({"commandId":"pause"})),
+            Some(token)
+        )
+        .await
+        .0,
+        StatusCode::OK
+    );
+    let paused = loop {
+        let (_, v) = call(&app, "GET", &path, None, Some(token)).await;
+        if v["status"] == "paused" {
+            break v;
+        }
+        assert!(start.elapsed().as_secs() < 30, "{v}");
+        tokio::time::sleep(std::time::Duration::from_millis(1)).await;
+    };
+    assert!(paused["controlRequested"].is_null());
+    assert_eq!(paused["proof"], "proved");
+    assert_eq!(paused["collectionComplete"], false);
+    tokio::time::sleep(std::time::Duration::from_millis(300)).await;
+    assert_eq!(
+        call(&app, "GET", &path, None, Some(token)).await.1["confirmedCount"],
+        paused["confirmedCount"]
+    );
+    assert_eq!(
+        call(
+            &app,
+            "POST",
+            &command("continue"),
+            Some(json!({"commandId":"continue"})),
+            Some(token)
+        )
+        .await
+        .0,
+        StatusCode::OK
+    );
+    assert_eq!(
+        call(
+            &app,
+            "POST",
+            &command("continue"),
+            Some(json!({"commandId":"continue"})),
+            Some(token)
+        )
+        .await
+        .0,
+        StatusCode::OK
+    );
+    loop {
+        let (_, v) = call(&app, "GET", &path, None, Some(token)).await;
+        if v["confirmedCount"].as_u64() > paused["confirmedCount"].as_u64() {
+            break;
+        }
+        assert!(start.elapsed().as_secs() < 30, "{v}");
+        tokio::time::sleep(std::time::Duration::from_millis(1)).await;
+    }
+    assert_eq!(
+        call(
+            &app,
+            "POST",
+            &command("cancel"),
+            Some(json!({"commandId":"cancel"})),
+            Some(token)
+        )
+        .await
+        .0,
+        StatusCode::OK
+    );
+    let end = terminal(&app, &owner).await;
+    assert_eq!(end["status"], "cancelled");
+    assert_eq!(end["id"], owner["id"]);
+    assert_eq!(
+        end["maximumBaseHundredths"],
+        paused["maximumBaseHundredths"]
+    );
+    assert!(end["controlRequested"].is_null());
+    assert!(end["confirmedCount"].as_u64() >= paused["confirmedCount"].as_u64());
+}
+
+#[tokio::test]
+async fn ignored_zero_value_required_occurrences_keep_distinct_http_identity() {
+    let app = skating_planning_service::app();
+    let (_, namespace) = call(&app, "GET", "/api/v1/searches/identity", None, None).await;
+    let (_, profiles) = call(&app, "GET", "/api/v1/profiles", None, None).await;
+    let context = &profiles[0]["context"];
+    let key = |code: &str| {
+        format!(
+            "{}:{}:{}:{code}:false",
+            context["profile"].as_str().unwrap(),
+            context["ruleEdition"].as_str().unwrap(),
+            context["scoringTable"].as_str().unwrap()
+        )
+    };
+    let required = [
+        ("spin-a", "CCSp1"),
+        ("spin-b", "CLSp1"),
+        ("choreo", "ChSq1"),
+        ("first-waltz", "W"),
+        ("second-waltz", "W"),
+    ];
+    let request = json!({"creationKey":format!("{}:{}",namespace["creationNamespace"].as_str().unwrap(),"a".repeat(64)),"requestId":"ignored-identities","revision":1,"context":context,"requiredElements":required.map(|(id,code)|json!({"id":id,"elementKey":key(code)})),"allowMixedDirections":true,"personalLimits":{"jumps":{"T":{"enabled":false},"S":{"enabled":false},"Lz":{"enabled":false},"A":{"enabled":false}}}});
+    let (_, owner) = call(&app, "POST", "/api/v1/searches", Some(request), None).await;
+    let end = terminal(&app, &owner).await;
+    assert_eq!(end["status"], "completed", "{end}");
+    assert_eq!(end["maximumBaseHundredths"], 1030);
+    assert_eq!(end["confirmedCount"], 5);
+    for result in end["results"].as_array().unwrap() {
+        let entries = result["entries"].as_array().unwrap();
+        for (id, code) in required {
+            let index = entries.iter().position(|e| e["requiredId"] == id).unwrap();
+            assert_eq!(entries[index]["elementKey"], key(code));
+            assert_eq!(entries[index]["code"], code);
+            if code == "W" {
+                assert_eq!(
+                    result["assessment"]["elements"][index]["creditedHundredths"],
+                    0
+                );
+            }
+        }
+        assert_eq!(entries.iter().filter(|e| e["code"] == "W").count(), 2);
+        assert_eq!(result["assessment"]["construction"], "compliant");
+    }
 }

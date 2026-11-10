@@ -1,4 +1,14 @@
 import {test,expect} from '@playwright/test';
+// Each test owns and releases the real native sessions it creates, including
+// responses whose browser state has already been invalidated.
+const searchOwners=new WeakMap<object,Promise<{origin:string;id:string;accessToken:string}|undefined>[]>();
+test.beforeEach(async({page})=>{
+ const owners:Promise<{origin:string;id:string;accessToken:string}|undefined>[]=[];searchOwners.set(page,owners);
+ page.on('response',response=>{if(response.request().method()==='POST'&&new URL(response.url()).pathname==='/api/v1/searches'&&response.status()===202)owners.push(response.json().then(owner=>({origin:new URL(response.url()).origin,id:owner.id,accessToken:owner.accessToken})).catch(()=>undefined));});
+});
+test.afterEach(async({page})=>{
+ for(const owner of await Promise.all(searchOwners.get(page)??[]))if(owner)await page.request.delete(`${owner.origin}/api/v1/searches/${owner.id}`,{headers:{Authorization:`Bearer ${owner.accessToken}`}});
+});
 test('explicit proof adopts a freshly assessed program and preserves retained identity',async({page})=>{
  await page.goto('/');await page.getByLabel('Language').selectOption('en');
  let creates=0;page.on('request',r=>{if(r.url().endsWith('/api/v1/searches')&&r.method()==='POST')creates++;});
@@ -44,4 +54,18 @@ test('semantic edits during namespace or creation waits cannot start or adopt st
  let releaseCreation=()=>{};const creationHeld=new Promise<void>(r=>releaseCreation=r);let creationSeen=()=>{};const seenCreation=new Promise<void>(r=>creationSeen=r);let owner:{id:string;accessToken:string}|undefined;
  await page.route('**/api/v1/searches',async route=>{const response=await route.fetch();owner=await response.json();creationSeen();await creationHeld;await route.fulfill({response});});
  await page.getByTestId('calculate').click();await seenCreation;await page.getByTestId('maximum-Lo').selectOption('1');releaseCreation();await expect(page.getByTestId('calculate')).toBeEnabled();await expect.poll(async()=>{const response=await page.request.get(`/api/v1/searches/${owner!.id}/updates`,{headers:{Authorization:`Bearer ${owner!.accessToken}`}});return response.status();}).toBe(404);expect(creates).toBe(1);await expect(page.getByTestId('adopt-result')).toHaveCount(0);await expect(page.getByTestId('search-maximum')).toHaveCount(0);
+});
+
+
+test('real collection pauses, continues, compares and adopts without losing focus',async({page})=>{
+ test.setTimeout(90000);
+ await page.goto('/');await page.getByLabel('Language').selectOption('en');await page.getByLabel('Category').selectOption('isu-adult-2026-27-silver');for(const kind of ['T','S','Lz'])await page.getByTestId(`enabled-${kind}`).uncheck();for(const kind of ['F','Lo','A'])await page.getByTestId(`maximum-${kind}`).selectOption('1');await page.getByTestId('enabled-W').uncheck();await page.getByTestId('calculate').click();
+ const control=page.getByTestId('collection-control');await expect(control).toHaveText('Pause collection',{timeout:30000});await control.focus();await page.keyboard.press('Enter');await expect(control).toHaveText('Continue collection',{timeout:30000});await expect(control).toBeFocused();
+ await expect(page.getByTestId('adopt-result').first()).toBeEnabled();const compare=page.locator('.search-results input[type=checkbox]');await compare.nth(0).check();await compare.nth(1).check();await expect(page.getByTestId('program-comparison').locator('tbody tr')).toHaveCount(2);
+ const before=await page.locator('.search-results > li').first().getAttribute('data-result-id');
+ for(const [locale,label] of [['de','Sammlung fortsetzen'],['ru','Продолжить сбор'],['en','Continue collection']]){await page.getByLabel('Language').selectOption(locale);await expect(control).toHaveText(label);}
+ await control.focus();await page.keyboard.press('Enter');await expect(control).toHaveText('Pause collection',{timeout:10000});await expect(control).toBeFocused();await expect(page.locator('.search-results > li').first()).toHaveAttribute('data-result-id',before!);
+ let lost=true;const commands:string[]=[];await page.route('**/api/v1/searches/*/pause',async route=>{commands.push(route.request().postData()!);const response=await route.fetch();if(lost){lost=false;await route.abort('failed');}else await route.fulfill({response});});
+ await control.click();await page.getByRole('button',{name:'Retry connection',exact:true}).click();await expect(control).toHaveText('Continue collection',{timeout:10000});expect(commands).toHaveLength(2);expect(commands[0]).toBe(commands[1]);
+ await page.getByRole('button',{name:'Cancel calculation',exact:true}).click();await expect(page.getByText('Calculation cancelled.',{exact:true})).toBeVisible({timeout:10000});await page.getByTestId('adopt-result').first().focus();await page.keyboard.press('Enter');await expect(page.getByTestId('assessment')).toContainText('Construction complies');
 });

@@ -10,7 +10,7 @@ use std::{
     num::NonZeroUsize,
     sync::{
         atomic::{AtomicBool, AtomicU8, AtomicUsize, Ordering},
-        Mutex,
+        Condvar, Mutex,
     },
     thread::{self, JoinHandle},
     time::{Duration, Instant},
@@ -108,6 +108,7 @@ struct Job {
     last_contact: Mutex<Duration>,
     data: Mutex<Data>,
     join: Mutex<Option<JoinHandle<()>>>,
+    wake: Condvar,
 }
 struct Data {
     status: &'static str,
@@ -148,6 +149,7 @@ impl Manager {
             {
                 job.disposed.store(true, Ordering::Release);
                 job.control.store(2, Ordering::Release);
+                job.wake.notify_all();
                 false
             } else {
                 true
@@ -211,6 +213,7 @@ impl Drop for Manager {
             .filter_map(|r| r.job.as_ref())
         {
             job.control.store(2, Ordering::Release);
+            job.wake.notify_all();
         }
     }
 }
@@ -232,7 +235,7 @@ fn snapshot(job: &Job, after: usize, limit: usize) -> Value {
     let d = job.data.lock().unwrap();
     let end = after.saturating_add(limit).min(d.results.len());
     let after = after.min(d.results.len());
-    json!({"id":job.id,"requestId":job.request.repertoire.request_id,"revision":job.request.repertoire.revision,"context":job.request.repertoire.context,"status":d.status,"phase":d.phase,"proof":if d.maximum.is_some(){"proved"}else{"unproved"},"maximumBaseHundredths":d.maximum,"confirmedCount":d.results.len(),"collectionComplete":d.status=="completed","controlRequested":match job.control.load(Ordering::Acquire){2=>Some("cancel"),1=>Some("pause"),_=>None},"cursor":end,"results":d.results[after..end],"failure":d.failure,"diagnostics":d.diagnostics})
+    json!({"id":job.id,"requestId":job.request.repertoire.request_id,"revision":job.request.repertoire.revision,"context":job.request.repertoire.context,"status":d.status,"phase":d.phase,"proof":if d.maximum.is_some(){"proved"}else{"unproved"},"maximumBaseHundredths":d.maximum,"confirmedCount":d.results.len(),"collectionComplete":d.status=="completed","controlRequested":match (d.status,job.control.load(Ordering::Acquire)){("running"|"paused",2)=>Some("cancel"),("running",1)=>Some("pause"),("paused",3)=>Some("continue"),_=>None},"cursor":end,"results":d.results[after..end],"failure":d.failure,"diagnostics":d.diagnostics})
 }
 pub(super) fn router(catalog: Arc<Catalog>, options: SearchServiceOptions) -> Router {
     Router::new()
@@ -240,6 +243,8 @@ pub(super) fn router(catalog: Arc<Catalog>, options: SearchServiceOptions) -> Ro
         .route("/api/v1/searches", post(create))
         .route("/api/v1/searches/{id}/updates", get(updates))
         .route("/api/v1/searches/{id}/cancel", post(cancel))
+        .route("/api/v1/searches/{id}/pause", post(pause))
+        .route("/api/v1/searches/{id}/continue", post(resume))
         .route("/api/v1/searches/{id}", delete(dispose))
         .with_state(Manager::new(catalog, options))
 }
@@ -332,6 +337,7 @@ async fn create(
             commands: BTreeMap::new(),
         }),
         join: Mutex::new(None),
+        wake: Condvar::new(),
     });
     m.live.fetch_add(1, Ordering::AcqRel);
     let owner = job.clone();
@@ -386,24 +392,70 @@ async fn updates(
 struct Command {
     command_id: String,
 }
+async fn pause(
+    State(m): State<Arc<Manager>>,
+    Path(id): Path<String>,
+    headers: HeaderMap,
+    Json(command): Json<Command>,
+) -> Result<Json<Value>, ApiError> {
+    control_command(&m, &id, &headers, command, "pause")
+}
+async fn resume(
+    State(m): State<Arc<Manager>>,
+    Path(id): Path<String>,
+    headers: HeaderMap,
+    Json(command): Json<Command>,
+) -> Result<Json<Value>, ApiError> {
+    control_command(&m, &id, &headers, command, "continue")
+}
 async fn cancel(
     State(m): State<Arc<Manager>>,
     Path(id): Path<String>,
     headers: HeaderMap,
     Json(command): Json<Command>,
 ) -> Result<Json<Value>, ApiError> {
-    let job = m.authorize(&id, &headers)?;
+    control_command(&m, &id, &headers, command, "cancel")
+}
+fn control_command(
+    m: &Manager,
+    id: &str,
+    headers: &HeaderMap,
+    command: Command,
+    action: &str,
+) -> Result<Json<Value>, ApiError> {
+    let job = m.authorize(id, headers)?;
     if command.command_id.is_empty() {
         return Err(error(StatusCode::BAD_REQUEST, "invalid_command"));
     }
     let mut d = job.data.lock().unwrap();
-    if let Some(action) = d.commands.get(&command.command_id) {
-        if action != "cancel" {
+    if let Some(previous) = d.commands.get(&command.command_id) {
+        if previous != action {
             return Err(error(StatusCode::CONFLICT, "command_conflict"));
         }
     } else {
-        d.commands.insert(command.command_id, "cancel".into());
-        job.control.store(2, Ordering::Release);
+        let valid = match action {
+            "pause" => {
+                d.status == "running"
+                    && d.phase == "collecting"
+                    && job.control.load(Ordering::Acquire) == 0
+            }
+            "continue" => d.status == "paused" && job.control.load(Ordering::Acquire) == 1,
+            "cancel" => true,
+            _ => false,
+        };
+        if !valid {
+            return Err(error(StatusCode::CONFLICT, "invalid_transition"));
+        }
+        d.commands.insert(command.command_id, action.into());
+        job.control.store(
+            match action {
+                "pause" => 1,
+                "cancel" => 2,
+                _ => 3,
+            },
+            Ordering::Release,
+        );
+        job.wake.notify_all();
     }
     drop(d);
     Ok(Json(snapshot(&job, 0, 0)))
@@ -416,6 +468,7 @@ async fn dispose(
     let job = m.authorize(&id, &headers)?;
     job.disposed.store(true, Ordering::Release);
     job.control.store(2, Ordering::Release);
+    job.wake.notify_all();
     m.jobs.lock().unwrap().remove(&id);
     Ok(Json(json!({"disposed":true})))
 }
@@ -553,6 +606,10 @@ fn run(catalog: &Catalog, job: &Job) {
                     d.status = "running";
                     d.phase = "collecting"
                 }
+                PlanningSessionState::Paused => {
+                    d.status = "paused";
+                    d.phase = "collecting"
+                }
                 PlanningSessionState::Exhausted => {
                     d.status = "completed";
                     d.phase = "terminal"
@@ -571,7 +628,26 @@ fn run(catalog: &Catalog, job: &Job) {
                 }
             }
         }
-        if session.state() != PlanningSessionState::Collecting {
+        if session.state() == PlanningSessionState::Paused {
+            let mut d = job.data.lock().unwrap();
+            while job.control.load(Ordering::Acquire) == 1 {
+                // The mutex synchronizes the predicate and notification. Timed wake
+                // also lets disposal/lease cancellation reach a sleeping native owner.
+                d = job
+                    .wake
+                    .wait_timeout(d, Duration::from_millis(250))
+                    .unwrap()
+                    .0;
+            }
+            if job
+                .control
+                .compare_exchange(3, 0, Ordering::AcqRel, Ordering::Acquire)
+                .is_ok()
+            {
+                d.status = "running";
+            }
+            drop(d);
+        } else if session.state() != PlanningSessionState::Collecting {
             return;
         }
         let batch = match session.collect(NonZeroUsize::new(25).unwrap(), job) {
