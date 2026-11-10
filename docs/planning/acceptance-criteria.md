@@ -2,6 +2,8 @@
 
 **Accepted for planning on 2026-11-09, with the user’s explicit Q1/Q4 simplifications. No implementation, new prototype or acceptance run was performed by this document.**
 
+**Owner update, 2026-11-10:** real-screenreader testing is no longer an acceptance gate. Keep the other scoped accessibility checks and report screen-reader behavior as unverified; do not substitute a fabricated pass.
+
 Decision: [Set measurable UI performance and usability acceptance criteria](https://github.com/tizian-bitschi/skating-program-lab/issues/152). Scope: the selected C2 UI, [accepted service contract](service-contract.md), [local workspace/recovery policy](https://github.com/tizian-bitschi/skating-program-lab/issues/149#issuecomment-6750385948), and [language contract](language-contract.md).
 
 The [technical source notes](acceptance-technical-notes.md) distinguish standards, external guidance and the proposed product targets below. The old native service and prototype observations remain feasibility evidence, not acceptance of the integrated application.
@@ -64,7 +66,7 @@ Report retained data and memory growth versus result count, and after repeated d
 ### Practical accessibility — all listed checks must pass
 
 - Finish the core flows by keyboard, without traps; keep focus order/indicator visible and unobscured. Dialogs close and restore focus correctly.
-- Named controls and slider values make sense with at least one real screen reader/browser combination. Announce concise state/result updates without moving focus or reading every new row.
+- Check named controls and slider values through the browser/keyboard boundary. Keep concise state/result live regions without moving focus or placing every new row in the announcement region. A real screen-reader/browser run is optional under the owner update above; unperformed speech behavior remains unverified.
 - Touch operations do not require hover or dragging alone. Choose an effective target of about 44×44 CSS pixels for essential phone controls; keyboard and point/tap alternatives remain available.
 - Check normal-text contrast at 4.5:1, applicable large-text/control contrast at 3:1, and communicate errors/states through more than color. Apply the actual criterion and its exceptions rather than asserting every pixel has one universal ratio.
 - Layout remains operable under the reflow/zoom conditions above. Do not disable zoom to make the console fit.

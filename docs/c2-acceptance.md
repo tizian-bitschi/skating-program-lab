@@ -1,9 +1,10 @@
 # C2 application acceptance observations (#162)
 
 Recorded 2026-11-10 against the integrated native service and production Vite
-application. Technical checks below passed within their stated scope. Overall
-acceptance remains open: a real screen-reader/browser walkthrough has not run.
-Human feedback on the three language catalogs is also outstanding. No physical
+application. Technical checks below passed within their stated scope. On
+2026-11-10, the owner removed real-screenreader testing as an acceptance gate.
+That check was not performed; the agreed remaining gates are complete.
+Optional human feedback on the three language catalogs is outstanding. No physical
 phone, recruited participant, field percentile or blanket WCAG claim is made.
 
 ## Implemented interface
@@ -33,8 +34,8 @@ invent client result identities or save that history in localStorage.
 
 Live regions contain concise assessment/BV and search-state/count summaries.
 Expanded findings, source links, result records and comparisons sit outside
-those regions. Keyboard checks supplement, and do not replace, the pending
-screen-reader check.
+those regions. Keyboard checks do not establish real-screenreader behavior;
+the owner waived that separate check as an acceptance gate.
 
 ## Automated behavior and layout
 
@@ -148,7 +149,8 @@ assumed, while UI knowledge and memorized codes were not.
 | Pause/continue, compare/adopt, reload and inspect restored content; browser lifecycle/storage tests | The requested-state text appears immediately. Escape from a filled search initially cleared text instead of closing; explicit dismissal and a regression now cover it. | Resume uses the same page-held search; reload restores content without silently starting optimization. Bounded comparison pages retain selection. Cancellation now immediately says it was requested and later reports confirmation. |
 
 No blocking ambiguity remained in these exercised paths after correction. Human
-language feedback and actual screen-reader output remain separate pending work.
+language feedback remains optional; real-screenreader output was not verified
+and is no longer an acceptance gate by the owner's decision.
 
 ## Evidence and remaining gates
 
@@ -175,13 +177,14 @@ warnings denied passed. The parent integration ran the prescribed library
 formatting, Clippy, default tests and no-default-features tests successfully.
 No CI, security, agent instruction, deployment or main-branch change is included.
 
-The required real Narrator/browser check remains unperformed. The fresh check
+The real Narrator/browser check was not performed. The fresh check
 in sibling `issue-154-screenreader-fresh-check.md` initialized desktop automation,
 then stopped on browser-window access because the current URL could not be
 established confidently enough for the tool policy. Narrator was not started.
 Earlier initialization failures remain historical evidence. No alternate
-presentation or automation path is treated as spoken output. Parent acceptance
-retains this gate until an actual user-observed Narrator/browser run is recorded.
+presentation or automation path is treated as spoken output. On 2026-11-10,
+the owner explicitly removed this check as an acceptance requirement. This
+supersedes the earlier screen-reader gate without recording an invented pass.
 Informal language feedback remains optional and uncollected.
 
 ## Final review fixes and exact-build evidence
@@ -274,4 +277,5 @@ Initial install-cache and Clippy needless-borrow failures were corrected before
 the final build. Earlier timing/tooling failures remain evidence, not passes.
 The final Release service suite passed 24/24, including all 28 matrix cases.
 Build, service formatting and all-target Clippy with warnings denied passed.
-The real Narrator gate above remains open.
+The real Narrator check was not performed and was waived as an acceptance gate
+by the owner on 2026-11-10. No screen-reader conformance claim follows.
