@@ -120,3 +120,10 @@ cargo test --no-default-features
 
 The [solver comparison](docs/solver-comparison.md) has separate checks. Licensed under the [MIT License](LICENSE).
 
+
+## C2 browser application
+
+The Vue/TypeScript application and native Axum/Tokio service now expose real
+profile/repertoire selection on one local origin. See the
+[run instructions and #155 acceptance evidence](docs/c2-repertoire.md).
+Manual editor and search workflows are implemented in subsequent C2 slices.

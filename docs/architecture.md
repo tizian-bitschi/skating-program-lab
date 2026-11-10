@@ -4,7 +4,7 @@
 
 ## Current state
 
-The repository contains a Rust library and a separate solver-comparison executable. It accepts caller-provided plans, observations and panel recognition. It returns partial validation findings, scoring scenarios, bounded legacy optimization results and incremental complete planning-search sessions. It has no UI, network service, persistence, rule database or automatic panel inference. [Implementation status](implementation-status.md) defines current support.
+The repository contains a Rust library and a separate solver-comparison executable. It accepts caller-provided plans, observations and panel recognition. It returns partial validation findings, scoring scenarios, bounded legacy optimization results and incremental complete planning-search sessions. The separate C2 browser/service adapter adds repertoire selection. It has no persistence, rule database or automatic panel inference. [Implementation status](implementation-status.md) defines current support.
 
 The core is intended for native and eventual WebAssembly use. Correctness and traceability take priority, followed by independent tests, reproducibility, maintainability and measured performance. WebAssembly compatibility is not established.
 
@@ -82,3 +82,14 @@ solver and immutable request, borrows the selected registry and releases its sta
 when dropped. Legacy APIs remain capped at five deliveries. See the
 [contract](specs/planning-search.md#incremental-search-sessions-142) and
 [acceptance evidence](planning-session-acceptance.md).
+
+## C2 application adapter (#155)
+
+`service/` is a standalone Axum/Tokio consumer of the library. Its strict
+versioned HTTP DTOs translate context and personal settings into core selection;
+CPU work runs through `spawn_blocking`. `web/` contains Vue/TypeScript/Vite
+presentation and canonical backend element keys. Built assets and `/api/v1`
+share the service origin. Profile registration and eligibility remain in Rust;
+TypeScript contains translations and presentation state only. The library
+retains its existing dependencies and callers. See [C2 repertoire](c2-repertoire.md).
+
