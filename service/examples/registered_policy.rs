@@ -4,9 +4,11 @@ mod support;
 
 #[tokio::main]
 async fn main() {
-    let listener = tokio::net::TcpListener::bind("127.0.0.1:3156")
-        .await
-        .expect("bind registered-policy acceptance fixture");
+    let listener = tokio::net::TcpListener::bind(
+        std::env::var("C2_FIXTURE_LISTEN").unwrap_or_else(|_| "127.0.0.1:3156".into()),
+    )
+    .await
+    .expect("bind registered-policy acceptance fixture");
     axum::serve(
         listener,
         skating_planning_service::app_with_catalog(support::catalog()),

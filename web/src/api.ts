@@ -12,3 +12,5 @@ export async function fetchJson<T>(path:string,body?:unknown):Promise<T>{
  if(!response.ok)throw new Error((await response.json().catch(()=>({code:'connection_failure'}))).code);
  return response.json();
 }
+
+export interface ProgramEntry {id:string;elementKey:string;code:string;retained:boolean}

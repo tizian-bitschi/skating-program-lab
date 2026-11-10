@@ -57,7 +57,7 @@ test('every service-advertised built-in profile renders through the same UI',asy
 
 
 test('an independently registered policy uses the unchanged browser and HTTP path',async({page,request})=>{
- const origin='http://127.0.0.1:3156';
+ const origin=`http://127.0.0.1:${process.env.C2_FIXTURE_PORT??3158}`;
  const profilesResponse=await request.get(`${origin}/api/v1/profiles`);
  expect(profilesResponse.ok()).toBe(true);
  const profiles=await profilesResponse.json();
