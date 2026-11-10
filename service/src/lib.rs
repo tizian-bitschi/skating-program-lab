@@ -451,6 +451,41 @@ pub fn resolve_workspace_element(
     resolve_context(catalog, &original)?;
     decode_element_key(&original, key)
 }
+// Product exclusions are whole jump connections, never arbitrary element holes.
+// Validate in the key's original context so category/limit changes preserve them.
+fn resolve_connection_exclusion(
+    catalog: &Catalog,
+    key: &str,
+) -> Result<AssumedRecognition, ApiError> {
+    let invalid = || input_error(None, "invalid_connection_exclusion", "excludedConnections");
+    let element = resolve_workspace_element(catalog, key).map_err(|_| invalid())?;
+    if !element.code.contains('+') {
+        return Err(invalid());
+    }
+    let original = catalog
+        .profiles
+        .iter()
+        .find(|p| {
+            key.starts_with(&format!(
+                "{}:{}:{}:",
+                p.id.name,
+                p.id.version,
+                p.scoring_table.as_str()
+            ))
+        })
+        .ok_or_else(invalid)?;
+    let choices = selectable_jump_elements(
+        &catalog.registry,
+        &original.id,
+        TABLE,
+        RotationPreference::AllowMixedDirections,
+    )
+    .map_err(|_| invalid())?;
+    if !choices.contains(&element) {
+        return Err(invalid());
+    }
+    Ok(element)
+}
 fn personal_setting(kind: &PersonalLimitConflictKind, choices: &[SelectableElement]) -> String {
     match kind {
         PersonalLimitConflictKind::StepLevel { .. } => "StSq".into(),
@@ -553,8 +588,13 @@ pub fn assessment_response(catalog: &Catalog, r: &AssessmentRequest) -> Result<V
         .excluded_connections
         .iter()
         .map(|key| {
-            resolve_workspace_element(catalog, key)
-                .map_err(|_| envelope_error(request, "invalid_element_key"))
+            resolve_connection_exclusion(catalog, key).map_err(|_| {
+                input_error(
+                    Some(request),
+                    "invalid_connection_exclusion",
+                    "excludedConnections",
+                )
+            })
         })
         .collect::<Result<Vec<_>, _>>()?;
     // Preserved entries can be unavailable in the newly selected category;
@@ -668,7 +708,15 @@ pub fn connection_response(catalog: &Catalog, r: &ConnectionRequest) -> Result<V
     let excluded = r
         .excluded_connections
         .iter()
-        .map(|k| decode_element_key(&request.context, k))
+        .map(|k| {
+            resolve_connection_exclusion(catalog, k).map_err(|_| {
+                input_error(
+                    Some(request),
+                    "invalid_connection_exclusion",
+                    "excludedConnections",
+                )
+            })
+        })
         .collect::<Result<Vec<_>, _>>()?;
     let permitted = |a: &&AssumedRecognition| {
         a.code.split('+').all(|code| {
@@ -710,7 +758,7 @@ pub fn connection_response(catalog: &Catalog, r: &ConnectionRequest) -> Result<V
         }
     }
     Ok(
-        json!({"requestId":request.request_id,"revision":request.revision,"context":request.context,"prefix":r.prefix,"next":next,"nextParts":next.iter().map(|code|element_parts(catalog,code)).collect::<Vec<_>>(),"completions":completions}),
+        json!({"requestId":request.request_id,"revision":request.revision,"context":request.context,"prefix":r.prefix,"next":next,"nextParts":next.iter().map(|code|element_parts(catalog,code)).collect::<Vec<_>>(),"completions":completions,"excludedConnections":r.excluded_connections.iter().zip(&excluded).map(|(key,a)|json!({"key":key,"code":a.code,"parts":element_parts(catalog,&a.code),"directTransitionsAssumed":a.direct_transitions_assumed})).collect::<Vec<_>>()}),
     )
 }
 fn malformed_request(_: JsonRejection) -> ApiError {

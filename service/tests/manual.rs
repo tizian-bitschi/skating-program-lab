@@ -20,6 +20,26 @@ async fn manual_credit_preserves_occurrences_and_binary_construction() {
     assert_eq!(body["elements"][0]["creditedHundredths"], 60);
 }
 mod support;
+#[tokio::test]
+async fn exclusion_field_rejects_non_connections_with_correlated_errors() {
+    let context = json!({"profile":"isu-adult-2026-27-bronze","ruleEdition":"2026-07-16","scoringTable":"isu-2786-2026-06-02"});
+    for code in ["1Lz", "SSp1", "1Lz+SSp1"] {
+        for path in ["/api/v1/program-assessments", "/api/v1/connections/options"] {
+            let mut body = json!({"requestId":"excluded-invalid","revision":19,"context":context,"personalLimits":{},"excludedConnections":[format!("isu-adult-2026-27-bronze:2026-07-16:isu-2786-2026-06-02:{code}:false")]});
+            if path.ends_with("options") {
+                body["prefix"] = json!([]);
+            } else {
+                body["entries"] = json!([]);
+                body["submission"] = json!("draft");
+            }
+            let (status, result) = post(skating_planning_service::app(), path, body).await;
+            assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{result}");
+            assert_eq!(result["requestId"], "excluded-invalid");
+            assert_eq!(result["revision"], 19);
+            assert_eq!(result["field"], "excludedConnections");
+        }
+    }
+}
 async fn post(app: axum::Router, path: &str, body: Value) -> (StatusCode, Value) {
     let response = app
         .oneshot(
@@ -105,6 +125,61 @@ async fn optional_pair_completion_third_jump_and_exact_exclusion_are_independent
         .unwrap()
         .iter()
         .any(|c| c["code"] == "1Lz+1Lo+1Lo" && c["excluded"] == false));
+}
+#[tokio::test]
+async fn exclusion_identity_survives_context_changes_and_reports_responsible_occurrence() {
+    let catalog = support::catalog();
+    let contexts = catalog
+        .profiles
+        .iter()
+        .map(|p| serde_json::to_value(skating_planning_service::Context::for_profile(p)).unwrap())
+        .collect::<Vec<_>>();
+    let app = skating_planning_service::app_with_catalog(catalog);
+    let original = &contexts[2];
+    let (_, options) = post(app.clone(), "/api/v1/connections/options", json!({"requestId":"original","revision":1,"context":original,"personalLimits":{},"prefix":["1Lz","1A"]})).await;
+    let sequence = &options["completions"][0];
+    for context in &contexts {
+        let body = json!({"requestId":"preserved","revision":42,"context":context,"personalLimits":{"jumps":{"A":{"enabled":false}}},"prefix":[],"excludedConnections":[sequence["key"]]});
+        let (status, choices) = post(app.clone(), "/api/v1/connections/options", body).await;
+        assert_eq!(status, StatusCode::OK, "{choices}");
+        assert_eq!(choices["excludedConnections"][0]["key"], sequence["key"]);
+        assert_eq!(
+            choices["excludedConnections"][0]["directTransitionsAssumed"],
+            true
+        );
+        assert_eq!(choices["excludedConnections"][0]["parts"][0]["form"], "Lz");
+        if context["profile"] == "independent-http-policy" {
+            assert_eq!(choices["next"], json!(["1Lz", "W"]));
+            continue;
+        }
+        let mut pair = json!({"requestId":"pair","revision":43,"context":context,"personalLimits":{},"prefix":["1F","1Lo"]});
+        let (status, selected) =
+            post(app.clone(), "/api/v1/connections/options", pair.clone()).await;
+        assert_eq!(status, StatusCode::OK, "{selected}");
+        let whole = &selected["completions"][0];
+        assert_eq!(
+            whole["code"], "1F+1Lo",
+            "context={context} options={selected}"
+        );
+        pair["excludedConnections"] = json!([whole["key"]]);
+        let (_, excluded) = post(app.clone(), "/api/v1/connections/options", pair.clone()).await;
+        assert_eq!(excluded["completions"][0]["excluded"], true);
+        pair["prefix"] = json!([]);
+        let (_, roots) = post(app.clone(), "/api/v1/connections/options", pair).await;
+        assert!(roots["next"].as_array().unwrap().contains(&json!("1F")));
+        assert!(roots["next"].as_array().unwrap().contains(&json!("1Lo")));
+        let body = json!({"requestId":"conflict","revision":44,"context":context,"personalLimits":{},"excludedConnections":[whole["key"]],"entries":[{"id":"retained-whole","elementKey":whole["key"]}],"submission":"draft"});
+        let (status, assessed) = post(app.clone(), "/api/v1/program-assessments", body).await;
+        assert_eq!(status, StatusCode::OK, "{assessed}");
+        assert_eq!(
+            assessed["personalConflicts"][0]["entryId"],
+            "retained-whole"
+        );
+        assert_eq!(
+            assessed["personalConflicts"][0]["translationKey"],
+            "excluded"
+        );
+    }
 }
 #[tokio::test]
 async fn reordered_duplicate_credit_and_old_context_identity_are_preserved() {
