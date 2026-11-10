@@ -87,3 +87,7 @@ heuristic walkthrough remain parent-level work. These automated viewport checks
 are browser proxies, not physical-phone or recruited-participant evidence. The
 selected compact C2 layout remains; the large-results/layout ticket owns its
 final combined viewport fit.
+
+The [local workspace](c2-workspace.md) now automatically saves/restores the editor,
+category, limits, exact exclusions, rotation preference and language. Search
+sessions and result history stay outside durable storage.
