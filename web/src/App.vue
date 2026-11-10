@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed,onMounted,ref,watch } from 'vue';
+import ManualEditor from './ManualEditor.vue';
 import { type Form,type Profile,type Repertoire,type Limit,emptyLimits,fetchJson } from './api';
 import { type Locale,type TextKey,browserLocale,formName,text } from './i18n';
 const locale=ref<Locale>(browserLocale());
@@ -32,9 +33,7 @@ watch([selected,limits],refresh,{deep:true});watch(locale,value=>{document.docum
  <small v-else-if="form.family!=='unlevelled'">{{form.permittedLevels.map(n=>n===0?'B':n).join(' · ')||'—'}}</small>
  </div></div></section></div>
  <p class="status">Max = {{t('none')}}</p><p class="status" role="status">{{pending?t('loading'):`${repertoire?.elements.length??0} ${t('permitted')}`}}</p></section>
- <div class="workspace"><section><h2>{{t('program')}}</h2><p>{{t('empty')}}</p><details><summary>{{t('repertoire')}}</summary><ul data-testid="repertoire"><li v-for="element in repertoire?.elements" :key="element.key"><code>{{element.code}}</code> <span>{{new Intl.NumberFormat(locale,{minimumFractionDigits:2}).format(element.baseHundredths/100)}}</span></li></ul></details></section><section><h2>{{t('results')}}</h2><p>{{t('noResults')}}</p></section></div>
+ <div class="workspace"><section><h2>{{t('program')}}</h2><ManualEditor :context="profile?.context" :limits="limits" :repertoire="repertoire" :locale="locale" /></section><section><h2>{{t('results')}}</h2><p>{{t('noResults')}}</p></section></div>
  <details class="sources"><summary>{{t('source')}}</summary><p v-if="profile">{{profile.context.profile}} · {{profile.context.ruleEdition}} · {{profile.context.scoringTable}}</p><ul><li v-for="source in profile?.sources" :key="source.document+source.location">{{source.document}} · {{source.version}} · {{source.location}}</li></ul></details>
  </main>
 </template>
-
-
