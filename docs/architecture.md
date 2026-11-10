@@ -4,7 +4,7 @@
 
 ## Current state
 
-The repository contains a Rust library and a separate solver-comparison executable. It accepts caller-provided plans, observations and panel recognition. It returns partial validation findings, scoring scenarios, bounded legacy optimization results and incremental complete planning-search sessions. The separate C2 browser/service adapter adds repertoire selection. It has no persistence, rule database or automatic panel inference. [Implementation status](implementation-status.md) defines current support.
+The repository contains a Rust library and a separate solver-comparison executable. It accepts caller-provided plans, observations and panel recognition. It returns partial validation findings, scoring scenarios, bounded legacy optimization results and incremental complete planning-search sessions. The separate C2 browser/service adapter adds repertoire selection, manual assessment, local workspace storage and [native proved program adoption](c2-search.md). It has no persistence, rule database or automatic panel inference. [Implementation status](implementation-status.md) defines current support.
 
 The core is intended for native and eventual WebAssembly use. Correctness and traceability take priority, followed by independent tests, reproducibility, maintainability and measured performance. WebAssembly compatibility is not established.
 

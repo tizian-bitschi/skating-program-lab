@@ -1,11 +1,11 @@
 mod search;
-pub use search::{SearchClock, SearchServiceOptions};
 use axum::{
     extract::{rejection::JsonRejection, State},
     http::StatusCode,
     routing::{get, post},
     Json, Router,
 };
+pub use search::{SearchClock, SearchServiceOptions};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use skating_program_lab::*;
@@ -92,17 +92,20 @@ pub fn app() -> Router {
     app_with_catalog(Catalog::default())
 }
 pub fn app_with_catalog(catalog: Catalog) -> Router {
-    app_with_catalog_and_search_options(catalog,SearchServiceOptions::default())
+    app_with_catalog_and_search_options(catalog, SearchServiceOptions::default())
 }
-pub fn app_with_catalog_and_search_options(catalog: Catalog,options:SearchServiceOptions) -> Router {
-    let catalog=Arc::new(catalog);
+pub fn app_with_catalog_and_search_options(
+    catalog: Catalog,
+    options: SearchServiceOptions,
+) -> Router {
+    let catalog = Arc::new(catalog);
     Router::new()
         .route("/api/v1/profiles", get(profiles))
         .route("/api/v1/repertoire", post(repertoire))
         .route("/api/v1/program-assessments", post(assessment))
         .route("/api/v1/connections/options", post(connections))
         .with_state(catalog.clone())
-        .merge(search::router(catalog,options))
+        .merge(search::router(catalog, options))
         .fallback_service(
             ServeDir::new(concat!(env!("CARGO_MANIFEST_DIR"), "/../web/dist"))
                 .append_index_html_on_directories(true),
@@ -744,4 +747,3 @@ async fn connections(
         .await
         .map_err(|_| worker_failure())?
 }
-

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import {computed,onBeforeUnmount,ref,watch} from 'vue';
 import {type Context,type Limits,type ProgramEntry} from './api';
-import {type Locale} from './i18n';
+import {type Locale,formName} from './i18n';
 const props=defineProps<{context?:Context;limits:Limits;entries:ProgramEntry[];locale:Locale;excludedConnections:string[];allowMixedDirections:boolean}>();
 const emit=defineEmits<{adopt:[entries:ProgramEntry[]]}>();
 const copy={
@@ -10,7 +10,7 @@ const copy={
  ru:{calculate:'Рассчитать лучшую программу',cancel:'Отменить расчёт',retry:'Повторить подключение',proving:'Доказательство максимума…',collecting:'Максимум доказан. Поиск альтернатив…',completed:'Все оптимальные составы собраны.',cancelled:'Расчёт отменён.',infeasible:'Для этих ограничений нет программы, соответствующей правилам.',failed:'Расчёт завершился с ошибкой.',maximum:'Доказанная максимальная базовая стоимость',adopt:'Использовать эту программу',retained:'Сохранено',added:'Добавлено',stale:'Эти результаты относятся к прежним ограничениям. Запустите новый расчёт.',empty:'Доказанной программы пока нет.',count:'Подтверждённые программы',requested:'Запрошена отмена…',connection:'Соединение прервано. Идентификатор текущего поиска сохранён.',request_invalid:'Проверьте обязательные элементы и личные ограничения.',unsupported_search:'Расчёт недоступен для выбранных правил.',internal_failure:'Не удалось проверить программу. Запустите новый расчёт.',search_capacity:'Сервис занят. Этот расчёт не запущен.',session_unavailable:'Сессия недоступна. Запустите новый расчёт.',newCalculation:'Начать новый расчёт'}
 };
 const labels=computed(()=>copy[props.locale]);
-interface Result {id:string;entries:{elementKey:string;code:string;requiredId:string|null}[];assessment:{totalHundredths:number;elements:{creditedHundredths:number|null}[]}}
+interface Result {id:string;entries:{elementKey:string;code:string;requiredId:string|null}[];assessment:{totalHundredths:number;elements:{creditedHundredths:number|null;parts:{form:string;level:number|null}[]}[]}}
 interface Identity {id:string;accessToken:string;requestId:string;revision:number}
 interface Update {id:string;requestId:string;revision:number;status:'running'|'completed'|'cancelled'|'infeasible'|'failed';phase:'proving'|'collecting'|'terminal';maximumBaseHundredths:number|null;confirmedCount:number;cursor:number;results:Result[];failure?:{code:string;entryIds?:string[]};controlRequested?:string}
 const results=ref<Result[]>([]),update=ref<Update>(),stale=ref(false),busy=ref(false),connection=ref(false),problem=ref(''),cancelRequested=ref(false);
@@ -34,6 +34,7 @@ async function submit(){if(!creation)return;const current=creation;busy.value=tr
 async function calculate(){invalidate();if(!props.context)return;const own=generation;const input=JSON.parse(JSON.stringify({context:props.context,personalLimits:props.limits,requiredElements:props.entries.filter(e=>e.retained).map(({id,elementKey})=>({id,elementKey})),allowMixedDirections:props.allowMixedDirections,excludedConnections:props.excludedConnections}));busy.value=true;problem.value='';try{const namespace=await request<{creationNamespace:string}>('/api/v1/searches/identity');if(own!==generation)return;const bytes=crypto.getRandomValues(new Uint8Array(32));const retryKey=Array.from(bytes,b=>b.toString(16).padStart(2,'0')).join('');creation={generation:own,body:JSON.parse(JSON.stringify({creationKey:`${namespace.creationNamespace}:${retryKey}`,requestId:crypto.randomUUID(),revision:own,...input}))};await submit();}catch{if(own===generation){busy.value=false;connection.value=true;problem.value='connection';}}}
 async function retry(){if(creation)await submit();else if(identity)await poll(generation);else await calculate();}
 async function cancel(){if(!identity)return;const own=generation,owner=identity;cancelRequested.value=true;try{await request(`/api/v1/searches/${owner.id}/cancel`,'POST',{commandId:crypto.randomUUID()},owner);if(own===generation){stopPolling();void poll(own);}}catch{if(own===generation)connection.value=true;}}
+function entryName(result:Result,index:number){return result.assessment.elements[index]?.parts.map(part=>`${formName(props.locale,part.form)}${part.level==null?'':` ${part.level===0?'B':part.level}`}`).join(' + ');}
 function adopt(result:Result){if(stale.value)return;emit('adopt',result.entries.map(e=>({id:e.requiredId??crypto.randomUUID(),elementKey:e.elementKey,code:e.code,retained:e.requiredId!==null})));}
 const stateMessage=computed(()=>{const s=update.value;if(!s||stale.value&&busy.value)return busy.value?labels.value.proving:labels.value.empty;if(s.status==='running')return labels.value[s.phase==='collecting'?'collecting':'proving'];return labels.value[s.status];});
 const errorMessage=computed(()=>labels.value[problem.value as keyof typeof copy.en]??labels.value.connection);
@@ -45,7 +46,8 @@ onBeforeUnmount(invalidate);
  <button v-if="busy&&identity" :disabled="cancelRequested" @click="cancel">{{labels.cancel}}</button>
  <div role="status" aria-live="polite"><p>{{stateMessage}}</p><p v-if="cancelRequested&&busy">{{labels.requested}}</p><p v-if="update?.maximumBaseHundredths!=null" data-testid="search-maximum">{{labels.maximum}}: <strong>{{number(update.maximumBaseHundredths)}}</strong></p><p v-if="update">{{labels.count}}: {{update.confirmedCount}}</p></div>
  <p v-if="connection||problem" role="alert">{{errorMessage}} <button v-if="connection" @click="retry">{{labels.retry}}</button></p>
+ <ul v-if="update?.failure?.entryIds?.length"><li v-for="id in update.failure.entryIds" :key="id">{{labels.retained}}: {{entries.find(e=>e.id===id)?.code??id}}</li></ul>
  <p v-if="stale" data-testid="search-stale" role="status">{{labels.stale}}</p>
- <ol class="search-results"><li v-for="result in results" :key="result.id" :data-result-id="result.id"><strong>{{number(result.assessment.totalHundredths)}}</strong><ul><li v-for="(entry,index) in result.entries" :key="index"><code>{{entry.code}}</code> · {{entry.requiredId?labels.retained:labels.added}} · {{number(result.assessment.elements[index]?.creditedHundredths)}}</li></ul><button data-testid="adopt-result" :disabled="stale" @click="adopt(result)">{{labels.adopt}}</button></li></ol>
+ <ol class="search-results"><li v-for="result in results" :key="result.id" :data-result-id="result.id"><strong>{{number(result.assessment.totalHundredths)}}</strong><ul><li v-for="(entry,index) in result.entries" :key="index"><code>{{entry.code}}</code> <span>{{entryName(result,index)}}</span> · {{entry.requiredId?labels.retained:labels.added}} · {{number(result.assessment.elements[index]?.creditedHundredths)}}</li></ul><button data-testid="adopt-result" :disabled="stale" @click="adopt(result)">{{labels.adopt}}</button></li></ol>
 </div>
 </template>
