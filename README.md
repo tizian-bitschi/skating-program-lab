@@ -129,3 +129,7 @@ profile/repertoire selection on one local origin. See the
 The [manual program editor](docs/c2-manual.md) supports real whole elements,
 stable occurrences and automatic shared-core assessment. The [local workspace](docs/c2-workspace.md) saves current inputs automatically and restores ordinary assessment without starting a search. Search workflows are
 implemented in subsequent C2 slices.
+
+The [exact connection controls](docs/c2-exclusions.md) exclude and restore whole
+jump connections while preserving their components, longer wholes and saved
+constraints across category changes.

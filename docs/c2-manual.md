@@ -19,8 +19,8 @@ Program entries retain their codes, IDs and flags across category changes.
 `next` contains permitted next code parts; `nextParts` provides translated-name
 metadata. `completions` provides complete keys, codes, parts, direct-step flags
 and exact exclusion flags. An excluded pair remains visible and does not remove
-longer completions with the same prefix. This slice exposes that service behavior;
-the later restrictions workflow owns the exclusion controls.
+longer completions with the same prefix. The shared builder also powers the
+[exact exclusion and restoration controls](c2-exclusions.md).
 
 `POST /api/v1/program-assessments` takes the same envelope plus ordered
 `entries: [{ id, elementKey }]`, `submission: "draft" | "complete"`, optional

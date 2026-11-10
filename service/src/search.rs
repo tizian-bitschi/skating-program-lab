@@ -309,7 +309,7 @@ async fn create(
             .map_err(|e| correlated(&r, e, Some("requiredElements"), Some(&entry.id)))?;
     }
     for key in &r.excluded_connections {
-        resolve_workspace_element(&m.catalog, key)
+        resolve_connection_exclusion(&m.catalog, key)
             .map_err(|e| correlated(&r, e, Some("excludedConnections"), None))?;
     }
     if m.live.load(Ordering::Acquire) >= m.options.capacity {
@@ -559,7 +559,7 @@ fn run(catalog: &Catalog, job: &Job) {
         exclusions.push(PlanningExclusion::JumpKind(JumpKind::Waltz));
     }
     for key in &r.excluded_connections {
-        match resolve_workspace_element(catalog, key) {
+        match resolve_connection_exclusion(catalog, key) {
             Ok(a) => exclusions.push(PlanningExclusion::ExactElement(a.code)),
             Err(_) => {
                 failure(job, "request_invalid", vec![]);
