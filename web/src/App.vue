@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import SourceReference from './SourceReference.vue';
 import { computed,nextTick,onMounted,ref,watch } from 'vue';
 import ManualEditor from './ManualEditor.vue';
 import ConnectionBuilder from './ConnectionBuilder.vue';
@@ -74,6 +75,6 @@ watch([selected,limits],refresh,{deep:true});watch(locale,value=>{document.docum
  </div></div></section></div>
  </fieldset><p class="status">Max = {{t('none')}}</p><p class="status" role="status">{{pending?t('loading'):`${repertoire?.elements.length??0} ${t('permitted')}`}}</p></section>
  <div class="workspace"><section><h2>{{t('program')}}</h2><fieldset :disabled="loadingWorkspace" class="editor-guard"><ManualEditor :excluded-connections="excludedConnections" :allow-mixed-directions="allowMixedDirections" ref="editor" @change="onProgramChange" :context="profile?.context" :limits="limits" :repertoire="repertoire" :locale="locale" /><ConnectionBuilder purpose="exclude" :context="profile?.context" :limits="limits" :locale="locale" :excluded-connections="excludedConnections" :allow-mixed-directions="allowMixedDirections" @change="excludedConnections=$event" /></fieldset></section><section><h2>{{t('results')}}</h2><PlanningSearch :context="loadingWorkspace?undefined:profile?.context" :limits="limits" :entries="entries" :locale="locale" :excluded-connections="excludedConnections" :allow-mixed-directions="allowMixedDirections" @adopt="editor?.replaceEntries($event,true)" /></section></div>
- <details class="sources"><summary>{{t('source')}}</summary><p v-if="profile">{{profile.context.profile}} · {{profile.context.ruleEdition}} · {{profile.context.scoringTable}}</p><ul><li v-for="source in profile?.sources" :key="source.document+source.location">{{source.document}} · {{source.version}} · {{source.location}}</li></ul></details>
+ <details class="sources"><summary>{{t('source')}}</summary><p v-if="profile">{{profile.context.profile}} · {{profile.context.ruleEdition}} · {{profile.context.scoringTable}}</p><ul><li v-for="source in profile?.sources" :key="source.document+source.location"><SourceReference :source="source" :locale="locale" /></li></ul></details>
  </main>
 </template>

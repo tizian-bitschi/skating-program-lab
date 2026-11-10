@@ -1,5 +1,5 @@
 export interface Context { profile:string; ruleEdition:string; scoringTable:string }
-export interface Source { document:string; version:string; location:string }
+export interface Source { document:string; version:string; location:string; url?:string }
 export interface Profile { context:Context; label:string; translationKey:string; sources:Source[] }
 export interface Limit { enabled:boolean; maximum?:number }
 export interface Limits { jumps:Record<string,Limit>;spins:Record<string,Limit>;steps?:Limit;unlevelledElements:Record<string,boolean> }
