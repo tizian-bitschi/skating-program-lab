@@ -1,3 +1,4 @@
+import {setMaximum,setEnabled} from './picker';
 import { test, expect } from '@playwright/test';
 test('category changes preserve explicit limits and all twenty spin controls', async ({ page }) => {
  await page.goto('/');
@@ -5,13 +6,13 @@ test('category changes preserve explicit limits and all twenty spin controls', a
  await expect(page.locator('[data-family="spin"]')).toHaveCount(20);
  await page.getByLabel('Language').selectOption('en');
  await page.getByLabel('Category').selectOption({label:'Adult Silver'});
- await page.getByTestId('maximum-CSp').selectOption('0');
- await expect(page.getByTestId('maximum-CSp')).toHaveValue('0');
+ await setMaximum(page,'CSp',0);
+ await expect(page.getByTestId('fader-CSp')).toHaveAttribute('aria-valuetext','Maximum: Basic');
  await page.getByLabel('Category').selectOption({label:'Adult Bronze'});
- await expect(page.getByTestId('maximum-CSp')).toHaveValue('0');
+ await expect(page.getByTestId('fader-CSp')).toHaveAttribute('aria-valuetext','Maximum: Basic');
  await expect(page.getByTestId('repertoire')).toContainText('CSpB');
  await expect(page.getByTestId('repertoire').locator('code').filter({hasText:/^CSp1$/})).toHaveCount(0);
- await page.getByTestId('enabled-CSp').uncheck();
+ await setEnabled(page,'CSp',false);
  await expect(page.getByTestId('repertoire').locator('code').filter({hasText:/^CSpB$/})).toHaveCount(0);
  await page.getByLabel('Language').selectOption('ru');
  await expect(page.locator('html')).toHaveAttribute('lang','ru');
@@ -34,9 +35,9 @@ test('three languages reflow and keyboard controls work against the service', as
  }
  await page.setViewportSize({width:1280,height:720});
  await page.getByLabel('Language').selectOption('en');
- await page.getByTestId('enabled-T').focus();
- await page.keyboard.press('Space');
- await expect(page.getByTestId('enabled-T')).not.toBeChecked();
+ await page.getByTestId('fader-T').focus();
+ await page.keyboard.press('Home');
+ await expect(page.getByTestId('fader-T')).toHaveValue('0');
  await expect(page.getByTestId('repertoire').locator('code').filter({hasText:/^1T$/})).toHaveCount(0);
  await page.screenshot({path:'test-results/repertoire-1280.png',fullPage:true});
 });
@@ -66,13 +67,13 @@ test('an independently registered policy uses the unchanged browser and HTTP pat
  await page.goto(origin);
  await page.getByLabel('Language').selectOption('en');
  await page.getByLabel('Category').selectOption(profile.context.profile);
- await expect(page.getByTestId('enabled-T')).toBeDisabled();
- await expect(page.getByTestId('enabled-Lz')).toBeEnabled();
+ await expect(page.getByTestId('fader-T')).toBeDisabled();
+ await expect(page.getByTestId('fader-Lz')).toBeEnabled();
  const codes=page.getByTestId('repertoire').locator('code');
  await expect(codes.filter({hasText:/^1Lz$/})).toHaveCount(1);
  await expect(codes.filter({hasText:/^1T$/})).toHaveCount(0);
  await expect(page.locator('[data-family="spin"]')).toHaveCount(20);
- await page.getByTestId('enabled-Lz').uncheck();
+ await setEnabled(page,'Lz',false);
  await expect(codes.filter({hasText:/^1Lz$/})).toHaveCount(0);
  const response=await request.post(`${origin}/api/v1/repertoire`,{data:{requestId:'independent-browser-check',revision:3,context:profile.context,personalLimits:{}}});
  expect(response.status()).toBe(200);

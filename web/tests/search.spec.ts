@@ -1,4 +1,4 @@
-import {openPicker} from './picker';
+import {openPicker,setMaximum,setEnabled} from './picker';
 import {test,expect} from '@playwright/test';
 // Each test owns and releases the real native sessions it creates, including
 // responses whose browser state has already been invalidated.
@@ -15,7 +15,7 @@ test('explicit proof adopts a freshly assessed program and preserves retained id
  let creates=0;page.on('request',r=>{if(r.url().endsWith('/api/v1/searches')&&r.method()==='POST')creates++;});
  for(const code of ['CCSp1','CLSp1','ChSq1']){await openPicker(page);await page.getByTestId('element-query').fill(code);await page.getByTestId(`add-${code}`).click();await page.getByTestId('program-entry').last().getByRole('checkbox').check();}
  const ids=await page.getByTestId('program-entry').evaluateAll(nodes=>nodes.map(n=>n.getAttribute('data-entry-id')));
- for(const kind of ['T','S','Lz'])await page.getByTestId(`enabled-${kind}`).uncheck();await page.getByTestId('enabled-W').uncheck();
+ for(const kind of ['T','S','Lz'])await setEnabled(page,`${kind}`,false);await setEnabled(page,'W',false);
  expect(creates).toBe(0);await page.getByTestId('calculate').focus();await page.keyboard.press('Enter');
  await expect(page.getByTestId('search-maximum')).toContainText('10.30',{timeout:30000});await expect(page.getByTestId('adopt-result').first()).toBeEnabled();
  await page.getByTestId('adopt-result').first().focus();await page.keyboard.press('Enter');await expect(page.getByTestId('assessment')).toContainText('Construction complies');await expect(page.getByTestId('assessment')).toContainText('10.30');
@@ -24,7 +24,7 @@ test('explicit proof adopts a freshly assessed program and preserves retained id
  const saved=await page.evaluate(()=>JSON.parse(localStorage.getItem('skating-c2-workspace')!));expect(saved.entries.filter((e:{retained:boolean})=>e.retained).map((e:{id:string})=>e.id).sort()).toEqual([...ids].sort());expect(saved.entries.some((e:{retained:boolean})=>!e.retained)).toBe(true);expect(JSON.stringify(saved)).not.toMatch(/accessToken|creationKey|confirmedCount/);
 
  await page.getByLabel('Language').selectOption('de');await page.getByLabel('Language').selectOption('ru');await page.getByLabel('Language').selectOption('en');await adopted.last().getByRole('button',{name:'Move up'}).click();expect(creates).toBe(1);await expect(page.getByTestId('search-stale')).toHaveCount(0);
- await page.getByTestId('maximum-F').selectOption('1');await expect(page.getByTestId('search-stale')).toBeVisible();await expect(page.getByTestId('adopt-result').first()).toBeDisabled();expect(creates).toBe(1);
+ await setMaximum(page,'F',1);await expect(page.getByTestId('search-stale')).toBeVisible();await expect(page.getByTestId('adopt-result').first()).toBeDisabled();expect(creates).toBe(1);
  await page.reload();await expect(page.getByTestId('assessment')).toContainText('Construction complies');expect(creates).toBe(1);await expect(page.getByTestId('program-entry')).toHaveCount(saved.entries.length);for(const id of ids)await expect(page.locator(`[data-entry-id="${id}"]`).getByRole('checkbox')).toBeChecked();await expect(page.getByTestId('adopt-result')).toHaveCount(0);
 });
 
@@ -51,16 +51,16 @@ test('semantic edits during namespace or creation waits cannot start or adopt st
  let creates=0;page.on('request',r=>{if(r.method()==='POST'&&r.url().endsWith('/api/v1/searches'))creates++;});
  let releaseNamespace=()=>{};const namespaceHeld=new Promise<void>(r=>releaseNamespace=r);let namespaceSeen=()=>{};const seenNamespace=new Promise<void>(r=>namespaceSeen=r);
  await page.route('**/api/v1/searches/identity',async route=>{const response=await route.fetch();namespaceSeen();await namespaceHeld;await route.fulfill({response});});
- await page.getByTestId('calculate').click();await seenNamespace;await page.getByTestId('maximum-F').selectOption('1');releaseNamespace();await expect(page.getByTestId('calculate')).toBeEnabled();await page.unroute('**/api/v1/searches/identity');expect(creates).toBe(0);
+ await page.getByTestId('calculate').click();await seenNamespace;await setMaximum(page,'F',1);releaseNamespace();await expect(page.getByTestId('calculate')).toBeEnabled();await page.unroute('**/api/v1/searches/identity');expect(creates).toBe(0);
  let releaseCreation=()=>{};const creationHeld=new Promise<void>(r=>releaseCreation=r);let creationSeen=()=>{};const seenCreation=new Promise<void>(r=>creationSeen=r);let owner:{id:string;accessToken:string}|undefined;
  await page.route('**/api/v1/searches',async route=>{const response=await route.fetch();owner=await response.json();creationSeen();await creationHeld;await route.fulfill({response});});
- await page.getByTestId('calculate').click();await seenCreation;await page.getByTestId('maximum-Lo').selectOption('1');releaseCreation();await expect(page.getByTestId('calculate')).toBeEnabled();await expect.poll(async()=>{const response=await page.request.get(`/api/v1/searches/${owner!.id}/updates`,{headers:{Authorization:`Bearer ${owner!.accessToken}`}});return response.status();}).toBe(404);expect(creates).toBe(1);await expect(page.getByTestId('adopt-result')).toHaveCount(0);await expect(page.getByTestId('search-maximum')).toHaveCount(0);
+ await page.getByTestId('calculate').click();await seenCreation;await setMaximum(page,'Lo',1);releaseCreation();await expect(page.getByTestId('calculate')).toBeEnabled();await expect.poll(async()=>{const response=await page.request.get(`/api/v1/searches/${owner!.id}/updates`,{headers:{Authorization:`Bearer ${owner!.accessToken}`}});return response.status();}).toBe(404);expect(creates).toBe(1);await expect(page.getByTestId('adopt-result')).toHaveCount(0);await expect(page.getByTestId('search-maximum')).toHaveCount(0);
 });
 
 
 test('real collection pauses, continues, compares and adopts without losing focus',async({page})=>{
  test.setTimeout(90000);
- await page.goto('/');await page.getByLabel('Language').selectOption('en');await page.getByLabel('Category').selectOption('isu-adult-2026-27-silver');for(const kind of ['T','S','Lz'])await page.getByTestId(`enabled-${kind}`).uncheck();for(const kind of ['F','Lo','A'])await page.getByTestId(`maximum-${kind}`).selectOption('1');await page.getByTestId('enabled-W').uncheck();await page.getByTestId('calculate').click();
+ await page.goto('/');await page.getByLabel('Language').selectOption('en');await page.getByLabel('Category').selectOption('isu-adult-2026-27-silver');for(const kind of ['T','S','Lz'])await setEnabled(page,`${kind}`,false);for(const kind of ['F','Lo','A'])await setMaximum(page,`${kind}`,1);await setEnabled(page,'W',false);await page.getByTestId('calculate').click();
  const control=page.getByTestId('collection-control');await expect(control).toHaveText('Pause collection',{timeout:30000});await control.focus();await page.keyboard.press('Enter');await expect(control).toHaveText('Continue collection',{timeout:30000});await expect(control).toBeFocused();
  let disconnected=false;const reconnectReads:string[]=[];
  await page.route('**/api/v1/searches/*/updates?*',async route=>{reconnectReads.push(route.request().url());if(!disconnected){disconnected=true;await route.abort('failed');}else await route.continue();});
@@ -81,7 +81,7 @@ test('real collection pauses, continues, compares and adopts without losing focu
 
 test('lost accepted creation retries its capability and expired sessions require explicit calculation',async({page})=>{
  await page.goto('/');await page.getByLabel('Language').selectOption('en');
- await page.getByLabel('Category').selectOption('isu-adult-2026-27-silver');for(const kind of ['T','S','Lz'])await page.getByTestId(`enabled-${kind}`).uncheck();for(const kind of ['F','Lo','A'])await page.getByTestId(`maximum-${kind}`).selectOption('1');await page.getByTestId('enabled-W').uncheck();
+ await page.getByLabel('Category').selectOption('isu-adult-2026-27-silver');for(const kind of ['T','S','Lz'])await setEnabled(page,`${kind}`,false);for(const kind of ['F','Lo','A'])await setMaximum(page,`${kind}`,1);await setEnabled(page,'W',false);
  const bodies:string[]=[];let owner:{id:string;accessToken:string}|undefined;
  await page.route('**/api/v1/searches',async route=>{bodies.push(route.request().postData()!);const response=await route.fetch();owner=await response.json();if(bodies.length===1)await route.abort('failed');else await route.fulfill({response});});
  await page.getByTestId('calculate').click();await page.getByRole('button',{name:'Retry connection',exact:true}).click();await expect.poll(()=>bodies.length).toBe(2);expect(bodies[0]).toBe(bodies[1]);await expect(page.getByTestId('search-maximum')).toBeVisible({timeout:30000});await expect(page.getByTestId('adopt-result').first()).toBeEnabled();const maximum=await page.getByTestId('search-maximum').textContent();const first=await page.locator('[data-result-id]').first().getAttribute('data-result-id');
@@ -95,7 +95,7 @@ test('lost accepted creation retries its capability and expired sessions require
 test('proof disconnection reconnects the page-held identity without another calculation',async({page})=>{
  await page.goto('/');await page.getByLabel('Language').selectOption('en');
  for(const code of ['CCSp1','CLSp1','ChSq1']){await openPicker(page);await page.getByTestId('element-query').fill(code);await page.getByTestId(`add-${code}`).click();await page.getByTestId('program-entry').last().getByRole('checkbox').check();}
- for(const kind of ['T','S','Lz'])await page.getByTestId(`enabled-${kind}`).uncheck();await page.getByTestId('enabled-W').uncheck();
+ for(const kind of ['T','S','Lz'])await setEnabled(page,`${kind}`,false);await setEnabled(page,'W',false);
  let creates=0;page.on('request',r=>{if(r.method()==='POST'&&r.url().endsWith('/api/v1/searches'))creates++;});
  const reads:string[]=[];await page.route('**/api/v1/searches/*/updates?*',async route=>{reads.push(route.request().url());const response=await route.fetch();if(reads.length===1)await route.abort('failed');else await route.fulfill({response});});
  const accepted=page.waitForResponse(r=>r.request().method()==='POST'&&r.url().endsWith('/api/v1/searches'));await page.getByTestId('calculate').click();const owner=await(await accepted).json();await page.getByRole('button',{name:'Retry connection',exact:true}).click();await expect(page.getByTestId('search-maximum')).toContainText('10.30',{timeout:30000});expect(creates).toBe(1);expect(reads[0]).toBe(reads[1]);
@@ -110,9 +110,9 @@ test('called Waltz conflict names Axel Off and recovers when Axel is enabled',as
  const w=repertoire.elements.find((e:{form:string})=>e.form==='W');expect(w).toBeTruthy();
  await openPicker(page);await page.getByTestId('element-query').fill('W');await page.getByTestId(`add-${w.code}`).click();
  const conflict=page.waitForResponse(async r=>r.url().endsWith('/api/v1/program-assessments')&&r.request().method()==='POST'&&(await r.json()).personalConflicts?.some((f:{setting:string[]})=>f.setting?.includes('A')));
- await page.getByTestId('enabled-A').uncheck();const assessed=await(await conflict).json();expect(assessed.personalConflicts[0].setting).toEqual(['A']);
+ await setEnabled(page,'A',false);const assessed=await(await conflict).json();expect(assessed.personalConflicts[0].setting).toEqual(['A']);
  await openPicker(page);await page.getByTestId('element-query').fill('W');await expect(page.getByTestId(`add-${w.code}`)).toHaveCount(0);await page.keyboard.press('Escape');
  const restored=page.waitForResponse(async r=>r.url().endsWith('/api/v1/program-assessments')&&r.request().method()==='POST'&&(await r.json()).personalConflicts?.length===0);
- await page.getByTestId('enabled-A').check();await restored;
+ await setEnabled(page,'A',true);await restored;
  await openPicker(page);await page.getByTestId('element-query').fill('W');await expect(page.getByTestId(`add-${w.code}`)).toBeVisible();
 });

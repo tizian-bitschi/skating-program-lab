@@ -82,6 +82,9 @@ so a different running application cannot silently satisfy the readiness check.
 The new test initially failed with ECONNREFUSED before the fixture existed;
 all four Chrome tests and all three HTTP tests pass with the fixture running.
 
-The selected C2 vertical fader presentation remains pending in the combined
-#162 workspace pass. This slice currently uses native enabled and maximum
-controls; it does not establish final visual acceptance of the selected mixer.
+The completed C2 presentation uses one vertical slider per form. Its bottom
+position is Off; remaining positions are the service's category-eligible classes
+or levels. Unlevelled forms have only Off/On. There is no additional enabled
+checkbox or maximum dropdown. A saved personal ceiling survives category
+changes; the displayed slider position reflects its intersection with the current
+category. Pointer preview remains local until the change is committed.

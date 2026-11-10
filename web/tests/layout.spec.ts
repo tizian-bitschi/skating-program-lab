@@ -29,8 +29,8 @@ test('fader pointer preview stays local and keyboard preserves Off versus Basic'
  await page.mouse.move(rect.x+rect.width/2,rect.y+5);await page.mouse.down();await page.mouse.move(rect.x+rect.width/2,rect.y+rect.height-20,{steps:4});
  await page.waitForTimeout(150);expect(requests).toBe(0);
  await page.mouse.up();await expect.poll(()=>requests).toBeGreaterThan(0);
- await slider.focus();await page.keyboard.press('Home');await expect(page.getByTestId('enabled-SSp')).not.toBeChecked();
- await page.keyboard.press('ArrowUp');await expect(page.getByTestId('enabled-SSp')).toBeChecked();await expect(page.getByTestId('maximum-SSp')).toHaveValue('0');
+ await slider.focus();await page.keyboard.press('Home');await expect(page.getByTestId('fader-SSp')).toHaveValue('0');
+ await page.keyboard.press('ArrowUp');await expect(page.getByTestId('fader-SSp')).not.toHaveValue('0');await expect(page.getByTestId('fader-SSp')).toHaveAttribute('aria-valuetext','Maximum: Basic');
  await expect(slider).toHaveAttribute('aria-valuetext','Maximum: Basic');
 });
 

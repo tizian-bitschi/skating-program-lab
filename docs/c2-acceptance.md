@@ -9,11 +9,17 @@ phone, recruited participant, field percentile or blanket WCAG claim is made.
 
 ## Implemented interface
 
+The 2026-11-10 mixer correction below supersedes the original duplicate-control
+presentation. The historical timing tables remain tied to their recorded hashes.
+
 The selected C2 mixer now has vertical faders for every service-supplied jump,
 regular-spin form and step sequence. Pointer movement changes a local readout;
-release/change commits the setting. Checkboxes and explicit maximum selectors
-remain available as alternatives. Off and Basic are separate; category changes
-retain explicit maxima. All twenty spin forms remain present, including disabled
+release/change commits the setting. Each element has one slider: Off at the
+bottom, followed only by the category-eligible classes or levels supplied by
+the service. Unlevelled elements have only Off/On. No additional checkbox or
+maximum dropdown duplicates the slider. Off and Basic are separate; category changes
+retain explicit saved maxima while displaying the effective category ceiling.
+All twenty spin forms remain present, including disabled
 category-unavailable forms. Names appear on desktop hover/focus and remain
 visible in the reflow layout.
 
@@ -57,8 +63,8 @@ Russian. Program headings, the element picker action, calculation and assessment
 remain within the viewport, and the workspace container does not scroll.
 Phone/reflow checks include 360 and 320 CSS pixels, no horizontal document
 overflow, translated names, explicit touch targets and keyboard operation.
-Phone retain/compare labels provide at least 44px height; faders and buttons have
-tap/key alternatives. The main text/accent pairs meet 4.5:1, and the control
+Phone retain/compare labels provide at least 44px height; native faders support
+pointer and keyboard operation. The main text/accent pairs meet 4.5:1, and the control
 border/focus pairs meet 3:1 against white. Disabled controls use the applicable
 contrast exception. This is a scoped contrast check.
 
@@ -143,7 +149,7 @@ assumed, while UI knowledge and memorized codes were not.
 | Goal and actual exercised behavior | Twelve-year-old perspective | Adult perspective and corrections |
 | --- | --- | --- |
 | Category → explicit calculation → proved program; real profile browser tests and the separate Silver production run | Phone initially required traversing every control. Collapsed limits plus named program/suggestions links now expose the task directly; names remain available without memorizing codes. | “Proved maximum” and the explicit unknown-total message distinguish proof from all alternatives being delivered. |
-| Retain exact occurrences, set limits, calculate and adopt; browser required-ID assertions and manual reassessment | “Retain for calculation” is attached to each whole entry. Off versus Basic has a separate checkbox/fader position and named slider value. | Explicit maxima survive category changes; adoption keeps required IDs and labels added content. Narrow “M” maximum values were corrected to readable “Max”. |
+| Retain exact occurrences, set limits, calculate and adopt; browser required-ID assertions and manual reassessment | “Retain for calculation” is attached to each whole entry. Off and Basic have distinct positions on the same named slider. | Explicit maxima survive category changes; adoption keeps required IDs and labels added content. The later mixer correction removed the duplicate checkbox/dropdown and limits positions to eligible values. |
 | Exclude an exact connection, observe a retained conflict, restore and recalculate; real exclusion tests | The generic second “Build a connection” action was ambiguous. Its summary now says “Excluded connections”. Pair components and longer wholes remain available. | Personal-conflict details localize the whole entry; restore is direct and keyboard focus returns to a surviving action. Expanded-builder overlap was fixed by reserving panel space. |
 | Enter 1Lz/SSp1/ChSq1, mark complete, add a conflicting spin and correct it; independent complete fixtures | Search names/codes and visible full names in the picker avoid an abbreviation-only path. The native Done/Escape action returns to the program. | The literal Bronze 5.70 BV and separate category/personal findings remain understandable. Filled-program headings/actions were previously hidden by whole-workspace scrolling; only content now scrolls. |
 | Pause/continue, compare/adopt, reload and inspect restored content; browser lifecycle/storage tests | The requested-state text appears immediately. Escape from a filled search initially cleared text instead of closing; explicit dismissal and a regression now cover it. | Resume uses the same page-held search; reload restores content without silently starting optimization. Bounded comparison pages retain selection. Cancellation now immediately says it was requested and later reports confirmation. |
@@ -279,3 +285,21 @@ The final Release service suite passed 24/24, including all 28 matrix cases.
 Build, service formatting and all-target Clippy with warnings denied passed.
 The real Narrator check was not performed and was waived as an acceptance gate
 by the owner on 2026-11-10. No screen-reader conformance claim follows.
+
+## Mixer interaction correction (2026-11-10)
+
+Owner review identified a fixed 0–6 slider scale and redundant checkbox/dropdown
+controls. Each form now has one range input: Off, then only the service-supplied
+eligible levels/classes. Unlevelled content has only Off/On. Saved personal
+maxima remain unchanged on category switches; the slider shows the effective
+ceiling. During a category refresh, old-context controls cannot be changed.
+Home/End behavior is normalized because WebKit's native vertical-range End
+behavior differed from Chromium. Pointer preview remains local until release.
+
+The full updated browser suite passed 36/36, including category bounds,
+Off/Basic, stored-ceiling restoration, native pointer preview and existing
+planning/search/storage flows. Additional Chrome157, Edge157 and WebKit26.5
+checks verified physical bottom/top positions, keyboard values, absence of
+duplicate controls, desktop1280×720 fit and360px phone reflow. TypeScript/Vite
+and diff checks passed. The unchanged Rust service/core suites were not repeated.
+The earlier controlled timing tables were not rerun for this focused UI change.
