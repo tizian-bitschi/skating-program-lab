@@ -154,3 +154,41 @@ async fn independently_registered_policy_is_advertised_and_controls_eligibility(
         .iter()
         .any(|f| f["id"] == "T" && f["available"] == false));
 }
+
+#[tokio::test]
+async fn original_source_urls_match_exact_document_editions() {
+    let mut catalog = support::catalog();
+    let custom = catalog.profiles.last_mut().unwrap();
+    custom.sources.push(skating_program_lab::SourceReference {
+        document: "ISU Communication 2786".into(),
+        version: "custom-edition".into(),
+        location: "custom location".into(),
+    });
+    let response = skating_planning_service::app_with_catalog(catalog)
+        .oneshot(
+            Request::get("/api/v1/profiles")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let profiles: Value =
+        serde_json::from_slice(&response.into_body().collect().await.unwrap().to_bytes()).unwrap();
+    let sources = profiles
+        .as_array()
+        .unwrap()
+        .iter()
+        .flat_map(|p| p["sources"].as_array().unwrap())
+        .collect::<Vec<_>>();
+    let scale = sources
+        .iter()
+        .find(|s| s["document"] == "ISU Communication 2786" && s["version"] == "2026-06-02")
+        .unwrap();
+    assert_eq!(scale["url"], "https://isu-d8g8b4b7ece7aphs.a03.azurefd.net/isudamcontainer/CMS/Corporate-Site/Governance/Transparency/ISU-Communications/2786-SinglesPairs-SOV-Update-260602-1780481099-6311.pdf");
+    let custom = sources
+        .iter()
+        .find(|s| s["version"] == "custom-edition")
+        .unwrap();
+    assert_eq!(custom["location"], "custom location");
+    assert!(custom.get("url").is_none());
+}

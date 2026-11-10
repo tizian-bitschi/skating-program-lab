@@ -115,7 +115,11 @@ async fn profiles(State(catalog): State<Arc<Catalog>>) -> Json<Value> {
     Json(Value::Array(catalog.profiles.iter().map(|p|json!({"context":Context::for_profile(p),"label":p.category,"translationKey":format!("profiles.{}",p.id.name),"capabilities":{"repertoire":true},"sources":p.sources.iter().map(source).collect::<Vec<_>>() })).collect()))
 }
 fn source(s: &SourceReference) -> Value {
-    json!({"document":s.document,"version":s.version,"location":s.location})
+    let mut presented = json!({"document":s.document,"version":s.version,"location":s.location});
+    if let Some(url) = s.official_url() {
+        presented["url"] = json!(url);
+    }
+    presented
 }
 pub fn resolve_context<'a>(
     catalog: &'a Catalog,
