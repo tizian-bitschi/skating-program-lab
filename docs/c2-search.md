@@ -97,3 +97,69 @@ and `git diff --check` passed. The exact five-composition literal HTTP oracle
 was rerun successfully after adding its full-set assertion. The compiler emitted
 only the environment's incremental-cache hard-link/copy warning; Clippy with
 warnings denied passed.
+
+## Progressive collection and controls (#158)
+
+`POST /api/v1/searches/{id}/pause` and `/continue` accept the same page-held
+Authorization capability and `{ commandId }` receipt as cancellation. Pause is
+valid only during collection; continue is valid only after confirmed pause.
+Invalid transitions return 409. Reusing a receipt for a different action also
+returns 409; replaying its original action does not repeat work. Cancellation
+remains harmless for an already terminal search and preserves its proof/data.
+
+Requested controls remain distinct from acknowledgement: `controlRequested`
+reports pause/cancel/continue while pending and clears when the native owner
+acknowledges that state. A paused owner retains its actual borrowed core session
+and solver. It sleeps on a condition variable rather than restarting or polling
+the solver; independent cancellation/disposal/lease signals wake it. The timed
+condition-variable wait also covers a concurrent shutdown notification.
+
+The browser continues lease-renewing bounded cursor reads while paused. Every
+confirmed result stays browsable and adoptable. Checkboxes select any confirmed
+programs for a comparison of whole elements, localized names, retained/added
+provenance and credited values. Stable result keys preserve reading position and
+selection as deltas append. Pending collection controls use `aria-disabled` with
+a guarded action so requesting pause/continue does not remove keyboard focus.
+No total is claimed before actual core exhaustion. A pending command keeps its
+original command ID through an interrupted-response retry.
+
+### Verification on 2026-11-10
+
+- The HTTP control test failed against the missing endpoints before their
+  implementation, then passed. All 16 service HTTP tests pass, including seven
+  search scenarios. Service Clippy with warnings denied passes.
+- The independent Bronze oracle uses literal retained CCSp1/CLSp1/ChSq1 = 8.30,
+  plus two Flips, two Loops and one Toe/Salchow = 2.40 in four jump entries.
+  It asserts all 16 complete optimal identities at 10.70 through three-result
+  cursor pages. Exact whole `1F+1Lo` exclusion removes exactly two, leaving all
+  14 expected identities. Replay IDs, full edition/transition keys, required
+  provenance and fresh ordinary HTTP assessments agree for every program.
+- An HTTP fixture preserves two required ignored zero-value Waltz occurrences
+  under separate IDs in every confirmed composition, with zero credited values.
+- A real Silver HTTP search pauses during collection, holds its confirmed count,
+  continues under the same search ID and delivers further results, then cancels
+  while keeping the proved maximum and confirmed history. Invalid proof-stage
+  and terminal pause/continue transitions and conflicting receipts reject.
+- The real Chrome flow on dedicated ports 3163/3164 verifies pause/continue,
+  comparison, adoption, English/German/Russian labels and keyboard focus. The
+  first passing targeted flow took 26.7 seconds, including native proof and
+  browser interaction. This is an observation, not a latency guarantee.
+- TypeScript/Vite production build passes. Unchanged core suites were not rerun.
+
+Exact finite-set equality is also checked after a confirmed native pause and
+continue of the 16-composition session. The busy Silver fixture separately
+checks continued deliveries before cancellation. Large-result rendering/performance,
+combined layout and cross-engine/device acceptance remain #162/parent work.
+
+During browser verification, native `disabled` removed focus from the pending
+control; the guarded `aria-disabled` control corrected that observed failure.
+An earlier combined run also hit capacity from sessions created by preceding
+tests. Search tests now capture every successful creation capability and delete
+their own sessions through the public HTTP seam in `afterEach`, including stale
+responses and the registered-policy service. A deliberately lost real pause
+response is retried with the original command ID before paused cancellation.
+
+Final search browser verification passed all four scenarios in 54.2 seconds in
+the original order with explicit HTTP cleanup. After preserving cancellation
+priority over a pending pause/continue request, the focused real control flow
+passed again in 27.5 seconds. Final build, formatting and diff checks pass.
