@@ -4,7 +4,16 @@
 
 ## Current state
 
-The repository contains a Rust library and a separate solver-comparison executable. It accepts caller-provided plans, observations and panel recognition. It returns partial validation findings, scoring scenarios, bounded legacy optimization results and incremental complete planning-search sessions. It has no UI, network service, persistence, rule database or automatic panel inference. [Implementation status](implementation-status.md) defines current support.
+The repository contains a Rust library, a separate solver-comparison executable,
+and a same-origin C2 browser application with a native HTTP service. The library
+accepts caller-provided plans, observations and panel recognition. It returns
+validation findings, scoring scenarios, bounded legacy optimization results and
+incremental complete planning-search sessions. C2 adds repertoire controls,
+ordered manual assessment, exact connection exclusions, one browser-local saved
+workspace, and [native proved program adoption](c2-search.md). Live search state
+is retained in service memory; it is not a durable checkpoint. There is no rule
+database or automatic panel inference. [Implementation status](implementation-status.md)
+defines current support.
 
 The core is intended for native and eventual WebAssembly use. Correctness and traceability take priority, followed by independent tests, reproducibility, maintainability and measured performance. WebAssembly compatibility is not established.
 
@@ -35,9 +44,13 @@ Consumers depend on the core. Validation and scoring use domain types; optimizat
 
 Version rules and tables without mutating earlier versions. Use integer or exact decimal arithmetic and source-defined rounding. Keep interpretations source-linked and return uncertainty when an applicable rule is unresolved. Do not add a general rule engine, DSL, plugin system or microservices without a new decision.
 
-## Planned architecture
+## Remaining architecture work
 
-A UI, native host or service may consume the library later. Full validation, complete scoring and broader optimization domains are planned. The [Pumpkin ADR](adr/0001-pumpkin.md) records the bounded solver choice. Domain and architecture changes require human review; passing tests alone does not establish domain correctness. The [source review](rule-review.md) records existing review waivers.
+The C2 service is an existing consumer of the library. Broader execution
+validation and scoring remain future work. The [Pumpkin ADR](adr/0001-pumpkin.md)
+records the bounded solver choice. Domain and architecture changes require human
+review; passing tests alone does not establish domain correctness. The
+[source review](rule-review.md) records existing review waivers.
 
 ## Versioned rule profiles
 
@@ -82,3 +95,30 @@ solver and immutable request, borrows the selected registry and releases its sta
 when dropped. Legacy APIs remain capped at five deliveries. See the
 [contract](specs/planning-search.md#incremental-search-sessions-142) and
 [acceptance evidence](planning-session-acceptance.md).
+
+## C2 application adapter (#155)
+
+`service/` is a standalone Axum/Tokio consumer of the library. Its strict
+versioned HTTP DTOs translate context and personal settings into core selection.
+Ordinary assessment uses `spawn_blocking`; each live search has a dedicated native
+owner thread that constructs and retains its non-Send registry/session. Independent
+control flags reach busy work without waiting behind its command queue. Safe
+handles/DTOs cross the HTTP boundary, and live-owner capacity is released only
+after actual owner termination. `web/` contains Vue/TypeScript/Vite
+presentation and canonical backend element keys. Built assets and `/api/v1`
+share the service origin. Profile registration and eligibility remain in Rust;
+TypeScript contains translations and presentation state only. The library
+retains its existing dependencies and callers. See [C2 repertoire](c2-repertoire.md).
+
+`App.vue` owns the persisted workspace inputs and local-only fader previews.
+`ManualEditor.vue` owns stable ordered occurrences and revision-correlated
+automatic assessment, with a native modal element/connection picker.
+`PlanningSearch.vue` owns page-held search capabilities, cursor reconciliation,
+controls and recovery. Locale/layout changes do not alter its problem signature.
+`ResultList.vue` pages both confirmed programs and selected comparison previews in
+groups of twenty. This bounds rendered rows, not collected data or the total
+number of alternatives: all received server IDs/data remain available during the
+page session. Append does not replace the current page or move focus. The small
+localStorage workspace excludes search capabilities and result history. See
+[C2 acceptance observations](c2-acceptance.md) for measured growth and remaining gates.
+

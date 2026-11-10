@@ -120,3 +120,16 @@ cargo test --no-default-features
 
 The [solver comparison](docs/solver-comparison.md) has separate checks. Licensed under the [MIT License](LICENSE).
 
+
+## C2 browser application
+
+The Vue/TypeScript application and native Axum/Tokio service now expose real
+profile/repertoire selection on one local origin. See the
+[run instructions and #155 acceptance evidence](docs/c2-repertoire.md).
+The [manual program editor](docs/c2-manual.md) supports real whole elements,
+stable occurrences and automatic shared-core assessment. The [local workspace](docs/c2-workspace.md) saves current inputs automatically and restores ordinary assessment without starting a search. Search workflows are
+implemented in subsequent C2 slices.
+
+The [exact connection controls](docs/c2-exclusions.md) exclude and restore whole
+jump connections while preserving their components, longer wholes and saved
+constraints across category changes.

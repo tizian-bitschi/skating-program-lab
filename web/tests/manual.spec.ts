@@ -1,0 +1,29 @@
+import {openPicker} from './picker';
+import { test,expect } from '@playwright/test';
+test('manual edits preserve occurrences and assess automatically',async({page})=>{
+ await page.goto('/');await page.getByLabel('Language').selectOption('en');await openPicker(page);await page.getByTestId('element-query').fill('1Lz');await page.getByTestId('add-1Lz').click();await openPicker(page);await page.getByTestId('add-1Lz').click();const entries=page.getByTestId('program-entry');await expect(entries).toHaveCount(2);const first=await entries.first().getAttribute('data-entry-id');await entries.first().getByRole('checkbox').check();await entries.first().getByRole('button',{name:'Move down'}).click();await expect(entries.last()).toHaveAttribute('data-entry-id',first!);await expect(entries.last().getByRole('checkbox')).toBeChecked();await expect(page.getByTestId('assessment')).toContainText('1.20');await entries.first().getByRole('button',{name:'Remove'}).click();await expect(entries).toHaveCount(1);await expect(page.getByTestId('assessment')).toContainText('0.60');await page.getByLabel('Category').selectOption({label:'Adult Silver'});await expect(entries).toHaveCount(1);await expect(page.getByTestId('assessment')).toContainText('0.60');
+});
+test('independent complete fixtures work across six profiles and registered policy',async({page})=>{
+ // Each independent oracle starts with an explicitly empty local workspace.
+ await page.addInitScript(()=>localStorage.removeItem('skating-c2-workspace'));
+ for(const origin of ['',`http://127.0.0.1:${process.env.C2_FIXTURE_PORT??3158}`]){
+ await page.goto(origin||'/');const profiles=await(await page.request.get(`${origin}/api/v1/profiles`)).json();
+ const bases:Record<string,string[]>={bronze:['1Lz','SSp1','ChSq1'],silver:['1A','CLSp2','ChSp1','ChSq1'],gold:['1A','CCoSp3','FSSp3','ChSp1','StSq2'],masters:['1A','CoSp4','FSSp4','ChSp1','StSq4'],women:['1A','CoSp4','FSSp4','ChSp1','StSq4','ChSq1'],men:['1A','CoSp4','FSSp4','ChSp1','StSq4','ChSq1'],'Independent HTTP test policy':['1Lz','SSp1','ChSq1']};
+ for(const p of profiles.filter((p:{label:string})=>origin?p.label==='Independent HTTP test policy':true)){
+ await page.goto(origin||'/');await page.getByLabel('Language').selectOption('en');await page.getByLabel('Category').selectOption(p.context.profile);
+ for(const code of bases[p.label]!){await openPicker(page);await page.getByTestId('element-query').fill(code);await page.getByTestId(`add-${code}`).click();}
+ const start=Date.now();await page.getByText('Program is fully described',{exact:true}).click();await expect(page.getByTestId('assessment')).toContainText('Construction complies');console.log(`manual assessment ${p.label}: ${Date.now()-start}ms`);
+ const spin=bases[p.label]!.find(c=>c.includes('Sp'))!;await openPicker(page);await page.getByTestId('element-query').fill(spin);await page.getByTestId(`add-${spin}`).click();await expect(page.getByTestId('assessment')).toContainText('Construction breaks');await page.getByTestId('program-entry').last().getByRole('button',{name:'Remove'}).click();await expect(page.getByTestId('assessment')).toContainText('Construction complies');
+ }}
+});
+test('late real assessment response cannot replace newer edits',async({page})=>{
+ await page.goto('/');await page.getByLabel('Language').selectOption('en');await openPicker(page);await page.getByTestId('element-query').fill('1Lz');let release=()=>{};const held=new Promise<void>(r=>{release=r});let captured=()=>{};const seen=new Promise<void>(r=>{captured=r});let delay=true;
+ await page.route('**/api/v1/program-assessments',async route=>{const response=await route.fetch();if(delay&&route.request().postDataJSON().entries.length===1){delay=false;captured();await held;}await route.fulfill({response});});
+ await page.getByTestId('add-1Lz').click();await seen;await openPicker(page);await page.getByTestId('add-1Lz').click();await expect(page.getByTestId('assessment')).toContainText('1.20');release();await page.waitForTimeout(200);await expect(page.getByTestId('assessment')).toContainText('1.20');
+});
+test('optional pair and third jump, translated names, keyboard reorder and reflow',async({page})=>{
+ await page.goto('/');await page.getByLabel('Language').selectOption('en');await page.getByLabel('Category').selectOption({label:'Adult Gold'});await openPicker(page);await page.getByTestId('program-connection-builder').getByText('Build a connection',{exact:true}).click();await page.getByRole('button',{name:'Next part: 1Lz',exact:true}).click();await page.getByRole('button',{name:'Next part: 1Lo',exact:true}).click();await expect(page.getByRole('button',{name:'Add connection 1Lz+1Lo',exact:true})).toBeVisible();await page.getByRole('button',{name:'Next part: 1Lo',exact:true}).click();await page.getByRole('button',{name:'Add connection 1Lz+1Lo+1Lo',exact:true}).click();await expect(page.getByTestId('program-entry')).toContainText('Lutz');
+ for(const locale of ['en','de','ru']){await page.getByLabel('Language').selectOption(locale);for(const width of [1280,390,320]){await page.setViewportSize({width,height:900});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);}}
+ await page.setViewportSize({width:1280,height:900});await page.getByLabel('Language').selectOption('en');await openPicker(page);await page.getByTestId('element-query').fill('Sit spin');await page.getByTestId('add-FSSp1').focus();await page.keyboard.press('Enter');await expect(page.getByTestId('program-entry')).toHaveCount(2);await page.getByTestId('program-entry').last().getByRole('button',{name:'Move up'}).focus();await page.keyboard.press('Enter');await expect(page.getByTestId('program-entry').first()).toContainText('FSSp1');await expect(page.getByTestId('program-entry').first().getByRole('button',{name:'Move down'})).toBeFocused();
+});
+
