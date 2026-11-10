@@ -1,5 +1,16 @@
 # Implementation status
 
+The real C2 Vue/TypeScript application and Axum/Tokio adapter implement category
+and complete repertoire selection, per-form limits, exact required occurrences,
+manual assessment, exact whole-connection exclusions, incremental proved search,
+pause/continue/cancel, recovery and adoption. One small local workspace is saved
+automatically. Results remain session-only and use bounded browser pagination,
+including comparison previews. These adapters reuse the Rust domain; they do not
+establish execution recognition or official judging. See the
+[current C2 acceptance record](c2-acceptance.md), which separates completed
+technical observations from the blocked real screen-reader gate and language
+feedback still requiring human review.
+
 [Assumed recognition](specs/assumed-recognition.md) supports explicit SOV selections in manual assessment, legality, finite candidate generation, optimization and locked completion. The coverage contract lists the execution checks outside that mode and the Senior repetition limit of the solver.
 The [milestone #89 matrix](milestone-89.md) maps the Adult and Senior workflows
 to source-backed fixtures and independent solver oracles.
