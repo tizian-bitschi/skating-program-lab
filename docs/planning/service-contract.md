@@ -2,7 +2,7 @@
 
 **Status: accepted for planning/specification on 2026-11-09. The user explicitly confirmed Q1–Q4 with “vier mal ja”. No production implementation or deployment is included.**
 
-Decision ticket: [Choose the browser runtime and integration contract](https://github.com/tizian-bitschi/skating-program-lab/issues/151). This contract preserves the [confirmed local-workspace/recovery behavior](https://github.com/tizian-bitschi/skating-program-lab/issues/149#issuecomment-6750385948) and uses the [bounded native-service feasibility evidence](../../experiments/service-proof/README.md). It does not promote the experiment's handwritten HTTP transport or convenience defaults.
+Decision ticket: [Choose the browser runtime and integration contract](https://github.com/tizian-bitschi/skating-program-lab/issues/151). This contract preserves the [confirmed local-workspace/recovery behavior](https://github.com/tizian-bitschi/skating-program-lab/issues/149#issuecomment-6750385948) and uses the [bounded native-service feasibility evidence](https://github.com/tizian-bitschi/skating-program-lab/blob/feature/153-native-service-proof/experiments/service-proof/README.md). It does not promote the experiment's handwritten HTTP transport or convenience defaults.
 
 ## 1. Accepted application boundary
 
@@ -148,3 +148,4 @@ The user explicitly confirmed all four proposals on 2026-11-09:
 4. A 15-minute lease without valid browser contact, renewed while contact continues, including during pause.
 
 This records an accepted planning decision. It does not implement or deploy the product, certify performance or select package versions. Final language content and measurable device/performance acceptance remain their separate map topics before synthesis of the implementation specification. Do not reopen the accepted C2 layout, storage location or four policies without new evidence or user direction.
+
