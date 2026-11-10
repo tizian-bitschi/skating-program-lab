@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed,nextTick,onMounted,ref,watch } from 'vue';
 import ManualEditor from './ManualEditor.vue';
+import PlanningSearch from './PlanningSearch.vue';
 import { type ProgramEntry,type Form,type Profile,type Repertoire,type Limit,emptyLimits,fetchJson } from './api';
 import { type Locale,type TextKey,browserLocale,formName,text } from './i18n';
 import {parseWorkspace,serializeWorkspace,workspaceKey,workspaceText,type Workspace} from './workspace';
@@ -70,7 +71,8 @@ watch([selected,limits],refresh,{deep:true});watch(locale,value=>{document.docum
  <small v-else-if="form.family!=='unlevelled'">{{form.permittedLevels.map(n=>n===0?'B':n).join(' · ')||'—'}}</small>
  </div></div></section></div>
  <p class="status">Max = {{t('none')}}</p><p class="status" role="status">{{pending?t('loading'):`${repertoire?.elements.length??0} ${t('permitted')}`}}</p></section>
- <div class="workspace"><section><h2>{{t('program')}}</h2><ManualEditor ref="editor" @change="onProgramChange" :context="profile?.context" :limits="limits" :repertoire="repertoire" :locale="locale" /></section><section><h2>{{t('results')}}</h2><p>{{t('noResults')}}</p></section></div>
+ <div class="workspace"><section><h2>{{t('program')}}</h2><ManualEditor ref="editor" @change="onProgramChange" :context="profile?.context" :limits="limits" :repertoire="repertoire" :locale="locale" /></section><section><h2>{{t('results')}}</h2><PlanningSearch :context="profile?.context" :limits="limits" :entries="entries" :locale="locale" :excluded-connections="excludedConnections" :allow-mixed-directions="allowMixedDirections" @adopt="editor?.replaceEntries($event,true)" /></section></div>
  <details class="sources"><summary>{{t('source')}}</summary><p v-if="profile">{{profile.context.profile}} · {{profile.context.ruleEdition}} · {{profile.context.scoringTable}}</p><ul><li v-for="source in profile?.sources" :key="source.document+source.location">{{source.document}} · {{source.version}} · {{source.location}}</li></ul></details>
  </main>
 </template>
+
