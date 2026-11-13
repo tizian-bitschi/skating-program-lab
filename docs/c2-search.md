@@ -19,6 +19,8 @@ program receives a fresh complete shared assessment before publication. Indexed
 required provenance maps to stable workspace IDs. Newly adopted occurrences get
 new IDs and remain replaceable. Adoption uses the editor's ordinary replacement
 and change event, so the same workspace autosave and assessment apply.
+[Alternative adoption and undo](c2-adoption.md) adds replacement explanations
+and one scoped undo action without changing search identity or freshness rules.
 
 The service exposes creation, cursor updates, cancellation and disposal at
 `/api/v1/searches`. Updates default to 25 results and transfer at most 100;

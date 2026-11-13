@@ -10,6 +10,18 @@ type Entry=ProgramEntry;
 const emit=defineEmits<{change:[entries:Entry[],complete:boolean]}>();
 const copy={en:{search:'Find an element by name or code',add:'Add',remove:'Remove',up:'Move up',down:'Move down',retain:'Required for calculation',connection:'Build a connection',next:'Next part',finish:'Add connection',reset:'Start again',complete:'Program is fully described',draft:'Draft',compliant:'Construction complies with category rules',noncompliant:'Construction breaks category rules',input_unavailable:'Input cannot be assessed',checking:'Assessing…',failed:'Assessment unavailable. Try again.',personal:'Personal conflicts',category:'Category findings',violation:'Check this category rule',conflict:'Conflicts with your limits',total:'Credited BV',sequence:'Direct step into Axel assumed',retry:'Try again'},de:{search:'Element nach Name oder Code suchen',add:'Hinzufügen',remove:'Entfernen',up:'Nach oben',down:'Nach unten',retain:'Für Berechnung erforderlich',connection:'Verbindung zusammenstellen',next:'Nächster Teil',finish:'Verbindung hinzufügen',reset:'Neu beginnen',complete:'Programm vollständig beschrieben',draft:'Entwurf',compliant:'Aufbau entspricht den Kategorieregeln',noncompliant:'Aufbau verletzt Kategorieregeln',input_unavailable:'Eingabe nicht auswertbar',checking:'Wird geprüft…',failed:'Prüfung nicht verfügbar. Erneut versuchen.',personal:'Persönliche Konflikte',category:'Kategoriehinweise',violation:'Diese Kategorieregel prüfen',conflict:'Widerspricht deinen Grenzen',total:'Angerechneter Basiswert',sequence:'Direkter Schritt in den Axel angenommen',retry:'Erneut versuchen'},ru:{search:'Найти элемент по названию или коду',add:'Добавить',remove:'Удалить',up:'Вверх',down:'Вниз',retain:'Обязательно для расчёта',connection:'Составить соединение',next:'Следующая часть',finish:'Добавить соединение',reset:'Начать заново',complete:'Программа полностью описана',draft:'Черновик',compliant:'Построение соответствует правилам категории',noncompliant:'Построение нарушает правила категории',input_unavailable:'Невозможно оценить ввод',checking:'Проверка…',failed:'Оценка недоступна. Повторите попытку.',personal:'Личные ограничения',category:'Замечания по категории',violation:'Проверьте это правило категории',conflict:'Противоречит вашим ограничениям',total:'Зачтённая базовая стоимость',sequence:'Предполагается прямой шаг в аксель',retry:'Повторить'}};
 const labels=computed(()=>copy[props.locale]);const query=ref(''),entries=ref<Entry[]>([]),complete=ref(false);
+const adoptionCopy={
+ en:{adopted:'Program adopted. Required occurrences kept; interchangeable entries replaced.',undo:'Undo adoption',undone:'Previous program restored.',edited:'Adoption undo is no longer available after further program or constraint changes.'},
+ de:{adopted:'Programm übernommen. Erforderliche Vorkommen beibehalten; austauschbare Einträge ersetzt.',undo:'Übernahme rückgängig machen',undone:'Vorheriges Programm wiederhergestellt.',edited:'Nach weiteren Programm- oder Vorgabenänderungen ist das Rückgängigmachen der Übernahme nicht mehr verfügbar.'},
+ ru:{adopted:'Программа принята. Обязательные элементы сохранены, заменяемые элементы заменены.',undo:'Отменить принятие',undone:'Предыдущая программа восстановлена.',edited:'После изменений программы или ограничений отмена принятия больше недоступна.'}
+};
+const adoptionState=ref<'adopted'|'undone'|'edited'>();
+const adoptionLabels=computed(()=>adoptionCopy[props.locale]);
+const programSnapshot=()=>({entries:entries.value.map(entry=>({...entry})),complete:complete.value});
+const adoptionUndo=ref<{before:ReturnType<typeof programSnapshot>;after:string}>();
+function invalidateAdoption(){if(adoptionUndo.value){adoptionUndo.value=undefined;adoptionState.value='edited';}}
+watch([entries,complete],()=>{if(adoptionUndo.value&&JSON.stringify(programSnapshot())!==adoptionUndo.value.after)invalidateAdoption();},{deep:true});
+watch([()=>props.context,()=>props.limits,()=>props.excludedConnections,()=>props.allowMixedDirections],invalidateAdoption,{deep:true});
 const picker=ref<HTMLDialogElement>(),pickerButton=ref<HTMLButtonElement>();
 const pickerLabels=computed(()=>({en:{open:'Add an element',close:'Done'},de:{open:'Element hinzufügen',close:'Fertig'},ru:{open:'Добавить элемент',close:'Готово'}}[props.locale]));
 async function openPicker(){picker.value?.showModal();await nextTick();picker.value?.querySelector<HTMLInputElement>('input')?.focus();}
@@ -27,11 +39,21 @@ async function edit(index:number,move:number){const id=entries.value[index]!.id;
 async function assess(own:number){if(!props.context)return;const requestId=crypto.randomUUID();failed.value=false;inputFailure.value=false;try{const result=await fetchJson<Assessment>('/api/v1/program-assessments',{requestId,revision:own,context:props.context,personalLimits:props.limits,entries:entries.value.map(({id,elementKey})=>({id,elementKey})),submission:complete.value?'complete':'draft',excludedConnections:props.excludedConnections??[],allowMixedDirections:props.allowMixedDirections??false});if(own===revision&&result.revision===own&&result.requestId===requestId)assessment.value=result;}catch(error){if(own===revision){failed.value=true;inputFailure.value=error instanceof Error&&["assessment_input_unavailable","invalid_element_key","context_unavailable"].includes(error.message);}}finally{if(own===revision)checking.value=false;}}
 function schedule(){const own=++revision;assessment.value=undefined;clearTimeout(timer);checking.value=true;timer=setTimeout(()=>assess(own),120);}
 watch([entries,complete,()=>props.context,()=>props.limits,()=>props.excludedConnections,()=>props.allowMixedDirections],()=>{emit('change',entries.value.map(e=>({...e})),complete.value);schedule();},{deep:true});
-function replaceEntries(next:ProgramEntry[],fullyDescribed=complete.value){entries.value=next.map(entry=>({...entry}));complete.value=fullyDescribed;}
-defineExpose({replaceEntries});
+function replaceEntries(next:ProgramEntry[],fullyDescribed=complete.value){adoptionUndo.value=undefined;adoptionState.value=undefined;entries.value=next.map(entry=>({...entry}));complete.value=fullyDescribed;}
+function adoptEntries(next:ProgramEntry[]){
+ const before=programSnapshot();replaceEntries(next,true);
+ adoptionUndo.value={before,after:JSON.stringify(programSnapshot())};adoptionState.value='adopted';
+}
+async function undoAdoption(){
+ const previous=adoptionUndo.value;if(!previous)return;
+ if(JSON.stringify(programSnapshot())!==previous.after){invalidateAdoption();return;}
+ replaceEntries(previous.before.entries,previous.before.complete);adoptionState.value='undone';
+ await nextTick();pickerButton.value?.focus();
+}
+defineExpose({replaceEntries,adoptEntries});
 </script>
 <template>
-<div class="manual-editor"><button ref="pickerButton" data-testid="open-element-picker" class="manual-search" @click="openPicker">{{pickerLabels.open}}</button>
+<div class="manual-editor"><p data-testid="adoption-feedback" role="status" aria-live="polite">{{adoptionState?adoptionLabels[adoptionState]:''}}</p><button v-if="adoptionUndo" data-testid="undo-adoption" @click="undoAdoption">{{adoptionLabels.undo}}</button><button ref="pickerButton" data-testid="open-element-picker" class="manual-search" @click="openPicker">{{pickerLabels.open}}</button>
 <dialog ref="picker" class="element-picker" :aria-label="pickerLabels.open" @keydown.esc.prevent="picker?.close()" @close="pickerButton?.focus()"><div class="picker-heading"><h2>{{pickerLabels.open}}</h2><button data-testid="close-element-picker" @click="picker?.close()">{{pickerLabels.close}}</button></div><label class="manual-search">{{labels.search}}<input data-testid="element-query" v-model="query" type="search"></label>
 <ul class="element-choices" data-testid="repertoire"><li v-for="e in matches" :key="e.key"><code>{{e.code}}</code><span>{{formName(locale,e.form)}}</span><span>{{number(e.baseHundredths)}}</span><button :data-testid="`add-${e.code}`" @click="add(e)">{{labels.add}} {{e.code}}</button></li></ul>
 <ConnectionBuilder :context="context" :limits="limits" :locale="locale" :excluded-connections="excludedConnections" :allow-mixed-directions="allowMixedDirections" @select="add" />

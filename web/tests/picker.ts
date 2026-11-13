@@ -15,3 +15,12 @@ export async function setMaximum(page:Page,id:string,maximum:number){
  for(let step=0;step<6&&await slider.getAttribute('aria-valuetext')!==wanted;step++)await slider.press('ArrowUp');
  await expect(slider).toHaveAttribute('aria-valuetext',wanted);
 }
+export async function configureSilver(page:Page){
+ await page.getByLabel('Category').selectOption({label:'Adult Silver'});
+ for(const kind of ['T','S','Lo','F','Lz','A'])await setMaximum(page,kind,1);
+ for(const form of ['USp','SSp','CSp','LSp','CoSp','CUSp','CSSp','CCSp','CLSp','CCoSp','FUSp','FSSp','FCSp','FLSp','FCoSp','FCUSp','FCSSp','FCCSp','FCLSp','FCCoSp']){
+  if(['USp','SSp','CSp','CCoSp'].includes(form))await setMaximum(page,form,['SSp','CCoSp'].includes(form)?1:0);
+  else await setEnabled(page,form,false);
+ }
+ await setEnabled(page,'W',false);await setEnabled(page,'ChSp',false);
+}

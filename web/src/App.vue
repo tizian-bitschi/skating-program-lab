@@ -33,7 +33,10 @@ async function showPanel(panel:Panel){
  document.getElementById(`${phone?'panel':'area'}-${panel}`)?.focus({preventScroll:true});
 }
 async function calculate(){await showPanel('suggestions');await search.value?.calculate();}
-async function adoptProgram(next:ProgramEntry[]){editor.value?.replaceEntries(next,true);await showPanel('program');}
+async function adoptProgram(next:ProgramEntry[]){
+ editor.value?.adoptEntries(next);await showPanel('program');
+ const panel=document.getElementById('area-program');panel?.scrollIntoView({block:'start'});panel?.focus({preventScroll:true});
+}
 const profile=computed(()=>profiles.value.find(p=>p.context.profile===selected.value));
 const groups=[['jump','jumps'],['spin','spins'],['other','other']] as const;
 function limit(form:Form):Limit|undefined {if(form.family==='jump')return limits.value.jumps[form.id];if(form.family==='spin')return limits.value.spins[form.id];if(form.family==='step')return limits.value.steps;return {enabled:limits.value.unlevelledElements[form.id]??true};}
