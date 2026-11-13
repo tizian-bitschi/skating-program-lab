@@ -89,6 +89,7 @@ main{max-width:1600px;margin:auto;padding:16px 24px}
 .result-pages input{width:64px;min-height:44px;padding:5px;border:1px solid var(--border);border-radius:5px}
 table{border-collapse:collapse;width:100%}
 th,td{text-align:left;vertical-align:top;padding:8px;overflow-wrap:anywhere}
+td:nth-child(2){white-space:nowrap}
 .excluded-connections{padding-left:22px}
 [data-testid=connection-exclusions]>h2{display:none}
 

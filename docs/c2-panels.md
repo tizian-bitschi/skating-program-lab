@@ -64,3 +64,10 @@ This evidence does not establish screen-reader conformance or a sport-rule audit
 Screenshot evidence: [desktop program areas](evidence/165/required-1280.png),
 [phone entry paths](evidence/165/ability-390.png),
 [320px required occurrences and navigation](evidence/165/required-320.png).
+
+Verification on 2026-11-13: TypeScript/Vite build passed; the full browser
+regression passed 41/41. After correcting comparison-value wrapping, all four
+panel tests passed again and their screenshots were refreshed. The initial
+entry-path test failed on the previous UI because its discovery action was
+absent. Windows sandbox restrictions required running build and browser checks
+outside the sandbox.

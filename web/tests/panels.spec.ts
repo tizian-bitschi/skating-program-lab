@@ -32,7 +32,7 @@ for(const width of [1280,390,320]){
   page.on('request',request=>{const path=new URL(request.url()).pathname;if(path==='/api/v1/searches'&&request.method()==='POST'){creates++;bodies.push(request.postDataJSON());}if(path.startsWith('/api/v1/searches/')&&request.method()==='DELETE')deletes++;});
   await expect(page.getByTestId('discover-programs')).toBeEnabled();
   await page.screenshot({path:info.outputPath('ability.png'),fullPage:true});
-  await page.getByTestId('panel-ability').click();await page.screenshot({path:info.outputPath('ability-viewport.png')});
+  await page.getByTestId('panel-ability').click();await page.evaluate(()=>scrollTo(0,0));await page.screenshot({path:info.outputPath('ability-viewport.png')});
   await page.getByTestId('discover-programs').click();
   await expect(page.getByTestId('adopt-result').first()).toBeEnabled({timeout:30000});
   expect(bodies[0]!.requiredElements).toEqual([]);
