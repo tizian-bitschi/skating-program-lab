@@ -1,6 +1,7 @@
 # C2 proved program adoption (#157)
 
-The browser starts optimization only through **Calculate best program**. It
+The browser starts optimization only through explicit calculation actions in
+[Ability, My program or Suggestions](c2-panels.md). It
 submits one immutable context, personal maxima and enabled settings, retained
 occurrences, rotation preference and exact connection exclusions. Changing a
 calculation constraint cancels/disposes the previous search and marks shown

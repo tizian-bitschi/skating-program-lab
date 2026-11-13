@@ -1,10 +1,19 @@
 import {test,expect} from '@playwright/test';
 
+test('expandable rotation preference is localized, persisted and reaches assessment',async({page})=>{
+ await page.setViewportSize({width:390,height:844});await page.goto('/');await page.getByLabel('Language').selectOption('en');
+ await expect(page.getByRole('switch')).toBeHidden();await page.getByText('More options',{exact:true}).click();
+ const assessment=page.waitForResponse(response=>response.url().endsWith('/program-assessments')&&response.request().postDataJSON().allowMixedDirections===true);
+ await page.getByRole('switch',{name:'Allow mixed rotation directions within a connection'}).check();expect((await assessment).ok()).toBe(true);
+ for(const [locale,label] of [['de','Verschiedene Drehrichtungen'],['ru','Разрешить разные направления'],['en','Allow mixed rotation directions']]){await page.getByLabel('Language').selectOption(locale!);await expect(page.getByRole('switch')).toHaveAccessibleName(new RegExp(label!));}
+ await page.reload();await page.getByText('More options',{exact:true}).click();await expect(page.getByRole('switch')).toBeChecked();
+});
+
 test('one category-bounded slider provides Off, Basic and only eligible maxima',async({page})=>{
  await page.goto('/');await page.getByLabel('Language').selectOption('en');
  const sit=page.getByTestId('fader-SSp');await expect(sit).toBeEnabled();
  await expect(sit).toHaveAttribute('max','2'); // Bronze: Off, Basic, 1.
- await expect(page.locator('.mixer input[type=checkbox], .mixer select')).toHaveCount(0);
+ await expect(page.locator('#mixer-controls input[type=checkbox], #mixer-controls select')).toHaveCount(0);
  await sit.press('Home');await expect(sit).toHaveAttribute('aria-valuetext','Off');
  await sit.press('ArrowUp');await expect(sit).toHaveAttribute('aria-valuetext','Maximum: Basic');
  await sit.press('End');await expect(sit).toHaveAttribute('aria-valuetext','Maximum: 1');
