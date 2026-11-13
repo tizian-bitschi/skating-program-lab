@@ -28,7 +28,6 @@ test('three languages reflow and keyboard controls work against the service', as
   for(const locale of ['de','en','ru']) {
    await page.getByLabel('Language').selectOption(locale);
    expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);
-   if(viewport.width>=1100){expect(await page.locator('.sources').evaluate(el=>el.getBoundingClientRect().bottom),locale).toBeLessThanOrEqual(viewport.height);}
    await expect(page.getByTestId('form-CCSp')).toBeVisible();
    await expect(page.getByTestId('form-CLSp')).toBeVisible();
   }

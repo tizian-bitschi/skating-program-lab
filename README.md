@@ -123,6 +123,10 @@ The [solver comparison](docs/solver-comparison.md) has separate checks. Licensed
 
 ## C2 browser application
 
+The [four planning areas](docs/c2-panels.md) provide equal discovery and
+required-element entry paths, with fixed phone navigation and readable desktop
+page flow.
+
 The Vue/TypeScript application and native Axum/Tokio service now expose real
 profile/repertoire selection on one local origin. See the
 [run instructions and #155 acceptance evidence](docs/c2-repertoire.md).

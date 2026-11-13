@@ -1,5 +1,12 @@
 # C2 application acceptance observations (#162)
 
+## Current planning presentation
+
+The [four-area workspace and entry-path acceptance](c2-panels.md) supersedes
+the fixed-console layout and collapsed phone mixer recorded below. Earlier
+measurements remain historical evidence. Conflict-removal and undo changes
+belong to later slices of #164.
+
 Recorded 2026-11-10 against the integrated native service and production Vite
 application. Technical checks below passed within their stated scope. On
 2026-11-10, the owner removed real-screenreader testing as an acceptance gate.

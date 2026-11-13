@@ -3,7 +3,9 @@
 The existing same-origin Vue application now adds, removes and reorders real
 whole program occurrences. Each occurrence has an independent stable ID and a
 retained flag. The flag means required content for a later calculation, not a
-fixed position. This slice does not start optimization or save a workspace.
+fixed position. [Manual additions are now required by default](c2-panels.md);
+users can release individual occurrences. The current workspace supports explicit
+calculation and local restoration through the existing parent integration.
 
 The element search matches canonical codes and translated form names without
 changing repertoire constraints. The connection builder receives prefix choices

@@ -14,8 +14,26 @@ const locale=ref<Locale>(browserLocale());
 const t=(key:TextKey)=>text(locale.value,key);
 const profiles=ref<Profile[]>([]),selected=ref(''),repertoire=ref<Repertoire>(),limits=ref(emptyLimits());
 const pending=ref(false),failure=ref(false);let revision=0;
-const mixerOpen=ref(!matchMedia('(max-width:1099px)').matches);
-const mixerToggle=computed(()=>({en:mixerOpen.value?'Hide controls':'Show all controls',de:mixerOpen.value?'Regler ausblenden':'Alle Regler anzeigen',ru:mixerOpen.value?'Скрыть регуляторы':'Показать все регуляторы'}[locale.value]));
+type Panel='ability'|'program'|'suggestions'|'exclusions';
+const panels:Panel[]=['ability','program','suggestions','exclusions'];
+const activePanel=ref<Panel>('ability'),search=ref<InstanceType<typeof PlanningSearch>>();
+const panelCopy={
+ en:{more:'More options',mixed:'Allow mixed rotation directions within a connection',navigation:'Planning areas',ability:'Ability',program:'My program',suggestions:'Suggestions',exclusions:'Exclusions',discover:'Calculate suggestions',specify:'Specify elements first',complete:'Calculate around required elements',intro:'Set your ability, then choose how to start.',required:'Added elements are required by default. Release an occurrence to make it interchangeable.'},
+ de:{more:'Weitere Optionen',mixed:'Verschiedene Drehrichtungen innerhalb einer Verbindung zulassen',navigation:'Planungsbereiche',ability:'Können',program:'Mein Programm',suggestions:'Vorschläge',exclusions:'Ausschlüsse',discover:'Vorschläge berechnen',specify:'Zuerst Elemente festlegen',complete:'Um erforderliche Elemente ergänzen',intro:'Stelle dein Können ein und wähle deinen Einstieg.',required:'Hinzugefügte Elemente sind zunächst erforderlich. Gib ein Vorkommen frei, um es austauschbar zu machen.'},
+ ru:{more:'Дополнительные настройки',mixed:'Разрешить разные направления вращения в соединении',navigation:'Разделы планирования',ability:'Навыки',program:'Моя программа',suggestions:'Варианты',exclusions:'Исключения',discover:'Рассчитать варианты',specify:'Сначала задать элементы',complete:'Дополнить обязательные элементы',intro:'Настройте навыки и выберите, с чего начать.',required:'Добавленные элементы обязательны. Снимите отметку с отдельного элемента, чтобы разрешить его замену.'}
+};
+const panelLabels=computed(()=>panelCopy[locale.value]);
+const readingPositions:Partial<Record<Panel,number>>={};
+async function showPanel(panel:Panel){
+ const phone=matchMedia('(max-width:1099px)').matches;
+ if(phone)readingPositions[activePanel.value]=window.scrollY;
+ activePanel.value=panel;await nextTick();
+ if(phone)window.scrollTo(0,readingPositions[panel]??0);
+ else document.getElementById(`area-${panel}`)?.scrollIntoView({block:'start'});
+ document.getElementById(`${phone?'panel':'area'}-${panel}`)?.focus({preventScroll:true});
+}
+async function calculate(){await showPanel('suggestions');await search.value?.calculate();}
+async function adoptProgram(next:ProgramEntry[]){editor.value?.replaceEntries(next,true);await showPanel('program');}
 const profile=computed(()=>profiles.value.find(p=>p.context.profile===selected.value));
 const groups=[['jump','jumps'],['spin','spins'],['other','other']] as const;
 function limit(form:Form):Limit|undefined {if(form.family==='jump')return limits.value.jumps[form.id];if(form.family==='spin')return limits.value.spins[form.id];if(form.family==='step')return limits.value.steps;return {enabled:limits.value.unlevelledElements[form.id]??true};}
@@ -99,10 +117,11 @@ watch([selected,limits],refresh,{deep:true});watch(locale,value=>{document.docum
  <header class="navbar"><strong>Skating Program Lab</strong><label>{{t('category')}} · 2026/27 <select v-model="selected" :disabled="loadingWorkspace" :aria-label="t('category')"><option v-for="p in profiles" :key="p.context.profile" :value="p.context.profile">{{profileName(p)}}</option></select></label><label>{{t('language')}} <select v-model="locale" aria-label="Language"><option value="de">Deutsch</option><option value="en">English</option><option value="ru">Русский</option></select></label></header>
  <main>
  <p v-if="storageState" data-testid="workspace-storage" :class="{'storage-saved':storageState==='saved'}" :role="storageState==='saved'?'status':'alert'">{{workspaceText[locale][storageState]}} <template v-if="storageState!=='saved'"><button @click="retryWorkspace">{{workspaceText[locale].retry}}</button> <button @click="replaceWorkspace">{{workspaceText[locale].replace}}</button></template></p>
- <nav class="workspace-links"><a href="#program">{{t('program')}}</a><a href="#suggestions">{{t('results')}}</a></nav>
- <section class="mixer" :aria-label="t('limits')" :aria-busy="pending"><div class="mixer-heading"><h1>{{t('limits')}}</h1><button class="mixer-toggle" :aria-expanded="mixerOpen" aria-controls="mixer-controls" @click="mixerOpen=!mixerOpen">{{mixerToggle}}</button></div>
+ <nav class="panel-navigation" :aria-label="panelLabels.navigation"><button v-for="panel in panels" :key="panel" :id="`panel-${panel}`" :data-testid="`panel-${panel}`" :aria-current="activePanel===panel?'page':undefined" :aria-controls="`area-${panel}`" @click="showPanel(panel)">{{panelLabels[panel]}}</button></nav>
+ <section id="area-ability" tabindex="-1" :class="['mixer','planning-panel',{'active-panel':activePanel==='ability'}]" :aria-label="panelLabels.ability" :aria-busy="pending"><div class="mixer-heading"><h1>{{panelLabels.ability}}</h1></div><p>{{panelLabels.intro}}</p><div class="entry-paths"><button data-testid="discover-programs" :disabled="loadingWorkspace||pending||!profile||search?.busy" @click="calculate">{{panelLabels.discover}}</button><button data-testid="specify-elements" :disabled="loadingWorkspace" @click="showPanel('program')">{{panelLabels.specify}}</button></div>
  <div v-if="failure" role="alert">{{t('failure')}} <button @click="profiles.length?refresh():initialize()">{{t('retry')}}</button></div>
- <fieldset v-show="mixerOpen" id="mixer-controls" :disabled="loadingWorkspace" class="workspace-guard"><div class="mixer-groups"><section v-for="[group,title] in groups" :key="group" :class="['group',group]"><h2>{{t(title)}}</h2><div class="channels">
+ <details class="rotation-options"><summary>{{panelLabels.more}}</summary><label class="rotation-preference"><input type="checkbox" role="switch" v-model="allowMixedDirections" :disabled="loadingWorkspace">{{panelLabels.mixed}}</label></details>
+ <fieldset id="mixer-controls" :disabled="loadingWorkspace" class="workspace-guard"><div class="mixer-groups"><section v-for="[group,title] in groups" :key="group" :class="['group',group]"><h2>{{t(title)}}</h2><div class="channels">
  <div v-for="form in forms(group)" :key="form.id" :data-testid="`form-${form.id}`" :data-family="form.family" :class="['channel',{'unavailable':!form.available}]">
  <label class="form-name" :for="`fader-${form.id}`" :title="formName(locale,form.id)">{{form.id}}<span>{{formName(locale,form.id)}}</span></label>
  <input :id="`fader-${form.id}`" class="fader" type="range" min="0" :max="Math.max(1,faderStops(form).length)" step="1" :value="faderValue(form)" :disabled="!form.available||repertoire?.context.profile!==profile?.context.profile" :aria-label="formName(locale,form.id)" :aria-valuetext="faderText(form)" :data-testid="`fader-${form.id}`" @input="previewFader(form,$event)" @change="fader(form,$event)" @keydown="faderKey(form,$event)"><span class="fader-readout" :title="faderText(form)">{{faderReadout(form)}}</span>
@@ -110,7 +129,11 @@ watch([selected,limits],refresh,{deep:true});watch(locale,value=>{document.docum
  <small v-else-if="form.family!=='unlevelled'">{{form.permittedLevels.map(n=>n===0?'B':n).join(' · ')||'—'}}</small>
  </div></div></section></div>
  </fieldset><p class="status" role="status">{{pending?t('loading'):`${repertoire?.elements.length??0} ${t('permitted')}`}}</p></section>
- <div class="workspace"><section><h2 id="program" tabindex="-1">{{t('program')}}</h2><fieldset :disabled="loadingWorkspace" class="editor-guard"><ManualEditor :excluded-connections="excludedConnections" :allow-mixed-directions="allowMixedDirections" ref="editor" @change="onProgramChange" :context="profile?.context" :limits="limits" :repertoire="repertoire" :locale="locale" /><ConnectionBuilder purpose="exclude" :context="profile?.context" :limits="limits" :locale="locale" :excluded-connections="excludedConnections" :allow-mixed-directions="allowMixedDirections" @change="excludedConnections=$event" /></fieldset></section><section><h2 id="suggestions" tabindex="-1">{{t('results')}}</h2><PlanningSearch :context="loadingWorkspace?undefined:profile?.context" :limits="limits" :entries="entries" :locale="locale" :excluded-connections="excludedConnections" :allow-mixed-directions="allowMixedDirections" @adopt="editor?.replaceEntries($event,true)" /></section></div>
+ <div class="workspace">
+ <section id="area-program" tabindex="-1" :class="['planning-panel',{'active-panel':activePanel==='program'}]" :aria-label="panelLabels.program"><h2 id="program">{{panelLabels.program}}</h2><p>{{panelLabels.required}}</p><fieldset :disabled="loadingWorkspace" class="editor-guard"><ManualEditor :excluded-connections="excludedConnections" :allow-mixed-directions="allowMixedDirections" ref="editor" @change="onProgramChange" :context="profile?.context" :limits="limits" :repertoire="repertoire" :locale="locale" /></fieldset><button data-testid="complete-program" :disabled="loadingWorkspace||!profile||search?.busy" @click="calculate">{{panelLabels.complete}}</button></section>
+ <section id="area-suggestions" tabindex="-1" :class="['planning-panel',{'active-panel':activePanel==='suggestions'}]" :aria-label="panelLabels.suggestions"><h2 id="suggestions">{{panelLabels.suggestions}}</h2><PlanningSearch ref="search" :context="loadingWorkspace?undefined:profile?.context" :limits="limits" :entries="entries" :locale="locale" :excluded-connections="excludedConnections" :allow-mixed-directions="allowMixedDirections" @adopt="adoptProgram" /></section>
+ <section id="area-exclusions" tabindex="-1" :class="['planning-panel',{'active-panel':activePanel==='exclusions'}]" :aria-label="panelLabels.exclusions"><h2>{{panelLabels.exclusions}}</h2><fieldset :disabled="loadingWorkspace" class="editor-guard"><ConnectionBuilder purpose="exclude" :context="profile?.context" :limits="limits" :locale="locale" :excluded-connections="excludedConnections" :allow-mixed-directions="allowMixedDirections" @change="excludedConnections=$event" /></fieldset></section>
+ </div>
  <details class="sources"><summary>{{t('source')}}</summary><p v-if="profile">{{profile.context.profile}} · {{profile.context.ruleEdition}} · {{profile.context.scoringTable}}</p><ul><li v-for="source in profile?.sources" :key="source.document+source.location"><SourceReference :source="source" :locale="locale" /></li></ul></details>
 
  </main>
