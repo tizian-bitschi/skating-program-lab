@@ -123,6 +123,8 @@ The [solver comparison](docs/solver-comparison.md) has separate checks. Licensed
 
 ## C2 browser application
 
+The [alternative adoption workflow](docs/c2-adoption.md) replaces interchangeable
+content while preserving required occurrences and offers one scoped undo action.
 The [four planning areas](docs/c2-panels.md) provide equal discovery and
 required-element entry paths, with fixed phone navigation and readable desktop
 page flow.

@@ -57,6 +57,8 @@ main{max-width:1600px;margin:auto;padding:16px 24px}
 .manual-search{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
 .manual-search input{min-width:0;flex:1;min-height:44px;border:1px solid var(--border);border-radius:5px;padding:8px}
 .manual-editor>.manual-search{width:100%;justify-content:center}
+.manual-editor [data-testid=adoption-feedback]:empty{margin:0}
+.manual-editor [data-testid=undo-adoption]{margin-bottom:12px}
 .element-picker{width:min(680px,calc(100% - 24px));max-height:calc(100dvh - 24px);padding:16px;border:1px solid var(--border);border-radius:7px;color:inherit;background:var(--surface)}
 .element-picker::backdrop{background:#17202d66}
 .picker-heading{display:flex;align-items:center;justify-content:space-between;gap:12px}

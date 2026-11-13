@@ -1,5 +1,5 @@
 import {test,expect} from '@playwright/test';
-import {openPicker,setEnabled,setMaximum} from './picker';
+import {openPicker,configureSilver} from './picker';
 
 test('phone panel changes preserve an in-flight real search and editor query',async({page})=>{
  await page.setViewportSize({width:390,height:844});await page.goto('/');await page.getByLabel('Language').selectOption('en');
@@ -21,13 +21,7 @@ for(const width of [1280,390,320]){
   test.setTimeout(90000);
   await page.setViewportSize({width,height:width===1280?800:844});
   await page.goto('/');await page.getByLabel('Language').selectOption('en');
-  await page.getByLabel('Category').selectOption({label:'Adult Silver'});
-  for(const kind of ['T','S','Lo','F','Lz','A'])await setMaximum(page,kind,1);
-  for(const form of ['USp','SSp','CSp','LSp','CoSp','CUSp','CSSp','CCSp','CLSp','CCoSp','FUSp','FSSp','FCSp','FLSp','FCoSp','FCUSp','FCSSp','FCCSp','FCLSp','FCCoSp']){
-   if(['USp','SSp','CSp','CCoSp'].includes(form))await setMaximum(page,form,['SSp','CCoSp'].includes(form)?1:0);
-   else await setEnabled(page,form,false);
-  }
-  await setEnabled(page,'W',false);await setEnabled(page,'ChSp',false);
+  await configureSilver(page);
   let creates=0,deletes=0;const bodies:Record<string,unknown>[]=[];
   page.on('request',request=>{const path=new URL(request.url()).pathname;if(path==='/api/v1/searches'&&request.method()==='POST'){creates++;bodies.push(request.postDataJSON());}if(path.startsWith('/api/v1/searches/')&&request.method()==='DELETE')deletes++;});
   await expect(page.getByTestId('discover-programs')).toBeEnabled();

@@ -32,10 +32,11 @@ the versioned workspace without starting optimization.
 
 This replaces the earlier C2 fixed-console presentation and phone links/collapsed
 mixer described in the historical acceptance evidence. It does not implement
-later #164 slices for direct card exclusions, mutation undo, difference-first
+later #164 slices for direct card exclusions, ability/exclusion undo, difference-first
 comparison or removal after ability/exclusion edits. Existing conflict reporting
 continues until those slices replace it. Domain, scoring and HTTP contracts are
-unchanged.
+unchanged. [Alternative adoption and undo](c2-adoption.md) now supplies the
+scoped adoption snapshot and replacement feedback from #166.
 
 ## Acceptance checks
 
