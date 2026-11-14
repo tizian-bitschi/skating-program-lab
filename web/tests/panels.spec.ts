@@ -66,6 +66,7 @@ for(const width of [1280,390,320]){
   if(width<1100){
    const nav=await page.getByRole('navigation',{name:'Planning areas'}).boundingBox();
    for(const name of ['ability','program','suggestions','exclusions']){const button=page.getByTestId(`panel-${name}`);const box=(await button.boundingBox())!;expect(box.height).toBeGreaterThanOrEqual(44);expect(box.width).toBeGreaterThanOrEqual(44);}
+   await expect(page.getByTestId('complete-program')).toBeEnabled({timeout:30000});
    await page.getByTestId('complete-program').focus();
    const box=(await page.getByTestId('complete-program').boundingBox())!;expect(box.y+box.height).toBeLessThan(nav!.y);
    await page.getByTestId('panel-exclusions').focus();await page.keyboard.press('Enter');await expect(page.getByTestId('panel-exclusions')).toHaveAttribute('aria-current','page');

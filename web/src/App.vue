@@ -16,10 +16,11 @@ const exclusionFeedback=computed(()=>{
  return `${exclusionLabels.value.excluded}: ${connectionCode(notice.key)}. ${exclusionLabels.value.removed}: ${notice.removed}.`;
 });
 const exclusionUndo=ref<{key:string;before:ProgramEntry[];removed:ProgramEntry[]}>();
-function replaceProgram(next:ProgramEntry[]){entries.value=next;editor.value?.replaceEntries(next,complete.value);}
+function replaceProgram(next:ProgramEntry[]){entries.value=next;editor.value?.editEntries(next);}
 function changeExclusions(keys:string[]){
  const added=keys.filter(key=>!excludedConnections.value.includes(key));
  exclusionUndo.value=undefined;
+ if(!added.length)exclusionNotice.value=undefined;
  excludedConnections.value=keys;
  for(const key of added){
   const before=entries.value.map(entry=>({...entry}));
