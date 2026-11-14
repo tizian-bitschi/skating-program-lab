@@ -40,6 +40,7 @@ async function assess(own:number){if(!props.context)return;const requestId=crypt
 function schedule(){const own=++revision;assessment.value=undefined;clearTimeout(timer);checking.value=true;timer=setTimeout(()=>assess(own),120);}
 watch([entries,complete,()=>props.context,()=>props.limits,()=>props.excludedConnections,()=>props.allowMixedDirections],()=>{emit('change',entries.value.map(e=>({...e})),complete.value);schedule();},{deep:true});
 function replaceEntries(next:ProgramEntry[],fullyDescribed=complete.value){adoptionUndo.value=undefined;adoptionState.value=undefined;entries.value=next.map(entry=>({...entry}));complete.value=fullyDescribed;}
+function editEntries(next:ProgramEntry[]){invalidateAdoption();entries.value=next.map(entry=>({...entry}));}
 function adoptEntries(next:ProgramEntry[]){
  const before=programSnapshot();replaceEntries(next,true);
  adoptionUndo.value={before,after:JSON.stringify(programSnapshot())};adoptionState.value='adopted';
@@ -50,7 +51,7 @@ async function undoAdoption(){
  replaceEntries(previous.before.entries,previous.before.complete);adoptionState.value='undone';
  await nextTick();pickerButton.value?.focus();
 }
-defineExpose({replaceEntries,adoptEntries});
+defineExpose({replaceEntries,editEntries,adoptEntries});
 </script>
 <template>
 <div class="manual-editor"><p data-testid="adoption-feedback" role="status" aria-live="polite">{{adoptionState?adoptionLabels[adoptionState]:''}}</p><button v-if="adoptionUndo" data-testid="undo-adoption" @click="undoAdoption">{{adoptionLabels.undo}}</button><button ref="pickerButton" data-testid="open-element-picker" class="manual-search" @click="openPicker">{{pickerLabels.open}}</button>
