@@ -115,7 +115,7 @@ retains its existing dependencies and callers. See [C2 repertoire](c2-repertoire
 automatic assessment, with a native modal element/connection picker.
 `PlanningSearch.vue` owns page-held search capabilities, cursor reconciliation,
 controls and recovery. Locale/layout changes do not alter its problem signature.
-`ResultList.vue` pages both confirmed programs and selected comparison previews in
+`ResultList.vue` pages both confirmed programs and selected difference-first comparisons in
 groups of twenty. This bounds rendered rows, not collected data or the total
 number of alternatives: all received server IDs/data remain available during the
 page session. Append does not replace the current page or move focus. The small

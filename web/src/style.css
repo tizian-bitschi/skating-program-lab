@@ -134,3 +134,9 @@ main{padding:16px 16px var(--nav-clearance)}
 }
 
 @media(max-width:359px){.channels{grid-template-columns:1fr}.form-name{min-height:0}}
+
+/* Comparison shares the page scroll and full desktop workspace. */
+@media(min-width:1100px){.workspace:has(.comparison-open) #area-suggestions{grid-column:1/-1}}
+.comparison-open>.result-browser>.search-results{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,340px),1fr));gap:24px;list-style:none;padding:0}
+.comparison-open h4{margin:16px 0 8px;color:var(--accent)}
+.comparison-open>button{scroll-margin:16px}

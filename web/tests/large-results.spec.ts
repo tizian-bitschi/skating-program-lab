@@ -40,8 +40,8 @@ test('synthetic 10000 HTTP records append without moving focus or losing selecti
  await list.getByRole('spinbutton',{name:'Page'}).fill('500');await list.getByRole('spinbutton',{name:'Page'}).press('Enter');
  await expect(list.locator('.search-results>li').last()).toContainText('SYNTHETIC 10000');
  await list.getByRole('checkbox').last().check();
- await expect(page.getByTestId('program-comparison')).toContainText('SYNTHETIC 1');await expect(page.getByTestId('program-comparison')).toContainText('SYNTHETIC 10000');
- await list.getByRole('spinbutton',{name:'Page'}).fill('1');await list.getByRole('spinbutton',{name:'Page'}).press('Enter');await expect(list.getByRole('checkbox').first()).toBeChecked();
+ await page.getByTestId('open-comparison').click();await expect(page.getByTestId('program-comparison')).toContainText('SYNTHETIC 1');await expect(page.getByTestId('program-comparison')).toContainText('SYNTHETIC 10000');
+ await page.getByTestId('close-comparison').click();await list.getByRole('spinbutton',{name:'Page'}).fill('1');await list.getByRole('spinbutton',{name:'Page'}).press('Enter');await expect(list.getByRole('checkbox').first()).toBeChecked();
  const batches=await page.evaluate(()=>(window as unknown as {syntheticMetrics:{batches:number[]}}).syntheticMetrics.batches);expect(batches.length).toBeGreaterThan(0);console.log(`synthetic batch presentation ms: ${JSON.stringify(batches)}`);expect(Math.max(...batches)).toBeLessThanOrEqual(200);
  for(let cycle=1;cycle<=3;cycle++){await page.reload();await expect(page.getByTestId('calculate')).toBeEnabled();await sample(0,cycle);delivered=0;await page.getByTestId('calculate').click();await expect.poll(()=>delivered).toBe(10000);await expect(list.locator('.result-pages')).toContainText('10000');await sample(10000,cycle);}
  await page.reload();await expect(page.getByTestId('calculate')).toBeEnabled();await sample(0,4);

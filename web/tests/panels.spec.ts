@@ -40,7 +40,7 @@ for(const width of [1280,390,320]){
   await page.getByTestId('panel-program').click();
   await page.getByTestId('panel-suggestions').click();
   expect(creates).toBe(1);expect(deletes).toBe(beforeDeletes);
-  await expect(page.getByTestId('program-comparison')).toBeVisible();
+  await expect(page.getByTestId('open-comparison')).toContainText('(1)');
   await expect(resultBrowser.getByRole('spinbutton',{name:'Page'})).toHaveValue('2');
   if(width<1100)expect(Math.abs(await page.evaluate(()=>scrollY)-readingY)).toBeLessThan(3);
   await page.screenshot({path:info.outputPath('suggestions.png'),fullPage:true});

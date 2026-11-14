@@ -38,7 +38,8 @@ the program and suggestions; expanding controls does not alter the request.
 Desktop headings, completion/assessment and primary actions stay outside the
 scrolling content lists. The exclusion builder is named “Excluded connections”.
 
-Both confirmed results and selected comparisons render twenty records per page.
+The [difference-first comparison](c2-comparison.md) supersedes the earlier
+repeated full-content comparison presentation. Both confirmed results and selected comparisons render twenty records per page.
 Previous/next and a keyboard-operable page number reach every received record;
 the denominator explicitly describes confirmed records. Pagination does not cap
 collection or selection. New batches preserve the current page, scroll position,

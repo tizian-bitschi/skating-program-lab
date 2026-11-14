@@ -60,7 +60,9 @@ test('excluding a connection removes duplicate required occurrences and undo res
  await page.getByTestId('program-entry').last().getByRole('checkbox').uncheck();
  const before=await workspace(page);
  await page.getByTestId('calculate').click();await expect(page.getByTestId('adopt-result').first()).toBeEnabled({timeout:45000});
- await (await connection(page,'1Lz+1Lo')).click();
+ const action=await connection(page,'1Lz+1Lo');await action.locator('xpath=ancestor::li[@data-result-id]').getByRole('checkbox').check();
+ await page.getByTestId('open-comparison').click();const comparison=page.getByTestId('program-comparison');await comparison.locator('summary').click();
+ await comparison.getByRole('button',{name:'Exclude connection 1Lz+1Lo',exact:true}).first().click();
  await expect(page.getByTestId('program-entry')).toHaveCount(2);await expect(page.getByTestId('exclusion-feedback')).toContainText('2');
  await page.getByTestId('program-entry').first().getByRole('checkbox').uncheck();before.entries[0].retained=false;
  await openPicker(page);await page.getByTestId('element-query').fill('1S');await page.getByTestId('add-1S').click();
@@ -88,7 +90,7 @@ for(const width of [1280,390,320])test(`readable complete cards, comparison and 
  await (await connection(page,'1Lz+1Lo')).click();
  await page.getByTestId('undo-exclusion').click();expect((await workspace(page)).excludedConnections).toHaveLength(1);
  const checkbox=cards(page).getByRole('checkbox').first();await checkbox.check();
- const comparison=page.getByTestId('program-comparison');await comparison.scrollIntoViewIfNeeded();await page.screenshot({path:`../docs/evidence/167/comparison-${width}.png`});
+ await page.getByTestId('open-comparison').click();const comparison=page.getByTestId('program-comparison');await comparison.scrollIntoViewIfNeeded();await page.screenshot({path:`../docs/evidence/167/comparison-${width}.png`});
  await page.getByTestId('panel-exclusions').click();await expect(page.getByTestId('connection-exclusions')).toContainText('solo jumps and longer connections');
  await page.screenshot({path:`../docs/evidence/167/exclusions-${width}.png`});
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
