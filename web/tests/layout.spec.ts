@@ -20,8 +20,8 @@ test('fader pointer preview stays local and keyboard preserves Off versus Basic'
  const slider=page.getByTestId('fader-SSp');await expect(slider).toBeEnabled();
  let requests=0;page.on('request',request=>{if(request.method()==='POST'&&/repertoire|assessments/.test(request.url()))requests++;});
  await page.waitForTimeout(200);requests=0;
- const rect=(await slider.boundingBox())!;
- await page.mouse.move(rect.x+rect.width/2,rect.y+5);await page.mouse.down();await page.mouse.move(rect.x+rect.width/2,rect.y+rect.height-20,{steps:4});
+ await slider.scrollIntoViewIfNeeded();const rect=(await slider.boundingBox())!;
+ await page.mouse.move(rect.x+rect.width-5,rect.y+rect.height/2);await page.mouse.down();await page.mouse.move(rect.x+20,rect.y+rect.height/2,{steps:4});
  await page.waitForTimeout(150);expect(requests).toBe(0);
  await page.mouse.up();await expect.poll(()=>requests).toBeGreaterThan(0);
  await slider.focus();await page.keyboard.press('Home');await expect(page.getByTestId('fader-SSp')).toHaveValue('0');

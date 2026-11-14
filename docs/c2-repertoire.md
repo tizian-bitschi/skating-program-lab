@@ -33,8 +33,8 @@ The navbar, repertoire controls, empty program and empty suggestion regions
 follow the selected C2 workspace structure. German, English and Russian are
 available; the browser language selects the initial locale with English fallback.
 Canonical codes and values are unchanged by locale. Full spin labels distinguish
-Camel/Change Camel and Layback/Change Layback. Compact desktop labels expose
-full names on hover/focus and in accessible control names. No assessment,
+Camel/Change Camel and Layback/Change Layback. Full translated names remain visible beside the canonical form IDs on every
+viewport. The [ability controls](c2-ability.md) document the current layout. No assessment,
 optimization, save or recovery outcome is simulated.
 
 ## Verification on 2026-11-10
@@ -82,7 +82,7 @@ so a different running application cannot silently satisfy the readiness check.
 The new test initially failed with ECONNREFUSED before the fixture existed;
 all four Chrome tests and all three HTTP tests pass with the fixture running.
 
-The completed C2 presentation uses one vertical slider per form. Its bottom
+The current C2 presentation uses one horizontal slider per form. Its first
 position is Off; remaining positions are the service's category-eligible classes
 or levels. Unlevelled forms have only Off/On. There is no additional enabled
 checkbox or maximum dropdown. A saved personal ceiling survives category

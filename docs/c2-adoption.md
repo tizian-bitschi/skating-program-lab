@@ -36,7 +36,8 @@ remain visible but cannot be adopted. Recalculation remains explicit. Reordering
 interchangeable edits and completeness changes preserve the existing composition
 search semantics. The service, scoring and occurrence-identity contracts are
 unchanged. Direct card exclusions and automatic removal after exclusion/ability
-changes remain separate #164 slices; existing conflict reporting still applies.
+changes are covered by [ability removal and undo](c2-ability.md) and
+[exact exclusions](c2-exclusions.md), superseding retained-conflict reporting.
 
 ## Acceptance evidence
 

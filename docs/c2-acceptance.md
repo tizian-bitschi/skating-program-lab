@@ -4,8 +4,9 @@
 
 The [four-area workspace and entry-path acceptance](c2-panels.md) supersedes
 the fixed-console layout and collapsed phone mixer recorded below. Earlier
-measurements remain historical evidence. Conflict-removal and undo changes
-belong to later slices of #164.
+measurements remain historical evidence. [Exact exclusions](c2-exclusions.md)
+and [ability reductions](c2-ability.md) now remove affected whole occurrences
+with undo; they supersede the retained-personal-conflict interaction below.
 
 Recorded 2026-11-10 against the integrated native service and production Vite
 application. Technical checks below passed within their stated scope. On
