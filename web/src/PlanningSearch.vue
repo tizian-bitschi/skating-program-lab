@@ -13,6 +13,11 @@ const copy={
  ru:{service_unavailable:'Сервис недоступен. Подтверждённые программы сохранены. Когда сервис станет доступен, запустите новый расчёт.',control_invalid:'Это действие недоступно в текущем состоянии расчёта.',pause:'Приостановить сбор',continue:'Продолжить сбор',paused:'Сбор приостановлен. Подтверждённые программы доступны.',pauseRequested:'Запрошена пауза…',continueRequested:'Запрошено продолжение…',unknown:'Общее число неизвестно до завершения сбора.',compare:'Сравнить',comparison:'Выбранные программы',calculate:'Рассчитать лучшую программу',cancel:'Отменить расчёт',retry:'Повторить подключение',proving:'Доказательство максимума…',collecting:'Максимум доказан. Поиск альтернатив…',completed:'Все оптимальные составы собраны.',cancelled:'Расчёт отменён.',infeasible:'Для этих ограничений нет программы, соответствующей правилам.',failed:'Расчёт завершился с ошибкой.',maximum:'Доказанная максимальная базовая стоимость',adopt:'Использовать эту программу',retained:'Сохранено',added:'Добавлено',stale:'Эти результаты относятся к прежним ограничениям. Запустите новый расчёт.',empty:'Доказанной программы пока нет.',count:'Подтверждённые программы',requested:'Запрошена отмена…',connection:'Соединение прервано. Идентификатор текущего поиска сохранён.',request_invalid:'Проверьте обязательные элементы и личные ограничения.',unsupported_search:'Расчёт недоступен для выбранных правил.',internal_failure:'Не удалось проверить программу. Запустите новый расчёт.',search_capacity:'Сервис занят. Этот расчёт не запущен.',session_unavailable:'Сессия недоступна. Запустите новый расчёт.',newCalculation:'Начать новый расчёт'}
 };
 const labels=computed(()=>copy[props.locale]);
+const workspaceBoundary=computed(()=>({
+ en:'Suggestions and comparisons stay available when switching panels. After reload, calculate suggestions explicitly using the restored workspace inputs.',
+ de:'Vorschläge und Vergleiche bleiben beim Bereichswechsel erhalten. Berechne Vorschläge nach dem Neuladen ausdrücklich mit den wiederhergestellten Eingaben.',
+ ru:'Варианты и сравнения сохраняются при переходе между разделами. После перезагрузки запустите расчёт вариантов с восстановленными настройками.'
+}[props.locale]));
 const connectionLabels=computed(()=>connectionText[props.locale]);
 const adoptionHint=computed(()=>({
  en:'Replaces interchangeable entries in My program. Required occurrences are kept. You can undo this before your next program or constraint change.',
@@ -76,6 +81,7 @@ defineExpose({calculate,busy});
 </script>
 <template>
 <div class="planning-search">
+ <p data-testid="workspace-result-boundary">{{workspaceBoundary}}</p>
  <div class="search-actions">
  <button data-testid="calculate" :disabled="!context||busy" @click="calculate">{{stale?connectionLabels.update:labels.calculate}}</button>
  <button v-if="busy&&identity" :disabled="cancelRequested||pendingControl?.action==='cancel'" @click="control('cancel')">{{labels.cancel}}</button>
