@@ -1,15 +1,5 @@
 import {openPicker,setMaximum,setEnabled} from './picker';
-import {test,expect} from '@playwright/test';
-// Each test owns and releases the real native sessions it creates, including
-// responses whose browser state has already been invalidated.
-const searchOwners=new WeakMap<object,Promise<{origin:string;id:string;accessToken:string}|undefined>[]>();
-test.beforeEach(async({page})=>{
- const owners:Promise<{origin:string;id:string;accessToken:string}|undefined>[]=[];searchOwners.set(page,owners);
- page.on('response',response=>{if(response.request().method()==='POST'&&new URL(response.url()).pathname==='/api/v1/searches'&&response.status()===202)owners.push(response.json().then(owner=>({origin:new URL(response.url()).origin,id:owner.id,accessToken:owner.accessToken})).catch(()=>undefined));});
-});
-test.afterEach(async({page})=>{
- for(const owner of await Promise.all(searchOwners.get(page)??[]))if(owner)await page.request.delete(`${owner.origin}/api/v1/searches/${owner.id}`,{headers:{Authorization:`Bearer ${owner.accessToken}`}});
-});
+import {test,expect} from './search-fixture';
 test('explicit proof adopts a freshly assessed program and preserves retained identity',async({page})=>{
  await page.goto('/');await page.getByLabel('Language').selectOption('en');
  let creates=0;page.on('request',r=>{if(r.url().endsWith('/api/v1/searches')&&r.method()==='POST')creates++;});
@@ -65,8 +55,8 @@ test('real collection pauses, continues, compares and adopts without losing focu
  let disconnected=false;const reconnectReads:string[]=[];
  await page.route('**/api/v1/searches/*/updates?*',async route=>{reconnectReads.push(route.request().url());if(!disconnected){disconnected=true;await route.abort('failed');}else await route.continue();});
  await page.getByRole('button',{name:'Retry connection',exact:true}).click();await expect(control).toHaveText('Continue collection');await expect.poll(()=>reconnectReads.length).toBeGreaterThanOrEqual(2);expect(reconnectReads[0]).toBe(reconnectReads[1]);await page.unroute('**/api/v1/searches/*/updates?*');
- await expect(page.getByTestId('adopt-result').first()).toBeEnabled();const compare=page.locator('.search-results input[type=checkbox]');await compare.nth(0).check();await compare.nth(1).check();await expect(page.getByTestId('program-comparison').locator('[data-result-id]')).toHaveCount(2);
- const before=await page.locator('.search-results > li').first().getAttribute('data-result-id');
+ await expect(page.getByTestId('adopt-result').first()).toBeEnabled();const compare=page.locator('.search-results input[type=checkbox]');await compare.nth(0).check();await compare.nth(1).check();await page.getByTestId('open-comparison').click();await expect(page.getByTestId('program-comparison').locator('[data-result-id]')).toHaveCount(2);
+ await page.getByTestId('close-comparison').click();const before=await page.locator('.search-results > li').first().getAttribute('data-result-id');
  for(const [locale,label] of [['de','Sammlung fortsetzen'],['ru','Продолжить сбор'],['en','Continue collection']]){await page.getByLabel('Language').selectOption(locale);await expect(control).toHaveText(label);}
  await control.focus();await page.keyboard.press('Enter');await expect(control).toHaveText('Pause collection',{timeout:10000});await expect(control).toBeFocused();await expect(page.locator('.search-results > li').first()).toHaveAttribute('data-result-id',before!);
  let releaseOld=()=>{},seenOld=()=>{};const oldHeld=new Promise<void>(r=>releaseOld=r),oldSeen=new Promise<void>(r=>seenOld=r);let holdOld=true;

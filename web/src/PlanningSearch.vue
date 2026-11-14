@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import {computed,onBeforeUnmount,onMounted,ref,watch} from 'vue';
+import {computed,nextTick,onBeforeUnmount,onMounted,ref,watch} from 'vue';
 import ResultList from './ResultList.vue';
 import ProgramElements, {type ResultEntry,type ResultAssessment} from './ProgramElements.vue';
 import {connectionText} from './connection-text';
@@ -25,6 +25,22 @@ interface Update {id:string;requestId:string;revision:number;status:'running'|'p
 const results=ref<Result[]>([]),update=ref<Update>(),stale=ref(false),busy=ref(false),connection=ref(false),problem=ref(''),cancelRequested=ref(false);
 const selected=ref<string[]>([]);
 const compared=computed(()=>results.value.filter(r=>selected.value.includes(r.id)));
+const comparisonOpen=ref(false),openButton=ref<HTMLButtonElement>(),backButton=ref<HTMLButtonElement>();
+const comparisonLabels=computed(()=>({en:{open:'Open comparison',back:'Back to suggestions',differences:'Differences',identical:'Identical content',same:'Same whole-element composition'},de:{open:'Vergleich öffnen',back:'Zurück zu Vorschlägen',differences:'Unterschiede',identical:'Identischer Inhalt',same:'Gleiche Zusammenstellung ganzer Elemente'},ru:{open:'Открыть сравнение',back:'Назад к вариантам',differences:'Различия',identical:'Одинаковые элементы',same:'Одинаковый состав целых элементов'}}[props.locale]));
+let browsingY=0;
+async function openComparison(){browsingY=window.scrollY;comparisonOpen.value=true;await nextTick();backButton.value?.focus({preventScroll:true});backButton.value?.scrollIntoView({block:'center'});}
+async function closeComparison(){comparisonOpen.value=false;await nextTick();openButton.value?.focus({preventScroll:true});window.scrollTo(0,browsingY);}
+// Intersect whole-element multisets, preserving compound identity and duplicate counts.
+const comparisonParts=computed(()=>{
+ const counts=compared.value.map(result=>{const map=new Map<string,number>();for(const entry of result.entries)map.set(entry.elementKey,(map.get(entry.elementKey)??0)+1);return map;});
+ const common=new Map<string,number>();
+ for(const [key,count] of counts[0]??[])common.set(key,counts.slice(1).reduce((minimum,map)=>Math.min(minimum,map.get(key)??0),count));
+ return new Map(compared.value.map(result=>{
+  const remaining=new Map(common),identical:number[]=[],different:number[]=[];
+  result.entries.forEach((entry,index)=>{const count=remaining.get(entry.elementKey)??0;if(count>0){identical.push(index);remaining.set(entry.elementKey,count-1);}else different.push(index);});
+  return [result.id,{identical,different}];
+ }));
+});
 const pendingControl=ref<{action:'pause'|'continue'|'cancel';commandId:string}>();
 // A control or newer read supersedes every older in-flight status snapshot.
 let pollSequence=0;
@@ -45,7 +61,7 @@ async function poll(own:number){if(!identity||own!==generation)return;stopPollin
  connection.value=false;problem.value='';update.value=next;cursor=next.cursor;const known=new Set(results.value.map(r=>r.id));for(const r of next.results)if(!known.has(r.id)){results.value.push(r);known.add(r.id);}busy.value=next.status==='running'||next.status==='paused';cancelRequested.value=next.controlRequested==='cancel';if(next.failure)problem.value=next.failure.code;
  if(busy.value||cursor<next.confirmedCount)timer=setTimeout(()=>poll(own),cursor<next.confirmedCount?0:1000);
  }catch(error){if(own===generation&&sequence===pollSequence)failed(error);}}
-async function submit(){if(!creation)return;const current=creation;busy.value=true;connection.value=false;problem.value='';try{const owner=await request<Identity>('/api/v1/searches','POST',current.body);if(current.generation!==generation){void release(owner);return;}if(creation!==current)return;identity=owner;creation=undefined;results.value=[];selected.value=[];update.value=undefined;stale.value=false;cursor=0;void poll(generation);}catch(error){if(current.generation===generation){busy.value=false;failed(error);}}}
+async function submit(){if(!creation)return;const current=creation;busy.value=true;connection.value=false;problem.value='';try{const owner=await request<Identity>('/api/v1/searches','POST',current.body);if(current.generation!==generation){void release(owner);return;}if(creation!==current)return;identity=owner;creation=undefined;results.value=[];selected.value=[];comparisonOpen.value=false;update.value=undefined;stale.value=false;cursor=0;void poll(generation);}catch(error){if(current.generation===generation){busy.value=false;failed(error);}}}
 async function calculate(){if(busy.value)return;invalidate();if(!props.context)return;const own=generation;const input=JSON.parse(JSON.stringify({context:props.context,personalLimits:props.limits,requiredElements:props.entries.filter(e=>e.retained).map(({id,elementKey})=>({id,elementKey})),allowMixedDirections:props.allowMixedDirections,excludedConnections:props.excludedConnections}));busy.value=true;problem.value='';try{const namespace=await request<{creationNamespace:string}>('/api/v1/searches/identity');if(own!==generation)return;const bytes=crypto.getRandomValues(new Uint8Array(32));const retryKey=Array.from(bytes,b=>b.toString(16).padStart(2,'0')).join('');creation={generation:own,body:JSON.parse(JSON.stringify({creationKey:`${namespace.creationNamespace}:${retryKey}`,requestId:crypto.randomUUID(),revision:own,...input}))};await submit();}catch(error){if(own===generation){busy.value=false;failed(error);}}}
 async function retry(){if(pendingControl.value)await sendControl();else if(creation)await submit();else if(identity)await poll(generation);else await calculate();}
 async function control(action:'pause'|'continue'|'cancel'){if(action!=='cancel'&&(pendingControl.value||update.value?.controlRequested))return;pendingControl.value={action,commandId:crypto.randomUUID()};await sendControl();}
@@ -70,7 +86,16 @@ defineExpose({calculate,busy});
  <ul v-if="update?.failure?.entryIds?.length"><li v-for="id in update.failure.entryIds" :key="id">{{labels.retained}}: {{entries.find(e=>e.id===id)?.code??id}}</li></ul>
  <p v-if="stale" data-testid="search-stale" role="status">{{labels.stale}}</p>
  <p v-if="results.length" class="connection-scope">{{connectionLabels.scope}}</p>
- <section v-if="compared.length" :aria-label="labels.comparison" data-testid="program-comparison"><h3>{{labels.comparison}}</h3><ResultList :results="compared" :locale="locale" v-slot="{result}"><h3>{{labels.compare}} {{results.indexOf(result)+1}} · {{number(result.assessment.totalHundredths)}} <small v-if="stale">{{connectionLabels.outdated}}</small></h3><ProgramElements :entries="result.entries" :assessment="result.assessment" :locale="locale" :excluded-connections="excludedConnections" :stale="stale" :retained="labels.retained" :added="labels.added" @exclude="emit('exclude',$event)" /></ResultList></section>
- <ResultList :results="results" :locale="locale" v-slot="{result,index:resultIndex}"><h3>{{connectionLabels.program}} {{resultIndex+1}}</h3><label><input v-model="selected" type="checkbox" :value="result.id"> {{labels.compare}} {{resultIndex+1}}</label><p>{{connectionLabels.value}}: <strong>{{number(result.assessment.totalHundredths)}}</strong> <span v-if="stale">{{connectionLabels.outdated}}</span></p><ProgramElements :entries="result.entries" :assessment="result.assessment" :locale="locale" :excluded-connections="excludedConnections" :stale="stale" :retained="labels.retained" :added="labels.added" @exclude="emit('exclude',$event)" /><p :id="`adoption-${result.id}`" class="adoption-hint">{{adoptionHint}}</p><button data-testid="adopt-result" :aria-describedby="`adoption-${result.id}`" :disabled="stale" @click="adopt(result)">{{labels.adopt}}</button></ResultList>
+ <button v-if="compared.length" v-show="!comparisonOpen" ref="openButton" data-testid="open-comparison" @click="openComparison">{{comparisonLabels.open}} ({{compared.length}})</button>
+ <section v-if="compared.length" v-show="comparisonOpen" :aria-label="labels.comparison" data-testid="program-comparison" :class="{'comparison-open':comparisonOpen}">
+ <button ref="backButton" data-testid="close-comparison" @click="closeComparison">{{comparisonLabels.back}}</button><h3>{{labels.comparison}}</h3>
+ <ResultList :results="compared" :locale="locale" v-slot="{result}">
+ <h3>{{connectionLabels.program}} {{results.indexOf(result)+1}} · {{connectionLabels.value}}: {{number(result.assessment.totalHundredths)}} <small v-if="stale">{{connectionLabels.outdated}}</small></h3>
+ <h4>{{comparisonLabels.differences}}</h4><p v-if="!comparisonParts.get(result.id)?.different.length">{{comparisonLabels.same}}</p>
+ <ProgramElements :indices="comparisonParts.get(result.id)?.different" :entries="result.entries" :assessment="result.assessment" :locale="locale" :excluded-connections="excludedConnections" :stale="stale" :retained="labels.retained" :added="labels.added" @exclude="emit('exclude',$event)" />
+ <details v-if="comparisonParts.get(result.id)?.identical.length"><summary>{{comparisonLabels.identical}} ({{comparisonParts.get(result.id)?.identical.length}})</summary><ProgramElements :indices="comparisonParts.get(result.id)?.identical" :entries="result.entries" :assessment="result.assessment" :locale="locale" :excluded-connections="excludedConnections" :stale="stale" :retained="labels.retained" :added="labels.added" @exclude="emit('exclude',$event)" /></details>
+ <p class="adoption-hint">{{adoptionHint}}</p><button data-testid="adopt-comparison" :disabled="stale" @click="adopt(result)">{{labels.adopt}}</button>
+ </ResultList></section>
+ <ResultList v-show="!comparisonOpen" :results="results" :locale="locale" v-slot="{result,index:resultIndex}"><h3>{{connectionLabels.program}} {{resultIndex+1}}</h3><label><input v-model="selected" type="checkbox" :value="result.id"> {{labels.compare}} {{resultIndex+1}}</label><p>{{connectionLabels.value}}: <strong>{{number(result.assessment.totalHundredths)}}</strong> <span v-if="stale">{{connectionLabels.outdated}}</span></p><ProgramElements :entries="result.entries" :assessment="result.assessment" :locale="locale" :excluded-connections="excludedConnections" :stale="stale" :retained="labels.retained" :added="labels.added" @exclude="emit('exclude',$event)" /><p :id="`adoption-${result.id}`" class="adoption-hint">{{adoptionHint}}</p><button data-testid="adopt-result" :aria-describedby="`adoption-${result.id}`" :disabled="stale" @click="adopt(result)">{{labels.adopt}}</button></ResultList>
 </div>
 </template>
