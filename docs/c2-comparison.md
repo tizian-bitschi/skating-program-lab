@@ -42,7 +42,9 @@ does not establish screen-reader conformance or a sport-rule audit.
 
 Representative evidence: [desktop](evidence/169/comparison-1280-en.png),
 [phone](evidence/169/comparison-390-de.png),
-[narrow Russian](evidence/169/comparison-320-ru.png).
+[narrow Russian](evidence/169/comparison-320-ru.png),
+[long German connection](evidence/169/connection-390-de.png),
+[narrow Russian connection and focus](evidence/169/connection-320-ru.png).
 The previous repeated full-program comparison is shown in
 [the earlier comparison evidence](evidence/167/comparison-1280.png).
 
