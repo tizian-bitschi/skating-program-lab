@@ -1,10 +1,6 @@
-import {test,expect,type Page} from '@playwright/test';
+import {test,expect} from './search-fixture';
 import {configureSilver} from './picker';
 import {mkdir} from 'node:fs/promises';
-
-const owners=new WeakMap<Page,Promise<{id:string;accessToken:string}>[]>();
-test.beforeEach(({page})=>{const sessions:Promise<{id:string;accessToken:string}>[]=[];owners.set(page,sessions);page.on('response',r=>{if(new URL(r.url()).pathname==='/api/v1/searches'&&r.request().method()==='POST'&&r.status()===202)sessions.push(r.json());});});
-test.afterEach(async({page})=>{for(const owner of await Promise.all(owners.get(page)??[]))await page.request.delete(`/api/v1/searches/${owner.id}`,{headers:{Authorization:`Bearer ${owner.accessToken}`}});});
 
 test('phone comparison returns to the selected result page and reading position',async({page})=>{
  test.setTimeout(90000);
@@ -46,6 +42,11 @@ for(const width of [1280,390,320])test(`real comparison differences, exclusions 
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
   if(width<1100)expect((await back.boundingBox())!.y+(await back.boundingBox())!.height).toBeLessThan((await page.getByTestId('panel-suggestions').boundingBox())!.y);
   await page.screenshot({path:`../docs/evidence/169/comparison-${width}-${locale}.png`});
+  const connection=comparison.getByTestId('exclude-result').first();await connection.focus();await connection.evaluate(el=>el.scrollIntoView({block:'center'}));
+  expect(await connection.evaluate(el=>{const r=el.getBoundingClientRect();return document.elementFromPoint(r.x+r.width/2,r.y+r.height/2)===el;})).toBe(true);
+  const target=(await connection.boundingBox())!;expect(target.width).toBeGreaterThanOrEqual(44);expect(target.height).toBeGreaterThanOrEqual(44);
+  if(width<1100)expect(target.y+target.height).toBeLessThan((await page.getByTestId('panel-suggestions').boundingBox())!.y);
+  await page.screenshot({path:`../docs/evidence/169/connection-${width}-${locale}.png`});
  }
  await page.getByLabel('Language').selectOption('en');
  for(const code of ['1Lz+1A+1A+SEQ','1Lz+1Lo']){

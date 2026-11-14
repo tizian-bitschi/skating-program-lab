@@ -1,13 +1,7 @@
-import {test,expect,type Page} from '@playwright/test';
+import {test,expect} from './search-fixture';
+import type {Page} from '@playwright/test';
 import {configureSilver,openPicker} from './picker';
 import {mkdir} from 'node:fs/promises';
-
-const owners=new WeakMap<Page,Promise<{id:string;accessToken:string}>[]>();
-test.beforeEach(({page})=>{
- const sessions:Promise<{id:string;accessToken:string}>[]=[];owners.set(page,sessions);
- page.on('response',r=>{if(new URL(r.url()).pathname==='/api/v1/searches'&&r.request().method()==='POST'&&r.status()===202)sessions.push(r.json());});
-});
-test.afterEach(async({page})=>{for(const owner of await Promise.all(owners.get(page)??[]))await page.request.delete(`/api/v1/searches/${owner.id}`,{headers:{Authorization:`Bearer ${owner.accessToken}`}});});
 
 async function workspace(page:Page){return page.evaluate(()=>JSON.parse(localStorage.getItem('skating-c2-workspace')!));}
 async function start(page:Page){await page.goto('/');await page.getByLabel('Language').selectOption('en');await configureSilver(page);}

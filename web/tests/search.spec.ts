@@ -1,15 +1,5 @@
 import {openPicker,setMaximum,setEnabled} from './picker';
-import {test,expect} from '@playwright/test';
-// Each test owns and releases the real native sessions it creates, including
-// responses whose browser state has already been invalidated.
-const searchOwners=new WeakMap<object,Promise<{origin:string;id:string;accessToken:string}|undefined>[]>();
-test.beforeEach(async({page})=>{
- const owners:Promise<{origin:string;id:string;accessToken:string}|undefined>[]=[];searchOwners.set(page,owners);
- page.on('response',response=>{if(response.request().method()==='POST'&&new URL(response.url()).pathname==='/api/v1/searches'&&response.status()===202)owners.push(response.json().then(owner=>({origin:new URL(response.url()).origin,id:owner.id,accessToken:owner.accessToken})).catch(()=>undefined));});
-});
-test.afterEach(async({page})=>{
- for(const owner of await Promise.all(searchOwners.get(page)??[]))if(owner)await page.request.delete(`${owner.origin}/api/v1/searches/${owner.id}`,{headers:{Authorization:`Bearer ${owner.accessToken}`}});
-});
+import {test,expect} from './search-fixture';
 test('explicit proof adopts a freshly assessed program and preserves retained identity',async({page})=>{
  await page.goto('/');await page.getByLabel('Language').selectOption('en');
  let creates=0;page.on('request',r=>{if(r.url().endsWith('/api/v1/searches')&&r.method()==='POST')creates++;});
