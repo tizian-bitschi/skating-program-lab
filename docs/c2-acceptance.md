@@ -1,6 +1,23 @@
 # C2 application acceptance observations (#162)
 
-## Current planning presentation
+## Current planning presentation (#164–#170)
+
+The [integrated continuation journeys](c2-continuation.md) record the current
+reload boundary and complete planning flows. The dated observations below remain
+historical evidence, not current layout or conflict-handling requirements:
+
+- Ability stays directly accessible through sliders; phones use four fixed
+  navigation actions rather than a collapsed mixer and program links.
+- Desktop panels and complete cards share page flow rather than competing inner
+  scroll windows. Comparison shows differences first, with identical content expandable.
+- Manual additions are required by default. Adoption preserves required identities
+  and replaces interchangeable content with scoped undo.
+- Interactive exclusions and ability reductions remove unavailable whole
+  occurrences, including required content, with scoped undo. They do not leave
+  those occurrences for a conflict-resolution gate.
+- Panel switches preserve results and comparison. Reload restores versioned
+  inputs only; suggestions require explicit calculation. Search credentials and
+  result history remain outside browser storage.
 
 The [four-area workspace and entry-path acceptance](c2-panels.md) supersedes
 the fixed-console layout and collapsed phone mixer recorded below. Earlier

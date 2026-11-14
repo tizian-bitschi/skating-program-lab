@@ -27,7 +27,21 @@ empty workspace; unsuccessful writes leave the original record intact. Successfu
 keyboard recovery returns focus to category selection. Users can continue editing
 in memory when storage is unavailable; failure feedback remains visible.
 
-## Verification
+## Redesigned workspace continuation (#170)
+
+The existing version 1 format also covers the four-area workflows without a
+schema migration. Exclusion removals, adoption, ability reductions and scoped
+undo feed the same occurrence mirror and allowlisted serializer. Reload keeps
+occurrence identity, order, required status and completeness along with context,
+ability, exclusions, rotation preference and language. Undo history itself is
+session-local.
+
+Suggestions now explain in German, English and Russian that panel switches keep
+results/comparison and reload requires explicit calculation using restored inputs.
+The calculation action is beside that explanation. No search is started or
+reattached by restoration. See [integrated acceptance](c2-continuation.md).
+
+## Original verification (#160, historical)
 
 2026-11-10, Windows, Chrome 156 (headless engine), built Vite production assets,
 local native Debug service, dedicated ports 3161/3162, no server reuse:
@@ -53,9 +67,9 @@ local native Debug service, dedicated ports 3161/3162, no server reuse:
   repeated. `git diff --check` passed. The latest integration branch was already
   merged at base `60857dc`; no newer integration commits were present.
 
-The genuine search-adoption flow lands with #157 and still needs combined parent
-verification; this slice tests its existing shared replacement seam through
-restored backend-issued content. Controlled network timing, real screen-reader
+The original slice tested the shared replacement seam through restored
+backend-issued content. Genuine adoption and integrated continuation are now
+covered by #157/#168/#170. Controlled network timing, real screen-reader
 checks, other browser engines and the complete integrated child/adult heuristic
 walkthrough remain parent acceptance work. Viewport emulation is not a physical
 phone test or native-language/participant approval.
