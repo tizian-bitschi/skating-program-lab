@@ -31,10 +31,10 @@ switches. Search credentials and results remain session-only; reload restores
 the versioned workspace without starting optimization.
 
 This replaces the earlier C2 fixed-console presentation and phone links/collapsed
-mixer described in the historical acceptance evidence. It does not implement
-later #164 slices for direct card exclusions, ability/exclusion undo, difference-first
-comparison or removal after ability/exclusion edits. Existing conflict reporting
-continues until those slices replace it. Domain, scoring and HTTP contracts are
+mixer described in the historical acceptance evidence. [Direct card exclusions](c2-exclusions.md)
+and [ability reductions](c2-ability.md) now remove affected whole occurrences
+with scoped undo. Difference-first comparison remains a later #164 slice.
+Domain, scoring and HTTP contracts are
 unchanged. [Alternative adoption and undo](c2-adoption.md) now supplies the
 scoped adoption snapshot and replacement feedback from #166.
 

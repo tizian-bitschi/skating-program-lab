@@ -10,7 +10,9 @@ export async function setEnabled(page:Page,id:string,enabled:boolean){
 }
 export async function setMaximum(page:Page,id:string,maximum:number){
  const slider=page.getByTestId(`fader-${id}`);await expect(slider).toBeEnabled();
- const wanted=`Maximum: ${maximum===0?'Basic':maximum}`;
+ const rotation=['Single','Double','Triple','Quadruple','Quintuple'];
+ const jump=['T','S','Lo','F','Lz','A'].includes(id);
+ const wanted=`Maximum: ${jump?rotation[maximum-1]:maximum===0?'Basic':maximum}`;
  await slider.press('Home');
  for(let step=0;step<6&&await slider.getAttribute('aria-valuetext')!==wanted;step++)await slider.press('ArrowUp');
  await expect(slider).toHaveAttribute('aria-valuetext',wanted);

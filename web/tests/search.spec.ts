@@ -104,7 +104,7 @@ test('proof disconnection reconnects the page-held identity without another calc
  await expect.poll(async()=>{const response=await page.request.get(`/api/v1/searches/${owner.id}/updates`,{headers:{Authorization:`Bearer ${owner.accessToken}`}});return response.status();}).toBe(404);
 });
 
-test('called Waltz conflict names Axel Off and recovers when Axel is enabled',async({page})=>{
+test('called Waltz uses authoritative Axel Off conflict for whole-entry removal and undo',async({page})=>{
  await page.goto('/');await page.getByLabel('Language').selectOption('en');await page.getByLabel('Category').selectOption('isu-adult-2026-27-silver');
  const repertoire=await(await page.request.post('/api/v1/repertoire',{data:{requestId:'waltz-browser',revision:0,context:(await(await page.request.get('/api/v1/profiles')).json())[1].context,personalLimits:{}}})).json();
  const w=repertoire.elements.find((e:{form:string})=>e.form==='W');expect(w).toBeTruthy();
@@ -113,6 +113,9 @@ test('called Waltz conflict names Axel Off and recovers when Axel is enabled',as
  await setEnabled(page,'A',false);const assessed=await(await conflict).json();expect(assessed.personalConflicts[0].setting).toEqual(['A']);
  await openPicker(page);await page.getByTestId('element-query').fill('W');await expect(page.getByTestId(`add-${w.code}`)).toHaveCount(0);await page.keyboard.press('Escape');
  const restored=page.waitForResponse(async r=>r.url().endsWith('/api/v1/program-assessments')&&r.request().method()==='POST'&&(await r.json()).personalConflicts?.length===0);
- await setEnabled(page,'A',true);await restored;
+ await expect(page.getByTestId('program-entry')).toHaveCount(0);
+ await expect(page.getByTestId('ability-feedback')).toContainText(w.code);
+ await page.getByTestId('undo-ability').click();await restored;
+ await expect(page.getByTestId('program-entry')).toHaveCount(1);
  await openPicker(page);await page.getByTestId('element-query').fill('W');await expect(page.getByTestId(`add-${w.code}`)).toBeVisible();
 });

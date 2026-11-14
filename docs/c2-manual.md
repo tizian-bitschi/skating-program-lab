@@ -12,6 +12,8 @@ changing repertoire constraints. The connection builder receives prefix choices
 from Rust, offers a valid two-jump finish independently of further continuation,
 and preserves direct sequence-step assumptions in the backend-issued whole key.
 Program entries retain their codes, IDs and flags across category changes.
+A committed ability reduction removes newly unavailable whole occurrences
+through [authoritative assessment and scoped undo](c2-ability.md).
 
 ## Integration boundary
 

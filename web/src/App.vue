@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import {restoreOccurrences} from './program-entries';
+import {abilityText} from './ability-text';
 import SourceReference from './SourceReference.vue';
 import {connectionIdentity,connectionCode,connectionText} from './connection-text';
 import { computed,nextTick,onMounted,ref,watch } from 'vue';
@@ -18,6 +20,7 @@ const exclusionFeedback=computed(()=>{
 const exclusionUndo=ref<{key:string;before:ProgramEntry[];removed:ProgramEntry[]}>();
 function replaceProgram(next:ProgramEntry[]){entries.value=next;editor.value?.editEntries(next);}
 function changeExclusions(keys:string[]){
+ abilityUndo.value=undefined;abilityNotice.value=undefined;
  const added=keys.filter(key=>!excludedConnections.value.includes(key));
  exclusionUndo.value=undefined;
  if(!added.length)exclusionNotice.value=undefined;
@@ -35,15 +38,7 @@ function excludeConnection(key:string){
 }
 async function undoExclusion(){
  const undo=exclusionUndo.value;if(!undo)return;
- const restored=entries.value.map(entry=>({...entry}));
- for(const removed of undo.removed){
-  if(restored.some(entry=>entry.id===removed.id))continue;
-  const index=undo.before.findIndex(entry=>entry.id===removed.id);
-  const following=undo.before.slice(index+1).find(entry=>restored.some(item=>item.id===entry.id));
-  const preceding=undo.before.slice(0,index).reverse().find(entry=>restored.some(item=>item.id===entry.id));
-  const position=following?restored.findIndex(entry=>entry.id===following.id):preceding?restored.findIndex(entry=>entry.id===preceding.id)+1:Math.min(index,restored.length);
-  restored.splice(position,0,{...removed});
- }
+ const restored=restoreOccurrences(entries.value,undo.before,undo.removed);
  excludedConnections.value=excludedConnections.value.filter(key=>key!==undo.key);
  replaceProgram(restored);exclusionUndo.value=undefined;exclusionNotice.value='undone';
  await nextTick();document.getElementById('exclusion-feedback')?.focus({preventScroll:true});
@@ -74,13 +69,53 @@ async function showPanel(panel:Panel){
 }
 async function calculate(){await showPanel('suggestions');await search.value?.calculate();}
 async function adoptProgram(next:ProgramEntry[]){
- exclusionUndo.value=undefined;editor.value?.adoptEntries(next);await showPanel('program');
+ abilityUndo.value=undefined;changedAbilityForms.clear();exclusionUndo.value=undefined;editor.value?.adoptEntries(next);await showPanel('program');
  const panel=document.getElementById('area-program');panel?.scrollIntoView({block:'start'});panel?.focus({preventScroll:true});
 }
 const profile=computed(()=>profiles.value.find(p=>p.context.profile===selected.value));
 const groups=[['jump','jumps'],['spin','spins'],['other','other']] as const;
-function limit(form:Form):Limit|undefined {if(form.family==='jump')return limits.value.jumps[form.id];if(form.family==='spin')return limits.value.spins[form.id];if(form.family==='step')return limits.value.steps;return {enabled:limits.value.unlevelledElements[form.id]??true};}
-function setLimit(form:Form,value:Limit){if(form.family==='jump')limits.value.jumps[form.id]=value;else if(form.family==='spin')limits.value.spins[form.id]=value;else if(form.family==='step')limits.value.steps=value;else limits.value.unlevelledElements[form.id]=value.enabled;}
+function limit(form:Form):Limit|undefined {if(form.family==='jump')return limits.value.jumps[form.id];if(form.family==='spin')return limits.value.spins[form.id];if(form.family==='step')return limits.value.steps;const enabled=limits.value.unlevelledElements[form.id];return enabled===undefined?undefined:{enabled};}
+function setLimit(form:Form,value?:Limit){
+ if(form.family==='step'){limits.value.steps=value;return;}
+ if(form.family==='unlevelled'){if(value)limits.value.unlevelledElements[form.id]=value.enabled;else delete limits.value.unlevelledElements[form.id];return;}
+ const settings=form.family==='jump'?limits.value.jumps:limits.value.spins;
+ if(value)settings[form.id]=value;else delete settings[form.id];
+}
+const changedAbilityForms=new Set<string>();
+const abilityUndo=ref<{form:Form;previous?:Limit;before:ProgramEntry[];removed:ProgramEntry[]}>();
+const abilityNotice=ref<{formId:string;removed:ProgramEntry[]}| 'undone'>();
+const abilityLabels=computed(()=>abilityText[locale.value]);
+const abilityFeedback=computed(()=>{
+ const notice=abilityNotice.value;if(!notice)return '';if(notice==='undone')return abilityLabels.value.undone;
+ return `${abilityLabels.value.changed}: ${formName(locale.value,notice.formId)}. ${abilityLabels.value.removed}: ${notice.removed.length}${notice.removed.length?` (${notice.removed.map(entry=>entry.code).join(', ')})`:''}.`;
+});
+function commitAbility(form:Form,value:Limit){
+ exclusionNotice.value=undefined;
+ const previous=limit(form);if(JSON.stringify(previous)===JSON.stringify(value))return;
+ abilityUndo.value={form,previous:previous?{...previous}:undefined,before:entries.value.map(entry=>({...entry})),removed:[]};
+ abilityNotice.value={formId:form.id,removed:[]};
+ if(!value.enabled||previous?.enabled!==false&&value.maximum!==undefined&&(previous?.maximum===undefined||value.maximum<previous.maximum))changedAbilityForms.add(form.id);
+ setLimit(form,value);
+}
+function applyAbilityAssessment(assessment:{personalConflicts:{entryId?:string;translationKey?:string;setting?:string|string[]}[]}){
+ if(!changedAbilityForms.size)return;
+ const conflicts=assessment.personalConflicts.filter(f=>['disabled','maximum'].includes(f.translationKey??''));
+ const settings=(f:typeof conflicts[number])=>Array.isArray(f.setting)?f.setting:[f.setting];
+ const removed=entries.value.filter(entry=>conflicts.some(f=>f.entryId===entry.id&&settings(f).some(id=>id&&changedAbilityForms.has(id))));
+ const undo=abilityUndo.value;
+ if(undo){
+  undo.removed=removed.filter(entry=>undo.before.some(original=>original.id===entry.id)&&conflicts.some(f=>f.entryId===entry.id&&settings(f).includes(undo.form.id))&&!conflicts.some(f=>f.entryId===entry.id&&settings(f).some(id=>id!==undo.form.id)));
+  abilityNotice.value={formId:undo.form.id,removed};
+ }
+ changedAbilityForms.clear();
+ if(removed.length)replaceProgram(entries.value.filter(entry=>!removed.some(item=>item.id===entry.id)));
+}
+async function undoAbility(){
+ const undo=abilityUndo.value;if(!undo)return;
+ abilityUndo.value=undefined;setLimit(undo.form,undo.previous);changedAbilityForms.add(undo.form.id);
+ replaceProgram(restoreOccurrences(entries.value,undo.before,undo.removed));abilityNotice.value='undone';
+ await nextTick();document.getElementById('ability-feedback')?.focus({preventScroll:true});
+}
 const faderPreview=ref<Record<string,number>>({});
 function faderStops(form:Form){return form.family==='unlevelled'?[0]:form.eligibleLevels;}
 function faderValue(form:Form){
@@ -94,9 +129,9 @@ function faderValue(form:Form){
 function previewFader(form:Form,event:Event){faderPreview.value[form.id]=Number((event.target as HTMLInputElement).value);}
 function fader(form:Form,event:Event){
  const value=Number((event.target as HTMLInputElement).value);delete faderPreview.value[form.id];
- if(value===0){setLimit(form,{...limit(form),enabled:false});return;}
+ if(value===0){commitAbility(form,{...limit(form),enabled:false});return;}
  const maximum=faderStops(form)[value-1];if(maximum===undefined)return;
- setLimit(form,{enabled:true,...(form.family==='unlevelled'?{}:{maximum})});
+ commitAbility(form,{enabled:true,...(form.family==='unlevelled'?{}:{maximum})});
 }
 function faderKey(form:Form,event:KeyboardEvent){
  if(event.key!=='Home'&&event.key!=='End')return;
@@ -104,17 +139,21 @@ function faderKey(form:Form,event:KeyboardEvent){
  (event.target as HTMLInputElement).value=String(event.key==='Home'?0:faderStops(form).length);
  fader(form,event);
 }
+function stopText(form:Form,maximum:number){
+ if(form.family==='jump')return [abilityLabels.value.single,abilityLabels.value.double,abilityLabels.value.triple,abilityLabels.value.quadruple,abilityLabels.value.quintuple][maximum-1]??String(maximum);
+ return maximum===0?t('basic'):String(maximum);
+}
 function faderText(form:Form){
  if(!form.available)return t('unavailable');
  const value=faderValue(form);if(value===0)return t('off');
  if(form.family==='unlevelled')return t('on');
- const maximum=faderStops(form)[value-1];return `${t('maximum')}: ${maximum===0?t('basic'):maximum}`;
+ const maximum=faderStops(form)[value-1]!;return `${t('maximum')}: ${stopText(form,maximum)}`;
 }
 function faderReadout(form:Form){
  if(!form.available)return '—';
  const value=faderValue(form);if(value===0)return t('off');
  if(form.family==='unlevelled')return t('on');
- const maximum=faderStops(form)[value-1];return maximum===0?'B':maximum;
+ return stopText(form,faderStops(form)[value-1]!);
 }
 function forms(group:string){return repertoire.value?.forms.filter(f=>group==='other'?['step','unlevelled'].includes(f.family):f.family===group)??[];}
 function profileName(p:Profile){ const known:Record<string,TextKey>={'bronze':'bronze','silver':'silver','gold':'gold','masters':'masters','women':'women','men':'men'};const key=known[p.label];return key?(['bronze','silver','gold','masters'].includes(p.label)?`${t('adult')} ${t(key)}`:t(key)):p.label; }
@@ -153,7 +192,7 @@ async function focusAfterRecovery(){await nextTick();if(storageState.value==='sa
 async function retryWorkspace(){if(storageState.value==='save'){ready.value=true;saveWorkspace();}else await restoreWorkspace();await focusAfterRecovery();}
 async function initialize(){loadingWorkspace.value=true;failure.value=false;try{profiles.value=await fetchJson<Profile[]>('/api/v1/profiles');await restoreWorkspace();}catch{failure.value=true;}finally{loadingWorkspace.value=false;}}
 watch([selected,limits,entries,complete,excludedConnections,allowMixedDirections,locale],saveWorkspace,{deep:true});
-watch(selected,()=>{faderPreview.value={};});
+watch(selected,()=>{faderPreview.value={};changedAbilityForms.clear();abilityUndo.value=undefined;abilityNotice.value=undefined;});
 watch([selected,limits,allowMixedDirections],()=>{exclusionUndo.value=undefined;},{deep:true});
 watch([selected,limits],refresh,{deep:true});watch(locale,value=>{document.documentElement.lang=value;},{immediate:true});onMounted(initialize);
 </script>
@@ -162,20 +201,21 @@ watch([selected,limits],refresh,{deep:true});watch(locale,value=>{document.docum
  <main>
  <p v-if="storageState" data-testid="workspace-storage" :class="{'storage-saved':storageState==='saved'}" :role="storageState==='saved'?'status':'alert'">{{workspaceText[locale][storageState]}} <template v-if="storageState!=='saved'"><button @click="retryWorkspace">{{workspaceText[locale].retry}}</button> <button @click="replaceWorkspace">{{workspaceText[locale].replace}}</button></template></p>
  <div v-if="exclusionFeedback" class="exclusion-feedback"><p id="exclusion-feedback" tabindex="-1" data-testid="exclusion-feedback" role="status">{{exclusionFeedback}}</p><button v-if="exclusionUndo" data-testid="undo-exclusion" @click="undoExclusion">{{exclusionLabels.undo}}</button></div>
+ <div v-if="abilityFeedback" class="ability-feedback"><p id="ability-feedback" tabindex="-1" data-testid="ability-feedback" role="status">{{abilityFeedback}}</p><button v-if="abilityUndo" data-testid="undo-ability" @click="undoAbility">{{abilityLabels.undo}}</button></div>
  <nav class="panel-navigation" :aria-label="panelLabels.navigation"><button v-for="panel in panels" :key="panel" :id="`panel-${panel}`" :data-testid="`panel-${panel}`" :aria-current="activePanel===panel?'page':undefined" :aria-controls="`area-${panel}`" @click="showPanel(panel)">{{panelLabels[panel]}}</button></nav>
  <section id="area-ability" tabindex="-1" :class="['mixer','planning-panel',{'active-panel':activePanel==='ability'}]" :aria-label="panelLabels.ability" :aria-busy="pending"><div class="mixer-heading"><h1>{{panelLabels.ability}}</h1></div><p>{{panelLabels.intro}}</p><div class="entry-paths"><button data-testid="discover-programs" :disabled="loadingWorkspace||pending||!profile||search?.busy" @click="calculate">{{panelLabels.discover}}</button><button data-testid="specify-elements" :disabled="loadingWorkspace" @click="showPanel('program')">{{panelLabels.specify}}</button></div>
  <div v-if="failure" role="alert">{{t('failure')}} <button @click="profiles.length?refresh():initialize()">{{t('retry')}}</button></div>
  <details class="rotation-options"><summary>{{panelLabels.more}}</summary><label class="rotation-preference"><input type="checkbox" role="switch" v-model="allowMixedDirections" :disabled="loadingWorkspace">{{panelLabels.mixed}}</label></details>
  <fieldset id="mixer-controls" :disabled="loadingWorkspace" class="workspace-guard"><div class="mixer-groups"><section v-for="[group,title] in groups" :key="group" :class="['group',group]"><h2>{{t(title)}}</h2><div class="channels">
  <div v-for="form in forms(group)" :key="form.id" :data-testid="`form-${form.id}`" :data-family="form.family" :class="['channel',{'unavailable':!form.available}]">
- <label class="form-name" :for="`fader-${form.id}`" :title="formName(locale,form.id)">{{form.id}}<span>{{formName(locale,form.id)}}</span></label>
+ <label class="form-name" :for="`fader-${form.id}`" :title="formName(locale,form.id)">{{formName(locale,form.id)}}<span>{{form.id}}</span></label>
  <input :id="`fader-${form.id}`" class="fader" type="range" min="0" :max="Math.max(1,faderStops(form).length)" step="1" :value="faderValue(form)" :disabled="!form.available||repertoire?.context.profile!==profile?.context.profile" :aria-label="formName(locale,form.id)" :aria-valuetext="faderText(form)" :data-testid="`fader-${form.id}`" @input="previewFader(form,$event)" @change="fader(form,$event)" @keydown="faderKey(form,$event)"><span class="fader-readout" :title="faderText(form)">{{faderReadout(form)}}</span>
  <small v-if="!form.available">{{t('unavailable')}}</small>
- <small v-else-if="form.family!=='unlevelled'">{{form.permittedLevels.map(n=>n===0?'B':n).join(' · ')||'—'}}</small>
+ <small v-else>{{(form.family==='unlevelled'?[t('off'),t('on')]:[t('off'),...form.eligibleLevels.map(n=>stopText(form,n))]).join(' · ')}}</small>
  </div></div></section></div>
  </fieldset><p class="status" role="status">{{pending?t('loading'):`${repertoire?.elements.length??0} ${t('permitted')}`}}</p></section>
  <div class="workspace">
- <section id="area-program" tabindex="-1" :class="['planning-panel',{'active-panel':activePanel==='program'}]" :aria-label="panelLabels.program"><h2 id="program">{{panelLabels.program}}</h2><p>{{panelLabels.required}}</p><fieldset :disabled="loadingWorkspace" class="editor-guard"><ManualEditor :excluded-connections="excludedConnections" :allow-mixed-directions="allowMixedDirections" ref="editor" @change="onProgramChange" :context="profile?.context" :limits="limits" :repertoire="repertoire" :locale="locale" /></fieldset><button data-testid="complete-program" :disabled="loadingWorkspace||!profile||search?.busy" @click="calculate">{{panelLabels.complete}}</button></section>
+ <section id="area-program" tabindex="-1" :class="['planning-panel',{'active-panel':activePanel==='program'}]" :aria-label="panelLabels.program"><h2 id="program">{{panelLabels.program}}</h2><p>{{panelLabels.required}}</p><fieldset :disabled="loadingWorkspace" class="editor-guard"><ManualEditor :excluded-connections="excludedConnections" :allow-mixed-directions="allowMixedDirections" ref="editor" @change="onProgramChange" @assessed="applyAbilityAssessment" :context="profile?.context" :limits="limits" :repertoire="repertoire" :locale="locale" /></fieldset><button data-testid="complete-program" :disabled="loadingWorkspace||!profile||search?.busy" @click="calculate">{{panelLabels.complete}}</button></section>
  <section id="area-suggestions" tabindex="-1" :class="['planning-panel',{'active-panel':activePanel==='suggestions'}]" :aria-label="panelLabels.suggestions"><h2 id="suggestions">{{panelLabels.suggestions}}</h2><PlanningSearch ref="search" :context="loadingWorkspace?undefined:profile?.context" :limits="limits" :entries="entries" :locale="locale" :excluded-connections="excludedConnections" :allow-mixed-directions="allowMixedDirections" @adopt="adoptProgram" @exclude="excludeConnection" /></section>
  <section id="area-exclusions" tabindex="-1" :class="['planning-panel',{'active-panel':activePanel==='exclusions'}]" :aria-label="panelLabels.exclusions"><h2>{{panelLabels.exclusions}}</h2><fieldset :disabled="loadingWorkspace" class="editor-guard"><ConnectionBuilder purpose="exclude" :context="profile?.context" :limits="limits" :locale="locale" :excluded-connections="excludedConnections" :allow-mixed-directions="allowMixedDirections" @change="changeExclusions" /></fieldset></section>
  </div>

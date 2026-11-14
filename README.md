@@ -132,6 +132,8 @@ page flow.
 The Vue/TypeScript application and native Axum/Tokio service now expose real
 profile/repertoire selection on one local origin. See the
 [run instructions and #155 acceptance evidence](docs/c2-repertoire.md).
+The [ability sliders](docs/c2-ability.md) show full names and category-eligible
+stops, removing unavailable whole occurrences with scoped undo.
 The [manual program editor](docs/c2-manual.md) supports real whole elements,
 stable occurrences and automatic shared-core assessment. The [local workspace](docs/c2-workspace.md) saves current inputs automatically and restores ordinary assessment without starting a search. Search workflows are
 implemented in subsequent C2 slices.
