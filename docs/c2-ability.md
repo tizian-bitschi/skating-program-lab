@@ -55,6 +55,27 @@ Screenshots cover 1280×800, 390×844 and 320×844 in English, German and Russia
 | 390 | [Controls](evidence/168/ability-390-en.png) | [Controls](evidence/168/ability-390-de.png) | [Controls](evidence/168/ability-390-ru.png) |
 | 320 | [Controls](evidence/168/ability-320-en.png) | [Controls](evidence/168/ability-320-de.png) | [Controls](evidence/168/ability-320-ru.png) |
 
+The [previous compact presentation](evidence/168/before-1280.png) used smaller
+names and abbreviated readouts. Current [jump classes](evidence/168/jumps-1280-ru.png)
+remain explicit. Named removal and undo are shown at [1280](evidence/168/removal-1280.png),
+[390](evidence/168/removal-390.png) and [320](evidence/168/removal-320.png) pixels.
+
 The browser checks full names, 44px range targets, visible keyboard focus,
 bottom-navigation clearance and no horizontal page overflow. These are Chrome
 viewport checks, not physical touch hardware or screen-reader certification.
+
+Verification on 2026-11-14:
+
+- `npm run build --prefix web`: TypeScript and production build passed.
+- `C2_TEST_PORT=3161 npm test --prefix web -- --workers=1`: all 71 tests passed
+  against the real service, including the ten new ability scenarios. The first
+  full run passed 70 tests; the locale test used its existing fallback port 3161
+  while the service used 3157. The explicit shared port resolved that setup error.
+- `cargo test --manifest-path service/Cargo.toml --release --offline -- --test-threads=1`:
+  all 24 tests passed, including seven profiles and four workflows.
+  An initial parallel Debug run exited natively with `0xc000001d`; the complete
+  search group then passed serially. The slow Debug workflow matrix was stopped
+  after the complete Release suite supplied the native workflow evidence.
+- Independent Standards review: zero findings. Independent Spec/UI review with
+  UI/UX Pro Max: zero findings, including a second inspection of final screenshots.
+- `git diff --check` passed. The unchanged core and solver checks run in PR CI.
