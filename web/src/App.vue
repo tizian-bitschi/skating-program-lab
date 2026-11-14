@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import SourceReference from './SourceReference.vue';
+import {connectionIdentity,connectionCode,connectionText} from './connection-text';
 import { computed,nextTick,onMounted,ref,watch } from 'vue';
 import ManualEditor from './ManualEditor.vue';
 import ConnectionBuilder from './ConnectionBuilder.vue';
@@ -8,6 +9,44 @@ import { type ProgramEntry,type Form,type Profile,type Repertoire,type Limit,emp
 import { type Locale,type TextKey,browserLocale,formName,text } from './i18n';
 import {parseWorkspace,serializeWorkspace,workspaceKey,workspaceText,type Workspace} from './workspace';
 const editor=ref<InstanceType<typeof ManualEditor>>(),entries=ref<ProgramEntry[]>([]),complete=ref(false),excludedConnections=ref<string[]>([]),allowMixedDirections=ref(false);
+const exclusionLabels=computed(()=>connectionText[locale.value]);
+const exclusionNotice=ref<{key:string;removed:number}| 'undone'>();
+const exclusionFeedback=computed(()=>{
+ const notice=exclusionNotice.value;if(!notice)return '';if(notice==='undone')return exclusionLabels.value.undone;
+ return `${exclusionLabels.value.excluded}: ${connectionCode(notice.key)}. ${exclusionLabels.value.removed}: ${notice.removed}.`;
+});
+const exclusionUndo=ref<{key:string;before:ProgramEntry[];removed:ProgramEntry[]}>();
+function replaceProgram(next:ProgramEntry[]){entries.value=next;editor.value?.replaceEntries(next,complete.value);}
+function changeExclusions(keys:string[]){
+ const added=keys.filter(key=>!excludedConnections.value.includes(key));
+ exclusionUndo.value=undefined;
+ excludedConnections.value=keys;
+ for(const key of added){
+  const before=entries.value.map(entry=>({...entry}));
+  const removed=before.filter(entry=>connectionIdentity(entry.elementKey)===connectionIdentity(key));
+  replaceProgram(before.filter(entry=>!removed.some(item=>item.id===entry.id)));
+  exclusionUndo.value={key,before,removed};
+  exclusionNotice.value={key,removed:removed.length};
+ }
+}
+function excludeConnection(key:string){
+ if(!excludedConnections.value.some(saved=>connectionIdentity(saved)===connectionIdentity(key)))changeExclusions([...excludedConnections.value,key]);
+}
+async function undoExclusion(){
+ const undo=exclusionUndo.value;if(!undo)return;
+ const restored=entries.value.map(entry=>({...entry}));
+ for(const removed of undo.removed){
+  if(restored.some(entry=>entry.id===removed.id))continue;
+  const index=undo.before.findIndex(entry=>entry.id===removed.id);
+  const following=undo.before.slice(index+1).find(entry=>restored.some(item=>item.id===entry.id));
+  const preceding=undo.before.slice(0,index).reverse().find(entry=>restored.some(item=>item.id===entry.id));
+  const position=following?restored.findIndex(entry=>entry.id===following.id):preceding?restored.findIndex(entry=>entry.id===preceding.id)+1:Math.min(index,restored.length);
+  restored.splice(position,0,{...removed});
+ }
+ excludedConnections.value=excludedConnections.value.filter(key=>key!==undo.key);
+ replaceProgram(restored);exclusionUndo.value=undefined;exclusionNotice.value='undone';
+ await nextTick();document.getElementById('exclusion-feedback')?.focus({preventScroll:true});
+}
 const loadingWorkspace=ref(true),ready=ref(false),storageState=ref<'saved'|'access'|'save'|'invalid'|'context'>();
 function onProgramChange(next:ProgramEntry[],fullyDescribed:boolean){entries.value=next;complete.value=fullyDescribed;}
 const locale=ref<Locale>(browserLocale());
@@ -34,7 +73,7 @@ async function showPanel(panel:Panel){
 }
 async function calculate(){await showPanel('suggestions');await search.value?.calculate();}
 async function adoptProgram(next:ProgramEntry[]){
- editor.value?.adoptEntries(next);await showPanel('program');
+ exclusionUndo.value=undefined;editor.value?.adoptEntries(next);await showPanel('program');
  const panel=document.getElementById('area-program');panel?.scrollIntoView({block:'start'});panel?.focus({preventScroll:true});
 }
 const profile=computed(()=>profiles.value.find(p=>p.context.profile===selected.value));
@@ -114,12 +153,14 @@ async function retryWorkspace(){if(storageState.value==='save'){ready.value=true
 async function initialize(){loadingWorkspace.value=true;failure.value=false;try{profiles.value=await fetchJson<Profile[]>('/api/v1/profiles');await restoreWorkspace();}catch{failure.value=true;}finally{loadingWorkspace.value=false;}}
 watch([selected,limits,entries,complete,excludedConnections,allowMixedDirections,locale],saveWorkspace,{deep:true});
 watch(selected,()=>{faderPreview.value={};});
+watch([selected,limits,allowMixedDirections],()=>{exclusionUndo.value=undefined;},{deep:true});
 watch([selected,limits],refresh,{deep:true});watch(locale,value=>{document.documentElement.lang=value;},{immediate:true});onMounted(initialize);
 </script>
 <template>
  <header class="navbar"><strong>Skating Program Lab</strong><label>{{t('category')}} · 2026/27 <select v-model="selected" :disabled="loadingWorkspace" :aria-label="t('category')"><option v-for="p in profiles" :key="p.context.profile" :value="p.context.profile">{{profileName(p)}}</option></select></label><label>{{t('language')}} <select v-model="locale" aria-label="Language"><option value="de">Deutsch</option><option value="en">English</option><option value="ru">Русский</option></select></label></header>
  <main>
  <p v-if="storageState" data-testid="workspace-storage" :class="{'storage-saved':storageState==='saved'}" :role="storageState==='saved'?'status':'alert'">{{workspaceText[locale][storageState]}} <template v-if="storageState!=='saved'"><button @click="retryWorkspace">{{workspaceText[locale].retry}}</button> <button @click="replaceWorkspace">{{workspaceText[locale].replace}}</button></template></p>
+ <div v-if="exclusionFeedback" class="exclusion-feedback"><p id="exclusion-feedback" tabindex="-1" data-testid="exclusion-feedback" role="status">{{exclusionFeedback}}</p><button v-if="exclusionUndo" data-testid="undo-exclusion" @click="undoExclusion">{{exclusionLabels.undo}}</button></div>
  <nav class="panel-navigation" :aria-label="panelLabels.navigation"><button v-for="panel in panels" :key="panel" :id="`panel-${panel}`" :data-testid="`panel-${panel}`" :aria-current="activePanel===panel?'page':undefined" :aria-controls="`area-${panel}`" @click="showPanel(panel)">{{panelLabels[panel]}}</button></nav>
  <section id="area-ability" tabindex="-1" :class="['mixer','planning-panel',{'active-panel':activePanel==='ability'}]" :aria-label="panelLabels.ability" :aria-busy="pending"><div class="mixer-heading"><h1>{{panelLabels.ability}}</h1></div><p>{{panelLabels.intro}}</p><div class="entry-paths"><button data-testid="discover-programs" :disabled="loadingWorkspace||pending||!profile||search?.busy" @click="calculate">{{panelLabels.discover}}</button><button data-testid="specify-elements" :disabled="loadingWorkspace" @click="showPanel('program')">{{panelLabels.specify}}</button></div>
  <div v-if="failure" role="alert">{{t('failure')}} <button @click="profiles.length?refresh():initialize()">{{t('retry')}}</button></div>
@@ -134,8 +175,8 @@ watch([selected,limits],refresh,{deep:true});watch(locale,value=>{document.docum
  </fieldset><p class="status" role="status">{{pending?t('loading'):`${repertoire?.elements.length??0} ${t('permitted')}`}}</p></section>
  <div class="workspace">
  <section id="area-program" tabindex="-1" :class="['planning-panel',{'active-panel':activePanel==='program'}]" :aria-label="panelLabels.program"><h2 id="program">{{panelLabels.program}}</h2><p>{{panelLabels.required}}</p><fieldset :disabled="loadingWorkspace" class="editor-guard"><ManualEditor :excluded-connections="excludedConnections" :allow-mixed-directions="allowMixedDirections" ref="editor" @change="onProgramChange" :context="profile?.context" :limits="limits" :repertoire="repertoire" :locale="locale" /></fieldset><button data-testid="complete-program" :disabled="loadingWorkspace||!profile||search?.busy" @click="calculate">{{panelLabels.complete}}</button></section>
- <section id="area-suggestions" tabindex="-1" :class="['planning-panel',{'active-panel':activePanel==='suggestions'}]" :aria-label="panelLabels.suggestions"><h2 id="suggestions">{{panelLabels.suggestions}}</h2><PlanningSearch ref="search" :context="loadingWorkspace?undefined:profile?.context" :limits="limits" :entries="entries" :locale="locale" :excluded-connections="excludedConnections" :allow-mixed-directions="allowMixedDirections" @adopt="adoptProgram" /></section>
- <section id="area-exclusions" tabindex="-1" :class="['planning-panel',{'active-panel':activePanel==='exclusions'}]" :aria-label="panelLabels.exclusions"><h2>{{panelLabels.exclusions}}</h2><fieldset :disabled="loadingWorkspace" class="editor-guard"><ConnectionBuilder purpose="exclude" :context="profile?.context" :limits="limits" :locale="locale" :excluded-connections="excludedConnections" :allow-mixed-directions="allowMixedDirections" @change="excludedConnections=$event" /></fieldset></section>
+ <section id="area-suggestions" tabindex="-1" :class="['planning-panel',{'active-panel':activePanel==='suggestions'}]" :aria-label="panelLabels.suggestions"><h2 id="suggestions">{{panelLabels.suggestions}}</h2><PlanningSearch ref="search" :context="loadingWorkspace?undefined:profile?.context" :limits="limits" :entries="entries" :locale="locale" :excluded-connections="excludedConnections" :allow-mixed-directions="allowMixedDirections" @adopt="adoptProgram" @exclude="excludeConnection" /></section>
+ <section id="area-exclusions" tabindex="-1" :class="['planning-panel',{'active-panel':activePanel==='exclusions'}]" :aria-label="panelLabels.exclusions"><h2>{{panelLabels.exclusions}}</h2><fieldset :disabled="loadingWorkspace" class="editor-guard"><ConnectionBuilder purpose="exclude" :context="profile?.context" :limits="limits" :locale="locale" :excluded-connections="excludedConnections" :allow-mixed-directions="allowMixedDirections" @change="changeExclusions" /></fieldset></section>
  </div>
  <details class="sources"><summary>{{t('source')}}</summary><p v-if="profile">{{profile.context.profile}} · {{profile.context.ruleEdition}} · {{profile.context.scoringTable}}</p><ul><li v-for="source in profile?.sources" :key="source.document+source.location"><SourceReference :source="source" :locale="locale" /></li></ul></details>
 

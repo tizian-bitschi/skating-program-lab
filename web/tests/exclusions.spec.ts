@@ -13,7 +13,7 @@ test('exact exclusion preserves pair components and longer wholes, survives relo
  await page.reload();await expect(exclusions.locator('[data-restore]')).toHaveCount(0);
 });
 
-test('retained connection conflict is localized and restoration recovers a genuine calculation',async({page})=>{
+test('excluding retained connections removes occurrences and restoration permits a genuine calculation',async({page})=>{
  await page.goto('/');await page.getByLabel('Language').selectOption('en');
  for(const code of ['CCSp1','CLSp1','ChSq1']){await openPicker(page);await page.getByTestId('element-query').fill(code);await page.getByTestId(`add-${code}`).click();await page.getByTestId('program-entry').last().getByRole('checkbox').check();}
  for(const kind of ['T','S','Lz','W'])await setEnabled(page,`${kind}`,false);
@@ -22,10 +22,10 @@ test('retained connection conflict is localized and restoration recovers a genui
  await page.getByTestId('calculate').click();await expect(page.getByTestId('search-maximum')).toContainText('10.30',{timeout:30000});
  let mutations=0;page.on('request',r=>{if(r.url().match(/\/api\/v1\/searches(?:\/[^/]+(?:\/cancel)?)?$/)&&r.method()!=='GET')mutations++;});
  await exclusions.getByRole('searchbox').fill('Loop');await page.getByLabel('Language').selectOption('de');await page.getByLabel('Language').selectOption('en');await expect(page.getByTestId('search-stale')).toHaveCount(0);expect(mutations).toBe(0);
- const start=Date.now();await exclusions.getByRole('button',{name:'Exclude connection 1F+1Lo',exact:true}).click();await expect(page.getByTestId('search-stale')).toBeVisible();await expect(page.getByTestId('assessment')).toContainText('Personal conflicts');console.log(`exclusion to conflict: ${Date.now()-start}ms`);
- for(const [locale,message] of [['de','Diese ganze Verbindung ist ausgeschlossen'],['ru','Это соединение исключено'],['en','This whole connection is excluded']]){await page.getByLabel('Language').selectOption(locale!);const details=page.getByTestId('assessment').locator('details').filter({hasText:message!});await details.locator('summary').first().click();await expect(details).toContainText('1F+1Lo');}
- await page.getByTestId('calculate').click();await expect(page.locator('.planning-search')).toContainText('Check the retained elements and planning restrictions.',{timeout:30000});await expect(page.locator('.planning-search')).toContainText('Retained: 1F+1Lo');
- await exclusions.locator('[data-restore]').click();await expect(page.getByTestId('assessment')).not.toContainText('Personal conflicts');await page.getByTestId('calculate').click();await expect(page.getByTestId('search-maximum')).toContainText('10.30',{timeout:30000});await expect(page.getByTestId('adopt-result').first()).toBeEnabled();
+ await exclusions.getByRole('button',{name:'Exclude connection 1F+1Lo',exact:true}).click();await expect(page.getByTestId('search-stale')).toBeVisible();
+ await expect(page.getByTestId('program-entry')).toHaveCount(3);await expect(page.getByTestId('exclusion-feedback')).toContainText('1F+1Lo');
+ await expect(page.getByTestId('assessment')).not.toContainText('Personal conflicts');
+ await exclusions.locator('[data-restore]').click();await page.getByTestId('calculate').click();await expect(page.getByTestId('search-maximum')).toContainText('10.30',{timeout:30000});await expect(page.getByTestId('adopt-result').first()).toBeEnabled();
 });
 
 test('sequence keys, change-from-position controls and translated touch-sized restore survive categories',async({page})=>{

@@ -219,3 +219,19 @@ they do not establish physical-device or screen-reader acceptance. The combined
 screen-reader runtime blocker remains recorded in the parent evidence. Large
 result rendering and retained-memory measurements belong to #162. The unchanged
 library baseline was not rerun for this controller change.
+
+
+## Readable suggestions and explicit refresh (#167)
+
+[Direct whole-connection exclusions](c2-exclusions.md#direct-suggestion-actions-167)
+are available in complete cards and comparison. Collecting exclusions, undo and
+central restoration all invalidate search inputs without starting optimization.
+The existing generation, poll sequencing and disposal lifecycle remains in use.
+Old cards, maximum and credited values are marked outdated; adoption is disabled,
+but further direct exclusions remain available. Update suggestions explicitly
+starts a fresh request with every current exclusion. Proof, collection, pause,
+completion, infeasibility, cancellation and failures retain their distinct states.
+The additional real-service browser regression holds an actual cursor response,
+excludes directly, then releases it and verifies unchanged old cards and HTTP
+404 for the disposed obsolete session. All confirmed results remain paginated;
+there is no new result cap.
